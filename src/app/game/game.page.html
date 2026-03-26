@@ -70,7 +70,7 @@
                     <ion-icon slot="end" name="share-outline"></ion-icon>
                   </ion-item>
                   <ion-item button detail="false" (click)="saveGameFileInput.click()">
-                    <ion-label>Importar jogo salvo</ion-label>
+                    <ion-label>Importar .e98 ou .zip de saves</ion-label>
                     <ion-icon slot="end" name="download-outline"></ion-icon>
                   </ion-item>
                   <ion-item *ngIf="debugMode" button detail="false" (click)="downloadFullDiskChanges()">
@@ -110,6 +110,30 @@
               </ion-content>
             </ng-template>
           </ion-popover>
+          <ion-item button detail="true" id="nested-tools">
+            <ion-label>Ferramentas</ion-label>
+            <ion-icon slot="end" name="construct-outline"></ion-icon>
+          </ion-item>
+          <ion-popover trigger="nested-tools" [dismissOnSelect]="true" side="end">
+            <ng-template>
+              <ion-content>
+                <ion-list>
+                  <ion-item button detail="false" (click)="showManagerNotebookModal()">
+                    <ion-label>Caderno do técnico</ion-label>
+                    <ion-icon slot="end" name="create-outline"></ion-icon>
+                  </ion-item>
+                  <ion-item button detail="false" (click)="showShortcutsHelpModal()">
+                    <ion-label>Controles e atalhos</ion-label>
+                    <ion-icon slot="end" name="keypad-outline"></ion-icon>
+                  </ion-item>
+                  <ion-item button detail="false" (click)="showPlaytimeSummary()">
+                    <ion-label>Tempo no banco</ion-label>
+                    <ion-icon slot="end" name="hourglass-outline"></ion-icon>
+                  </ion-item>
+                </ion-list>
+              </ion-content>
+            </ng-template>
+          </ion-popover>
           <ion-item button detail="false" (click)="showFAQAndManualModal()">
             <ion-label>FAQ e Manual</ion-label>
             <ion-icon slot="end" name="help-circle-outline"></ion-icon>
@@ -130,7 +154,7 @@
     </ng-template>
   </ion-popover>
   <input style="display:none;" type="file" accept=".zip" #patchFileInput (change)="onPatchFileSelected($event)" />
-  <input style="display:none;" type="file" accept=".e98" #saveGameFileInput (change)="onSaveFileSelected($event)" />
+  <input style="display:none;" type="file" accept=".e98,.zip,application/zip" #saveGameFileInput (change)="onSaveFileSelected($event)" />
   <div [ngClass]="{ hidden: isHidden, full: !isHidden }" class="smooth-canvas not-selectable" id="game-container"></div>
   <ion-fab *ngIf="!(!isMobile || !isLandscape)" slot="fixed" vertical="top" horizontal="start">
     <ion-fab-button color="tertiary">

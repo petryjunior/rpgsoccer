@@ -2,6 +2,11 @@ import { Injectable } from '@angular/core';
 import { BASE_SAVEGAME_DIR } from '../models/constants';
 import JSZip from 'jszip';
 
+function formatBackupTimestamp(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -72,10 +77,7 @@ export class SaveGameService {
       }
     })
     
-    // save zip file
-    const dateTime = new Date()
-    dateTime.toISOString()
-    const dateTimeString = `${dateTime.getFullYear()}-${dateTime.getMonth()}-${dateTime.getDate()}_${dateTime.getHours()}-${dateTime.getMinutes()}-${dateTime.getSeconds()}`
+    const dateTimeString = formatBackupTimestamp(new Date());
     this.saveUint8ArrayAsFile(content, `saveGames_${dateTimeString}.zip`)
     return true
   }
@@ -95,10 +97,7 @@ export class SaveGameService {
       return false;
     }
     
-    // Save the zip file
-    const dateTime = new Date()
-    dateTime.toISOString()
-    const dateTimeString = `${dateTime.getFullYear()}-${dateTime.getMonth()}-${dateTime.getDate()}_${dateTime.getHours()}-${dateTime.getMinutes()}-${dateTime.getSeconds()}`
+    const dateTimeString = formatBackupTimestamp(new Date());
     const zipContent = await zip.generateAsync({ type: 'uint8array' });
     this.saveUint8ArrayAsFile(zipContent, `fullDiskChanges_${dateTimeString}.zip`)
     return true; 

@@ -1,5 +1,10 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
-import { AlertController, LoadingController, ModalController } from '@ionic/angular';
+import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import {
+  AlertController,
+  LoadingController,
+  ModalController,
+  ViewWillLeave,
+} from '@ionic/angular';
 import { SaveGameService } from '../services/save-game.service';
 import { LocalStorageService } from '../services/local-storage.service';
 import { PatchService } from '../services/patch.service';
@@ -14,6 +19,9 @@ import { UserGuideComponent } from './components/user-guide/user-guide.component
 import { LayoutHelperService } from '../services/layout-helper.service';
 import { AboutComponent } from './components/about/about.component';
 import { OmaticModalComponent } from './components/omatic-modal/omatic-modal.component';
+import { ManagerNotebookComponent } from './components/manager-notebook/manager-notebook.component';
+import { ShortcutsHelpComponent } from './components/shortcuts-help/shortcuts-help.component';
+import { PlaySessionService } from '../services/play-session.service';
 
 
 @Component({
@@ -22,7 +30,7 @@ import { OmaticModalComponent } from './components/omatic-modal/omatic-modal.com
     styleUrls: ['./game.page.scss'],
     standalone: false
 })
-export class GamePage implements OnInit {
+export class GamePage implements OnInit, OnDestroy, ViewWillLeave {
   EmulatorKeyCode = EmulatorKeyCode
   @ViewChild('popover') popover: any;
   // UI state properties
@@ -44,7 +52,16 @@ export class GamePage implements OnInit {
     private storageService: LocalStorageService,
     private emulatorControlService: EmulatorControlService,
     private autoSaverService: AutoSaverService,
-    private layoutHelperService: LayoutHelperService) { }
+    private layoutHelperService: LayoutHelperService,
+    private playSessionService: PlaySessionService) { }
+
+  ngOnDestroy(): void {
+    this.playSessionService.stop();
+  }
+
+  ionViewWillLeave(): void {
+    this.playSessionService.stop();
+  }
 
   async ngOnInit() {
     const loading = await this.loadingController.create({
@@ -59,6 +76,7 @@ export class GamePage implements OnInit {
       console.timeEnd("carregando game...")
       await this.loadConfig()
       this.isHidden = false
+      this.playSessionService.start()
       await loading.dismiss()
       await this.handleShowTutorial()
       await this.storageService.set(STORAGE_KEY.FAIL_COUNT, 0)
@@ -255,6 +273,42 @@ export class GamePage implements OnInit {
     await modal.present()
   }
 
+  async showManagerNotebookModal() {
+    this.hidePopover()
+    const modal = await this.modalController.create({
+      component: ManagerNotebookComponent,
+      backdropDismiss: true,
+    })
+    await modal.present()
+  }
+
+  async showShortcutsHelpModal() {
+    this.hidePopover()
+    const modal = await this.modalController.create({
+      component: ShortcutsHelpComponent,
+      backdropDismiss: true,
+    })
+    await modal.present()
+  }
+
+  async showPlaytimeSummary() {
+    this.hidePopover()
+    this.playSessionService.checkpoint()
+    const ms = this.playSessionService.getTotalMs()
+    const formatted = PlaySessionService.formatDuration(ms)
+    const alert = await this.alertController.create({
+      header: 'Tempo no banco',
+      message:
+        `Tempo aproximado com o jogo aberto neste dispositivo: ${formatted}.` +
+        `\n\nO contador grava quando a aba fica em segundo plano e ao sair; ` +
+        `valores ficam só no seu navegador.`,
+      backdropDismiss: true,
+      cssClass: 'alert-whitespace',
+      buttons: ['OK'],
+    })
+    await alert.present()
+  }
+
   get gameInputs() {
     if (!this.isLandscape) {
       return GAME_INPUT_FN_BTNS_REVERSED;
@@ -330,6 +384,7 @@ export class GamePage implements OnInit {
           // clear all data
           await this.saveGameService.clearAllData(this.dosCI)
           await this.storageService.clearAllData()
+          this.playSessionService.reset()
           await loading.dismiss()
           window.location.reload()
         }
@@ -471,8 +526,12 @@ export class GamePage implements OnInit {
     await alert.present()
   }
 
-  async onSaveFileSelected(e: any) {
-    const file: File = e.target.files[0]
+  async onSaveFileSelected(ev: any) {
+    const file: File = ev.target.files[0]
+    if (!file) {
+      ev.target.value = ''
+      return
+    }
     console.log("Save file selected", { file })
     this.hidePopover()
 
@@ -501,12 +560,16 @@ export class GamePage implements OnInit {
         }]
       });
       await alert.present();
-    } catch (e: any) {
-      console.error(e)
+    } catch (err: any) {
+      console.error(err)
       await loading.dismiss()
-      await this.showErrorAlert(e)
+      await this.showErrorAlert(err)
+    } finally {
+      const input = ev?.target as HTMLInputElement | undefined
+      if (input) {
+        input.value = ''
+      }
     }
-    
   }
 
   async onPatchFileSelected(e: any) {

@@ -7,6 +7,8 @@ export const STORAGE_KEY = {
   HIDE_TUTORIAL: 'hideTutorial',
   PENDING_UPDATE: 'pendingUpdate',
   FAIL_COUNT: 'failCount',
+  /** Local notes while managing (Ionic Storage). */
+  MANAGER_NOTEBOOK: 'managerNotebook',
 }
 
 export const GAME_INPUT_FN_BTNS = [

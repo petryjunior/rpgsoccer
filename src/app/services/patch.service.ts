@@ -117,17 +117,40 @@ export class PatchService {
       throw new Error('No file provided')
     }
 
-    // Check if the file is a .e98 file
-    if (!file.name.toLowerCase().endsWith('.e98')) {
-      throw new Error('Invalid file type. Only .e98 files are allowed')
+    const name = file.name.toLowerCase()
+    const merged = new JSZip()
+
+    if (name.endsWith('.e98')) {
+      const fileName = file.name.toUpperCase()
+      await merged.file(BASE_SAVEGAME_DIR + fileName, file.arrayBuffer())
+      return merged
     }
 
-    const fileName = file.name.toUpperCase()
-    const zip = new JSZip()
-    // load .e98 file in the zip
-    await zip.file(BASE_SAVEGAME_DIR + fileName, file.arrayBuffer())
+    if (name.endsWith('.zip')) {
+      const container = await JSZip.loadAsync(await file.arrayBuffer(), {
+        createFolders: true,
+      })
+      const paths = Object.keys(container.files).filter(
+        (p) =>
+          !container.files[p].dir && p.toLowerCase().endsWith('.e98'),
+      )
+      if (paths.length === 0) {
+        throw new Error(
+          'ZIP sem arquivos .e98. Use o ZIP exportado em “Exportar jogos salvos” ou um .e98 avulso.',
+        )
+      }
+      for (const path of paths) {
+        const entry = container.files[path]
+        const base = (path.split('/').pop() || path).toUpperCase()
+        const buf = await entry.async('arraybuffer')
+        merged.file(BASE_SAVEGAME_DIR + base, buf)
+      }
+      return merged
+    }
 
-    return zip
+    throw new Error(
+      'Tipo inválido. Envie um arquivo .e98 ou um .zip com jogos salvos (.e98), como o exportado pelo app.',
+    )
   }
 
   async applySaveFilePatch(dosCI: DosCI, patch: JSZip) {

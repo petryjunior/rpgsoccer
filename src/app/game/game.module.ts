@@ -16,6 +16,8 @@ import { ManualComponent } from './components/manual/manual.component';
 import { AboutComponent } from './components/about/about.component';
 import { LayoutHelperService } from '../services/layout-helper.service';
 import { OmaticModalComponent } from './components/omatic-modal/omatic-modal.component';
+import { ManagerNotebookComponent } from './components/manager-notebook/manager-notebook.component';
+import { ShortcutsHelpComponent } from './components/shortcuts-help/shortcuts-help.component';
 
 @NgModule({
   imports: [
@@ -30,7 +32,9 @@ import { OmaticModalComponent } from './components/omatic-modal/omatic-modal.com
     FaqComponent,
     ManualComponent,
     AboutComponent,
-    OmaticModalComponent
+    OmaticModalComponent,
+    ManagerNotebookComponent,
+    ShortcutsHelpComponent,
   ],
   providers: [SaveGameService, LocalStorageService, PatchService, LayoutHelperService]
 })
