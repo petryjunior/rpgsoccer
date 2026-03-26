@@ -24,6 +24,10 @@ You only need this to play or develop locally. Nothing else in this repo is requ
 
 To stop the server, press `Ctrl+C` in the terminal.
 
+### “Can’t start emulator” (or “look browser logs for more info”)
+
+The DOS emulator needs **cross-origin isolation** so the browser allows `SharedArrayBuffer`. This repo configures that automatically for **`npm start`** (Angular dev server) and for **Firebase Hosting** (`firebase.json`). After pulling the latest changes, run `npm start` again and use a normal browser tab at `http://localhost:4200` (not opening the built files as `file://`). If you still see the error, try Chrome or Edge and check the browser **Console** (F12 → Console) for a red error line.
+
 ---
 
 # Elifoot 98 Online
