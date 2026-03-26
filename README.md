@@ -2,6 +2,28 @@
 
 This project is based on **[Elifoot 98 Online](https://github.com/elifoot98web/elifoot98web)** ([elifoot98web/elifoot98web](https://github.com/elifoot98web/elifoot98web)) — Elifoot 98 running in the browser with Ionic, js-dos, and Capacitor. The content below is inherited from that upstream README.
 
+## How to run it on your machine
+
+You only need this to play or develop locally. Nothing else in this repo is required for that.
+
+1. **Install Node.js** — Download the **LTS** version from [nodejs.org](https://nodejs.org/) and install it (this gives you `node` and `npm`).
+2. **Open a terminal** in this project folder (`elifoot2026`).
+3. **Install dependencies** (first time only):
+
+   ```bash
+   npm install
+   ```
+
+4. **Start the game**:
+
+   ```bash
+   npm start
+   ```
+
+5. When the terminal says the app is ready, open **http://localhost:4200** in your browser (Chrome or Edge works well).
+
+To stop the server, press `Ctrl+C` in the terminal.
+
 ---
 
 # Elifoot 98 Online
