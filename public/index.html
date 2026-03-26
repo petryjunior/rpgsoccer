@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RPG Soccer</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <header class="topo">
+      <h1>RPG Soccer</h1>
+      <p class="sub">Postura + letra no tempo: os atributos definem quanto tempo você tem para acertar a tecla — dois tempos, até 5 trocas.</p>
+    </header>
+
+    <main class="layout">
+      <aside class="painel painel-esq">
+        <h2>Seu time</h2>
+        <div class="subs-tutorial" role="note">
+          <strong>Como substituir (seu time)</strong>
+          <ol>
+            <li>Clique em um <strong>titular</strong> na lista de cima.</li>
+            <li>Depois clique em um <strong>reserva</strong> embaixo (ou o contrário).</li>
+          </ol>
+          <p class="subs-tutorial-meta">Só entre lances, no intervalo ou quando o relógio está parado. Máximo <strong>5 trocas</strong> por partida.</p>
+        </div>
+        <h3>Titulares</h3>
+        <ul id="time-jogador-tit" class="lista-jogadores"></ul>
+        <h3>Reservas</h3>
+        <ul id="time-jogador-res" class="lista-jogadores reservas"></ul>
+        <div class="acoes-pre">
+          <button type="button" id="btn-novo-time" class="btn sec">Sortear novo time</button>
+          <button type="button" id="btn-iniciar" class="btn pri">Iniciar partida</button>
+        </div>
+      </aside>
+
+      <section class="centro">
+        <div class="hud">
+          <div class="relogio-wrap">
+            <span class="label">Tempo</span>
+            <span id="relogio" class="relogio">0′</span>
+            <span id="etapa-tempo" class="etapa-tempo">—</span>
+          </div>
+          <div class="placar-wrap">
+            <span class="label">Placar</span>
+            <span id="placar" class="placar">0 × 0</span>
+          </div>
+          <div class="zona-atual">
+            <span class="label">Setor da bola</span>
+            <span id="zona-bola" class="zona-bola">—</span>
+          </div>
+          <div class="subs-wrap">
+            <span class="label">Substituições</span>
+            <span id="subs-info" class="subs-info">Você 0/5 · CPU 0/5</span>
+          </div>
+        </div>
+
+        <div id="intervalo-banner" class="intervalo-banner" hidden role="status">
+          <strong>Fim do 1º tempo.</strong> Faça substituições se quiser. Quando estiver pronto, use o botão <strong>Começar 2º tempo</strong> abaixo — o relógio só volta depois disso.
+        </div>
+        <button type="button" id="btn-segundo-tempo" class="btn pri btn-segundo-tempo" hidden>
+          Começar 2º tempo
+        </button>
+
+        <div class="campo" aria-label="Campo em três setores">
+          <div class="campo-zona defesa" data-zona="defesa_jogador">
+            <span class="marcador" data-zona="defesa_jogador"></span>
+            <span class="rotulo">Sua defesa</span>
+          </div>
+          <div class="campo-zona meio" data-zona="meio_campo">
+            <span class="marcador" data-zona="meio_campo"></span>
+            <span class="rotulo">Meio</span>
+          </div>
+          <div class="campo-zona ataque" data-zona="ataque_jogador">
+            <span class="marcador" data-zona="ataque_jogador"></span>
+            <span class="rotulo">Seu ataque</span>
+          </div>
+        </div>
+
+        <div class="dica-postura">
+          <strong>Como funciona:</strong> postura + <strong>letra A–Z</strong> no teclado no tempo certo. Entre lances o relógio corre devagar; no <strong>intervalo</strong> ele para até você clicar em <strong>Começar 2º tempo</strong> (o botão fica aqui no centro, fora de qualquer pop-up).
+        </div>
+
+        <div id="log" class="log" role="log" aria-live="polite"></div>
+      </section>
+
+      <aside class="painel painel-dir">
+        <h2>Computador</h2>
+        <p class="hint-sub hint-cpu">O adversário também troca até 5 jogadores; as mudanças aparecem no placar de substituições e no log.</p>
+        <h3>Titulares</h3>
+        <ul id="time-cpu-tit" class="lista-jogadores"></ul>
+        <h3>Reservas</h3>
+        <ul id="time-cpu-res" class="lista-jogadores reservas"></ul>
+      </aside>
+    </main>
+
+    <div id="gol-overlay" class="overlay overlay-gol" hidden>
+      <div class="cartao-gol">
+        <p id="gol-titulo" class="gol-titulo">GOL!</p>
+        <p id="gol-sub" class="gol-sub"></p>
+        <button type="button" id="btn-gol-ok" class="btn pri">OK</button>
+      </div>
+    </div>
+
+    <div id="duelo-overlay" class="overlay" hidden>
+      <div class="modal-duelo">
+        <h2 id="duelo-titulo">Lance importante</h2>
+
+        <div id="fase-postura" class="fase-modal">
+          <p id="duelo-texto" class="duelo-texto"></p>
+          <p id="duelo-detalhe" class="duelo-detalhe"></p>
+          <p class="escolha-label">Sua postura (vale também no duelo com o goleiro, se houver):</p>
+          <div class="posturas">
+            <button type="button" class="btn postura" data-postura="arrojado">Arrojado</button>
+            <button type="button" class="btn postura" data-postura="equilibrado">Equilibrado</button>
+            <button type="button" class="btn postura" data-postura="cauteloso">Cauteloso</button>
+          </div>
+        </div>
+
+        <div id="fase-transicao" class="fase-modal" hidden>
+          <p id="transicao-texto" class="duelo-texto"></p>
+          <p id="transicao-par" class="duelo-detalhe"></p>
+          <button type="button" id="btn-encarar-goleiro" class="btn pri">Encarar o goleiro</button>
+        </div>
+
+        <div id="fase-qte" class="fase-modal" hidden>
+          <p id="qte-dica" class="qte-dica"></p>
+          <div
+            id="qte-reacao"
+            class="qte-reacao qte-letra-painel"
+            tabindex="0"
+            role="application"
+            aria-label="Pressione no teclado a letra mostrada em destaque."
+          >
+            <span id="qte-reacao-label" class="qte-letra-gigante" aria-live="assertive"></span>
+            <p id="qte-reacao-sub" class="qte-reacao-sub"></p>
+          </div>
+          <p class="qte-ajuda">Use apenas letras A–Z no teclado. Outra letra ou fim do tempo = perde o lance.</p>
+        </div>
+
+        <div id="fase-resultado" class="fase-modal" hidden>
+          <h3 class="resultado-titulo">Resumo do lance</h3>
+          <div id="resultado-texto" class="resultado-texto"></div>
+          <button type="button" id="btn-fechar-lance" class="btn pri">Continuar</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/js/main.js"></script>
+  </body>
+</html>
