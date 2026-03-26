@@ -4,7 +4,7 @@ This project is based on **[Elifoot 98 Online](https://github.com/elifoot98web/e
 
 ## How to run it on your machine
 
-You only need this to play or develop locally. Nothing else in this repo is required for that.
+You only need this to play or develop locally. Nothing else in this repo is required for that. The game data file (`elifoot98.jsdos`) is stored in full in this repository — you do **not** need Git LFS.
 
 1. **Install Node.js** — Download the **LTS** version from [nodejs.org](https://nodejs.org/) and install it (this gives you `node` and `npm`).
 2. **Open a terminal** in this project folder (`elifoot2026`).
@@ -27,6 +27,8 @@ To stop the server, press `Ctrl+C` in the terminal.
 ### “Can’t start emulator” (or “look browser logs for more info”)
 
 The DOS emulator needs **cross-origin isolation** so the browser allows `SharedArrayBuffer`. This repo configures that automatically for **`npm start`** (Angular dev server) and for **Firebase Hosting** (`firebase.json`). After pulling the latest changes, run `npm start` again and use a normal browser tab at `http://localhost:4200` (not opening the built files as `file://`). If you still see the error, try Chrome or Edge and check the browser **Console** (F12 → Console) for a red error line.
+
+If the console says **`Not a zip archive`** or **`Broken bundle, .jsdos/dosbox.conf not found`**, the game bundle file is wrong or truncated. In this repo it should be about **6.5 MB** and start with `PK` (a zip). Re-clone or run `git checkout -- src/assets/elifoot/elifoot98.jsdos` after pulling the latest commit.
 
 ---
 
