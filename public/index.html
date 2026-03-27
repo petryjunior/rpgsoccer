@@ -21,7 +21,7 @@
             <li>Clique em um <strong>titular</strong> na lista de cima.</li>
             <li>Depois clique em um <strong>reserva</strong> embaixo (ou o contrário).</li>
           </ol>
-          <p class="subs-tutorial-meta">Só entre lances, no intervalo ou quando o relógio está parado. Máximo <strong>5 trocas</strong> por partida.</p>
+          <p class="subs-tutorial-meta">Só após <strong>Iniciar partida</strong>, com o lance <strong>fechado</strong> ou com o jogo em <strong>Pausar</strong> (relógio parado). Máximo <strong>5 trocas</strong> por partida. Antes do apito use <strong>Sortear novo time</strong> se quiser outro elenco.</p>
         </div>
         <h3>Titulares</h3>
         <ul id="time-jogador-tit" class="lista-jogadores"></ul>
@@ -51,6 +51,20 @@
           <div class="subs-wrap">
             <span class="label">Substituições</span>
             <span id="subs-info" class="subs-info">Você 0/5 · CPU 0/5</span>
+          </div>
+          <div class="hud-pausa">
+            <span class="label">Jogo</span>
+            <button type="button" id="btn-pausa" class="btn sec" hidden>Pausar</button>
+          </div>
+        </div>
+
+        <div id="pause-panel" class="pause-panel" hidden role="dialog" aria-modal="true" aria-labelledby="pause-titulo">
+          <div class="pause-inner">
+            <h2 id="pause-titulo" class="pause-titulo">Jogo pausado</h2>
+            <div id="pause-stats" class="pause-stats"></div>
+            <p class="pause-hint">O relógio está parado. Você pode <strong>substituir</strong> pelo painel à esquerda (até 5 por partida).</p>
+            <button type="button" id="btn-continuar-pausa" class="btn pri">Continuar</button>
+            <p class="pause-tecla"><kbd>Esc</kbd> também pausa e retoma.</p>
           </div>
         </div>
 
@@ -101,9 +115,10 @@
       </div>
     </div>
 
-    <div id="duelo-overlay" class="overlay" hidden>
+    <div id="duelo-overlay" class="overlay overlay-duelo" hidden>
       <div class="modal-duelo">
         <h2 id="duelo-titulo">Lance importante</h2>
+        <div id="duelo-rpg-strip" class="duelo-rpg-strip" hidden></div>
 
         <div id="fase-postura" class="fase-modal">
           <p id="duelo-texto" class="duelo-texto"></p>

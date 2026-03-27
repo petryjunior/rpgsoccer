@@ -7,6 +7,6 @@
 export function parametrosLetra(ratio) {
   const r = Math.min(0.93, Math.max(0.07, ratio));
   const letra = String.fromCharCode(65 + Math.floor(Math.random() * 26));
-  const tempoLimiteMs = 780 + r * 2550;
+  const tempoLimiteMs = 360 + r * 980;
   return { letra, tempoLimiteMs, ratioUsado: r };
 }
