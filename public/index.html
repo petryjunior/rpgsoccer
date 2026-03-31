@@ -9,27 +9,33 @@
   <body>
     <header class="topo">
       <h1>RPG Soccer</h1>
-      <p class="sub">Postura + letra no tempo: os atributos definem quanto tempo você tem para acertar a tecla — dois tempos, até 5 trocas.</p>
+      <p class="sub">Letra no tempo: os atributos definem o desafio; cada duelo cansa quem entra em campo. Dois tempos, até 5 trocas.</p>
     </header>
 
     <main class="layout">
       <aside class="painel painel-esq">
-        <h2>Seu time</h2>
-        <div class="subs-tutorial" role="note">
-          <strong>Como substituir (seu time)</strong>
-          <ol>
-            <li>Clique em um <strong>titular</strong> na lista de cima.</li>
-            <li>Depois clique em um <strong>reserva</strong> embaixo (ou o contrário).</li>
-          </ol>
-          <p class="subs-tutorial-meta">Só após <strong>Iniciar partida</strong>, com o lance <strong>fechado</strong> ou com o jogo em <strong>Pausar</strong> (relógio parado). Máximo <strong>5 trocas</strong> por partida. Antes do apito use <strong>Sortear novo time</strong> se quiser outro elenco.</p>
+        <div class="painel-esq-head">
+          <h2>Seu time</h2>
+          <div class="subs-tutorial" role="note">
+            <p class="subs-tutorial-titulo">Montar escalação</p>
+            <p class="subs-tutorial-passos">
+              Clique em um <strong>titular</strong> e depois em um <strong>reserva</strong> (ou o contrário) para trocar.
+            </p>
+            <p class="subs-tutorial-meta">
+              <span class="subs-tutorial-rotulo">Antes do apito:</span> trocas ilimitadas.
+              <span class="subs-tutorial-rotulo">Na partida:</span> com o lance fechado ou em <strong>Pausar</strong>, até 5 substituições. No banco, no máximo 2 goleiros.
+            </p>
+          </div>
         </div>
-        <h3>Titulares</h3>
-        <ul id="time-jogador-tit" class="lista-jogadores"></ul>
-        <h3>Reservas</h3>
-        <ul id="time-jogador-res" class="lista-jogadores reservas"></ul>
-        <div class="acoes-pre">
-          <button type="button" id="btn-novo-time" class="btn sec">Sortear novo time</button>
-          <button type="button" id="btn-iniciar" class="btn pri">Iniciar partida</button>
+        <div class="painel-esq-listas">
+          <section class="bloco-elenco" aria-labelledby="tit-titulares">
+            <h3 id="tit-titulares">Titulares</h3>
+            <ul id="time-jogador-tit" class="lista-jogadores"></ul>
+          </section>
+          <section class="bloco-elenco" aria-labelledby="tit-reservas">
+            <h3 id="tit-reservas">Reservas</h3>
+            <ul id="time-jogador-res" class="lista-jogadores reservas"></ul>
+          </section>
         </div>
       </aside>
 
@@ -69,10 +75,10 @@
         </div>
 
         <div id="intervalo-banner" class="intervalo-banner" hidden role="status">
-          <strong>Fim do 1º tempo.</strong> Faça substituições se quiser. Quando estiver pronto, use o botão <strong>Começar 2º tempo</strong> abaixo — o relógio só volta depois disso.
+          <strong>Fim do 1º tempo.</strong> Ajuste o time se quiser. O botão central passa a ser <strong>Começar 2º tempo</strong> — o relógio só volta depois do clique.
         </div>
-        <button type="button" id="btn-segundo-tempo" class="btn pri btn-segundo-tempo" hidden>
-          Começar 2º tempo
+        <button type="button" id="btn-centro-rodada" class="btn pri btn-centro-rodada">
+          Iniciar partida
         </button>
 
         <div class="campo" aria-label="Campo em três setores">
@@ -90,8 +96,8 @@
           </div>
         </div>
 
-        <div class="dica-postura">
-          <strong>Como funciona:</strong> postura + <strong>letra A–Z</strong> no teclado no tempo certo. Entre lances o relógio corre devagar; no <strong>intervalo</strong> ele para até você clicar em <strong>Começar 2º tempo</strong> (o botão fica aqui no centro, fora de qualquer pop-up).
+        <div class="dica-jogo">
+          <strong>Como funciona:</strong> em cada lance, leia o contexto e use <strong>Iniciar o duelo</strong>; só então vêm a contagem e a <strong>letra A–Z</strong>. O botão <strong>Iniciar partida</strong> fica no centro; após o 1º tempo vira <strong>Começar 2º tempo</strong>. Entre lances o relógio corre devagar.
         </div>
 
         <div id="log" class="log" role="log" aria-live="polite"></div>
@@ -116,18 +122,19 @@
     </div>
 
     <div id="duelo-overlay" class="overlay overlay-duelo" hidden>
+      <div class="duelo-shield-top" aria-hidden="true"></div>
+      <div class="duelo-scrim" aria-hidden="true"></div>
       <div class="modal-duelo">
         <h2 id="duelo-titulo">Lance importante</h2>
         <div id="duelo-rpg-strip" class="duelo-rpg-strip" hidden></div>
 
-        <div id="fase-postura" class="fase-modal">
+        <div id="fase-intro-duelo" class="fase-modal fase-intro-duelo">
           <p id="duelo-texto" class="duelo-texto"></p>
           <p id="duelo-detalhe" class="duelo-detalhe"></p>
-          <p class="escolha-label">Sua postura (vale também no duelo com o goleiro, se houver):</p>
-          <div class="posturas">
-            <button type="button" class="btn postura" data-postura="arrojado">Arrojado</button>
-            <button type="button" class="btn postura" data-postura="equilibrado">Equilibrado</button>
-            <button type="button" class="btn postura" data-postura="cauteloso">Cauteloso</button>
+          <div id="fase-acao-inicio-duelo" class="fase-acao-inicio-duelo" hidden>
+            <button type="button" id="btn-iniciar-duelo-campo" class="btn pri">
+              Iniciar o duelo
+            </button>
           </div>
         </div>
 

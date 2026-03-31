@@ -1,15 +1,18 @@
-import { ZONE_LABEL } from "./constants.js";
+import { ZONE_LABEL, ZONES } from "./constants.js";
 import {
+  textoChuteParaForaAposDuelo,
   textoContextoPrimario,
   textoDueloGoleiro,
   textoResultadoPrimario,
   textoTransicaoGoleiro,
 } from "./narrative.js";
 import {
-  atualizarPosse,
+  chanceErrarFinalizacaoAposVencerGoleiro,
   escolherDuelistas,
   metricasDuelo,
+  proximaZonaEPosse,
   proximoIntervaloMinutos,
+  sortearAcrescimosTempo,
   sortearGoleiro,
   sortearZona,
   tipoFinalizacaoGoleiro,
@@ -17,8 +20,6 @@ import {
 import { parametrosLetra } from "./qte.js";
 import { ordenarPorPosicao } from "./squadSort.js";
 import { gerarTime, validarElenco } from "./squad.js";
-
-/** @typedef {import('./match.js').Postura} Postura */
 
 const els = {
   timeJogadorTit: document.getElementById("time-jogador-tit"),
@@ -32,10 +33,11 @@ const els = {
   zonaBola: document.getElementById("zona-bola"),
   campoMarcadores: document.querySelectorAll(".campo-zona .marcador"),
   log: document.getElementById("log"),
-  btnNovoTime: document.getElementById("btn-novo-time"),
-  btnIniciar: document.getElementById("btn-iniciar"),
+  btnCentroRodada: document.getElementById("btn-centro-rodada"),
   dueloOverlay: document.getElementById("duelo-overlay"),
-  fasePostura: document.getElementById("fase-postura"),
+  faseIntroDuelo: document.getElementById("fase-intro-duelo"),
+  faseAcaoInicioDuelo: document.getElementById("fase-acao-inicio-duelo"),
+  btnIniciarDueloCampo: document.getElementById("btn-iniciar-duelo-campo"),
   faseTransicao: document.getElementById("fase-transicao"),
   faseQte: document.getElementById("fase-qte"),
   faseResultado: document.getElementById("fase-resultado"),
@@ -46,7 +48,6 @@ const els = {
   transicaoPar: document.getElementById("transicao-par"),
   btnEncararGoleiro: document.getElementById("btn-encarar-goleiro"),
   resultadoTexto: document.getElementById("resultado-texto"),
-  posturaBotoes: document.querySelectorAll("[data-postura]"),
   qteReacao: document.getElementById("qte-reacao"),
   qteReacaoLabel: document.getElementById("qte-reacao-label"),
   qteReacaoSub: document.getElementById("qte-reacao-sub"),
@@ -57,13 +58,136 @@ const els = {
   golSub: document.getElementById("gol-sub"),
   btnGolOk: document.getElementById("btn-gol-ok"),
   intervaloBanner: document.getElementById("intervalo-banner"),
-  btnSegundoTempo: document.getElementById("btn-segundo-tempo"),
   dueloRpgStrip: document.getElementById("duelo-rpg-strip"),
   btnPausa: document.getElementById("btn-pausa"),
   pausePanel: document.getElementById("pause-panel"),
   pauseStats: document.getElementById("pause-stats"),
   btnContinuarPausa: document.getElementById("btn-continuar-pausa"),
 };
+
+const CANSACO_DUELO = 3;
+const ATTR_MIN = 1;
+const ATTR_MAX = 99;
+const BONUS_STREAK_DUELO = 10;
+
+/** @type {Map<string, { ataque: number, defesa: number }>} */
+const statsBasePartida = new Map();
+/** @type {Map<string, { ataque: number, defesa: number }>} vitórias seguidas por papel (ataque/defesa) */
+const streakDueloPorJogador = new Map();
+/** Tempo com o feedback na tela antes de seguir para o resultado (falha: tecla errada ou fim do tempo). */
+const QTE_FEEDBACK_FALHA_MS = 1150;
+const QTE_FEEDBACK_ACERTO_MS = 280;
+/** Intervalo entre 3→2→1: um único valor sorteado por lance (mesmo tempo nos 3 passos). */
+const QTE_COUNTDOWN_MS_MIN = 260;
+const QTE_COUNTDOWN_MS_MAX = 2600;
+
+function sortearIntervaloContagemQte() {
+  const a = QTE_COUNTDOWN_MS_MIN;
+  const b = QTE_COUNTDOWN_MS_MAX;
+  return a + Math.floor(Math.random() * (b - a + 1));
+}
+
+/** Ex.: 800 ms → "0,8" para texto do QTE. */
+function fmtSegundosAproximados(ms) {
+  return (ms / 1000).toFixed(1).replace(".", ",");
+}
+
+/**
+ * @param {object} jogador seu titular no lance
+ * @param {object} adversario titular da CPU
+ * @param {boolean} jogadorComBola
+ */
+function aplicarCansacoDueloCampo(jogador, adversario, jogadorComBola) {
+  if (jogadorComBola) {
+    jogador.ataque = Math.max(ATTR_MIN, jogador.ataque - CANSACO_DUELO);
+    adversario.defesa = Math.max(ATTR_MIN, adversario.defesa - CANSACO_DUELO);
+  } else {
+    jogador.defesa = Math.max(ATTR_MIN, jogador.defesa - CANSACO_DUELO);
+    adversario.ataque = Math.max(ATTR_MIN, adversario.ataque - CANSACO_DUELO);
+  }
+}
+
+/** @param {object} atacante @param {object} goleiro */
+function aplicarCansacoDueloGoleiro(atacante, goleiro) {
+  atacante.ataque = Math.max(ATTR_MIN, atacante.ataque - CANSACO_DUELO);
+  goleiro.defesa = Math.max(ATTR_MIN, goleiro.defesa - CANSACO_DUELO);
+}
+
+function snapshotStatsInicioPartida() {
+  statsBasePartida.clear();
+  streakDueloPorJogador.clear();
+  for (const j of [
+    ...timeJogador.titulares,
+    ...timeJogador.reservas,
+    ...timeCpu.titulares,
+    ...timeCpu.reservas,
+  ]) {
+    statsBasePartida.set(j.id, { ataque: j.ataque, defesa: j.defesa });
+  }
+}
+
+/**
+ * @param {object} jogador
+ * @param {"ataque" | "defesa"} papel stat usada na vitória
+ */
+function aplicarVitoriaStreak(jogador, papel) {
+  let s = streakDueloPorJogador.get(jogador.id);
+  if (!s) s = { ataque: 0, defesa: 0 };
+  if (papel === "ataque") {
+    s.defesa = 0;
+    s.ataque += 1;
+    if (s.ataque >= 2) {
+      jogador.ataque = Math.min(ATTR_MAX, jogador.ataque + BONUS_STREAK_DUELO);
+      s.ataque = 0;
+    }
+  } else {
+    s.ataque = 0;
+    s.defesa += 1;
+    if (s.defesa >= 2) {
+      jogador.defesa = Math.min(ATTR_MAX, jogador.defesa + BONUS_STREAK_DUELO);
+      s.defesa = 0;
+    }
+  }
+  streakDueloPorJogador.set(jogador.id, s);
+}
+
+/** @param {object} jogador */
+function aplicarDerrotaStreak(jogador) {
+  streakDueloPorJogador.delete(jogador.id);
+}
+
+/**
+ * @param {object} eu
+ * @param {object} ele
+ * @param {boolean} euVenceu
+ * @param {boolean} jogadorComBola perspectiva de `eu`: com bola usa ataque no duelo (campo ou chute ao gol).
+ */
+function registrarResultadoDuelo(eu, ele, euVenceu, jogadorComBola) {
+  if (euVenceu) {
+    aplicarDerrotaStreak(ele);
+    aplicarVitoriaStreak(eu, jogadorComBola ? "ataque" : "defesa");
+  } else {
+    aplicarDerrotaStreak(eu);
+    aplicarVitoriaStreak(ele, jogadorComBola ? "defesa" : "ataque");
+  }
+}
+
+/**
+ * @param {object} j
+ * @param {"ataque" | "defesa"} attr
+ */
+function htmlStatVersusPartida(j, attr) {
+  const v = j[attr];
+  if (!partidaAtiva) return String(v);
+  const b = statsBasePartida.get(j.id);
+  if (!b) return String(v);
+  const base = b[attr];
+  const d = v - base;
+  if (d === 0) return String(v);
+  const cls = d < 0 ? "stat-delta-neg" : "stat-delta-pos";
+  const par = d > 0 ? `+${d}` : String(d);
+  return `${v}<span class="${cls}">(${par})</span>`;
+}
 
 let timeJogador = gerarTime();
 let timeCpu = gerarTime();
@@ -72,6 +196,9 @@ let substituicoesUsadas = 0;
 let substituicoesCpuUsadas = 0;
 /** Após o 1º tempo, só avança o relógio para o 2º quando o jogador confirmar */
 let segundoTempoAutorizado = false;
+/** Acréscimos sorteados por partida: 1º tempo até 45+ap1; 2º até 90+ap2 */
+let acrescimosPrimeiroTempo = 0;
+let acrescimosSegundoTempo = 0;
 /** No intervalo, relógio parado mas substituições liberadas */
 let aguardandoSegundoTempo = false;
 /** @type {(() => void) | null} */
@@ -90,8 +217,8 @@ let tempoAnimando = false;
 /** Pausa manual: relógio entre lances para; substituições e painel de stats */
 let jogoPausado = false;
 
-/** @type {{ minuto: number, posseJogador: boolean }} */
-let estadoGlobal = { minuto: 0, posseJogador: true };
+/** @type {{ minuto: number, posseJogador: boolean, proximaZona: string | null }} */
+let estadoGlobal = { minuto: 0, posseJogador: true, proximaZona: null };
 
 /** @type {object | null} */
 let ctx = null;
@@ -105,6 +232,12 @@ function escapeHtml(s) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function htmlParaTextoLog(html) {
+  const d = document.createElement("div");
+  d.innerHTML = html;
+  return (d.textContent || "").replace(/\s+/g, " ").trim();
 }
 
 /** @param {{ nome: string }} j */
@@ -141,8 +274,7 @@ function pintarDueloRpgPrimario(jogador, adversario, jogadorComBola) {
           <div class="duelo-rpg-stat-destaque"><span class="lbl">Defesa (vale no lance)</span>${adversario.defesa}</div>
           <div class="duelo-rpg-stat-sec">Ataque ${adversario.ataque}</div>
         </div>
-      </div>
-      <p class="duelo-rpg-nota">A postura (Arrojado / Equilibrado / Cauteloso) altera seu ataque e defesa antes do desafio de letra.</p>`;
+      </div>`;
   } else {
     el.innerHTML = `
       <p class="duelo-rpg-contexto">Sem a bola, o duelo compara sua <strong>defesa</strong> com o <strong>ataque</strong> do rival.</p>
@@ -160,40 +292,16 @@ function pintarDueloRpgPrimario(jogador, adversario, jogadorComBola) {
           <div class="duelo-rpg-stat-destaque"><span class="lbl">Ataque (vale no lance)</span>${adversario.ataque}</div>
           <div class="duelo-rpg-stat-sec">Defesa ${adversario.defesa}</div>
         </div>
-      </div>
-      <p class="duelo-rpg-nota">A postura altera seus atributos antes do desafio de letra.</p>`;
+      </div>`;
   }
 }
 
-/**
- * @param {Postura} postura
- */
-function pintarDueloRpgComPostura(jogador, adversario, jogadorComBola, postura) {
-  const met = metricasDuelo(jogador, adversario, jogadorComBola, postura);
-  const pn = posturaNome(postura);
-  pintarDueloRpgPrimario(jogador, adversario, jogadorComBola);
-  const el = els.dueloRpgStrip;
-  const extra = document.createElement("p");
-  extra.className = "duelo-rpg-nota";
-  extra.style.marginTop = "0.35rem";
-  extra.innerHTML = `<strong>${pn}:</strong> peso efetivo no lance <strong>${met.meuPeso.toFixed(0)}</strong> × <strong>${met.pesoOponente.toFixed(0)}</strong> do adversário (${(met.ratio * 100).toFixed(0)}% de vantagem sua na letra).`;
-  el.appendChild(extra);
-}
-
-/**
- * @param {Postura} postura
- */
-function pintarDueloRpgGoleiro(atacante, goleiro, chuteJogador, postura) {
+function pintarDueloRpgGoleiro(atacante, goleiro, chuteJogador) {
   const el = els.dueloRpgStrip;
   el.hidden = false;
-  const eu = chuteJogador ? atacante : goleiro;
-  const ele = chuteJogador ? goleiro : atacante;
-  const comBola = chuteJogador;
-  const met = metricasDuelo(eu, ele, comBola, postura);
-  const pn = posturaNome(postura);
   if (chuteJogador) {
     el.innerHTML = `
-      <p class="duelo-rpg-contexto"><strong>Chute:</strong> ataque do finalizador × defesa do goleiro (sua postura já aplicada no peso).</p>
+      <p class="duelo-rpg-contexto"><strong>Chute:</strong> ataque do finalizador × defesa do goleiro.</p>
       <div class="duelo-rpg-linhas">
         <div class="duelo-rpg-card seu">
           <div class="duelo-rpg-tag">Finalização</div>
@@ -208,8 +316,7 @@ function pintarDueloRpgGoleiro(atacante, goleiro, chuteJogador, postura) {
           <div class="duelo-rpg-stat-destaque"><span class="lbl">Defesa</span>${goleiro.defesa}</div>
           <div class="duelo-rpg-stat-sec">Ataque ${goleiro.ataque}</div>
         </div>
-      </div>
-      <p class="duelo-rpg-nota"><strong>${pn}:</strong> peso efetivo <strong>${met.meuPeso.toFixed(0)}</strong> × <strong>${met.pesoOponente.toFixed(0)}</strong> (${(met.ratio * 100).toFixed(0)}% seu).</p>`;
+      </div>`;
   } else {
     el.innerHTML = `
       <p class="duelo-rpg-contexto"><strong>Defesa do gol:</strong> sua defesa de goleiro × ataque do chutador.</p>
@@ -227,8 +334,7 @@ function pintarDueloRpgGoleiro(atacante, goleiro, chuteJogador, postura) {
           <div class="duelo-rpg-stat-destaque"><span class="lbl">Ataque</span>${atacante.ataque}</div>
           <div class="duelo-rpg-stat-sec">Defesa ${atacante.defesa}</div>
         </div>
-      </div>
-      <p class="duelo-rpg-nota"><strong>${pn}:</strong> peso efetivo <strong>${met.meuPeso.toFixed(0)}</strong> × <strong>${met.pesoOponente.toFixed(0)}</strong> (${(met.ratio * 100).toFixed(0)}% seu).</p>`;
+      </div>`;
   }
 }
 
@@ -236,9 +342,17 @@ function formatMinuto(m) {
   return `${Math.floor(m)}′`;
 }
 
-function labelEtapa(minuto) {
-  if (minuto <= 45) return "1º tempo";
+function labelEtapa(/** @type {number} */ _minuto) {
+  if (!segundoTempoAutorizado) return "1º tempo";
   return "2º tempo";
+}
+
+function minutoFimPrimeiroTempo() {
+  return 45 + acrescimosPrimeiroTempo;
+}
+
+function minutoFimJogo() {
+  return 90 + acrescimosSegundoTempo;
 }
 
 function sigla(pos) {
@@ -257,7 +371,9 @@ function renderLista(ul, jogadores, destaqueId, listaDoTimeHumano) {
     const li = document.createElement("li");
     li.dataset.id = j.id;
     if (j.id === destaqueId) li.classList.add("em-lance");
-    li.innerHTML = `<span class="sigla">${sigla(j.posicao)}</span> <span class="nome ${clsNome}">${escapeHtml(j.nome)}</span><span class="stats"> ${j.ataque}/${j.defesa}</span>`;
+    const stA = htmlStatVersusPartida(j, "ataque");
+    const stD = htmlStatVersusPartida(j, "defesa");
+    li.innerHTML = `<span class="sigla">${sigla(j.posicao)}</span> <span class="nome ${clsNome}">${escapeHtml(j.nome)}</span><span class="stats"> ${stA}/${stD}</span>`;
     ul.appendChild(li);
   }
 }
@@ -271,7 +387,32 @@ function renderEscalacoes(destaque) {
 }
 
 function atualizarSubsHud() {
+  if (!partidaAtiva) {
+    els.subsInfo.textContent = "Pré-jogo: escalação livre";
+    return;
+  }
   els.subsInfo.textContent = `Você ${substituicoesUsadas}/5 · CPU ${substituicoesCpuUsadas}/5`;
+}
+
+function atualizarBtnCentroRodada() {
+  const el = els.btnCentroRodada;
+  if (!partidaAtiva) {
+    el.hidden = false;
+    el.disabled = false;
+    el.textContent = "Iniciar partida";
+    el.classList.remove("sec");
+    el.classList.add("pri");
+    return;
+  }
+  if (aguardandoSegundoTempo && resolveSegundoTempo) {
+    el.hidden = false;
+    el.disabled = false;
+    el.textContent = "Começar 2º tempo";
+    el.classList.add("pri");
+    return;
+  }
+  el.hidden = true;
+  el.disabled = true;
 }
 
 function setZonaVisual(zona) {
@@ -290,12 +431,60 @@ function appendLog(html) {
   }
 }
 
-/** @param {"postura" | "transicao" | "qte" | "resultado"} fase */
+/**
+ * @param {"campo_pre_qte" | "qte_campo" | "qte" | "transicao" | "resultado" | "reset"} fase
+ */
 function mostrarFaseModal(fase) {
-  els.fasePostura.hidden = fase !== "postura";
-  els.faseTransicao.hidden = fase !== "transicao";
-  els.faseQte.hidden = fase !== "qte";
-  els.faseResultado.hidden = fase !== "resultado";
+  const intro = els.faseIntroDuelo;
+  const acaoInicio = els.faseAcaoInicioDuelo;
+  const qte = els.faseQte;
+  const trans = els.faseTransicao;
+  const res = els.faseResultado;
+  if (fase === "campo_pre_qte") {
+    intro.hidden = false;
+    acaoInicio.hidden = false;
+    qte.hidden = true;
+    trans.hidden = true;
+    res.hidden = true;
+    return;
+  }
+  if (fase === "qte_campo") {
+    intro.hidden = false;
+    acaoInicio.hidden = true;
+    qte.hidden = false;
+    trans.hidden = true;
+    res.hidden = true;
+    return;
+  }
+  if (fase === "qte") {
+    intro.hidden = true;
+    acaoInicio.hidden = true;
+    qte.hidden = false;
+    trans.hidden = true;
+    res.hidden = true;
+    return;
+  }
+  if (fase === "transicao") {
+    intro.hidden = true;
+    acaoInicio.hidden = true;
+    qte.hidden = true;
+    trans.hidden = false;
+    res.hidden = true;
+    return;
+  }
+  if (fase === "resultado") {
+    intro.hidden = true;
+    acaoInicio.hidden = true;
+    qte.hidden = true;
+    trans.hidden = true;
+    res.hidden = false;
+    return;
+  }
+  intro.hidden = false;
+  acaoInicio.hidden = true;
+  qte.hidden = true;
+  trans.hidden = true;
+  res.hidden = true;
 }
 
 function pararQte() {
@@ -319,40 +508,83 @@ function iniciarQteLetra(params, onFim, opts) {
   const label = els.qteReacaoLabel;
   const sub = els.qteReacaoSub;
   let resolvido = false;
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let feedbackTimer = null;
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let countdownLate = null;
 
-  painel.classList.remove("falha");
-  label.textContent = letra;
-  painel.setAttribute("aria-label", `Pressione a tecla ${letra} no teclado.`);
+  const pularContagem =
+    opts != null && opts.total > 1 && opts.indice > 1;
+  const intervaloContagemMs = pularContagem ? 0 : sortearIntervaloContagemQte();
   const seg = (tempoLimiteMs / 1000).toFixed(1);
-  sub.textContent =
+  const textoInstrucao =
     opts != null && opts.total > 1
       ? `Letra ${opts.indice} de ${opts.total} — ${seg} s para acertar.`
       : `Pressione essa letra (${seg} s).`;
+
+  painel.classList.remove("falha", "qte-feedback-acerto", "qte-countdown");
+  label.textContent = "";
+  sub.textContent = pularContagem ? textoInstrucao : "Prepare-se…";
+  painel.setAttribute(
+    "aria-label",
+    pularContagem
+      ? `Pressione a tecla ${letra} no teclado.`
+      : "Contagem regressiva antes da letra.",
+  );
   painel.focus();
 
   function detachListeners() {
     window.removeEventListener("keydown", keyHandler, true);
   }
 
+  function limparContagem() {
+    if (countdownLate !== null) {
+      clearTimeout(countdownLate);
+      countdownLate = null;
+    }
+  }
+
+  function limparFeedbackAgendado() {
+    if (feedbackTimer !== null) {
+      clearTimeout(feedbackTimer);
+      feedbackTimer = null;
+    }
+  }
+
   cancelarInputQte = () => {
     if (resolvido) return;
+    limparContagem();
+    limparFeedbackAgendado();
     resolvido = true;
     detachListeners();
     pararQte();
+    painel.classList.remove("falha", "qte-feedback-acerto", "qte-countdown");
     cancelarInputQte = null;
   };
 
   function finalizar(acertou) {
     if (resolvido) return;
     resolvido = true;
+    limparContagem();
+    limparFeedbackAgendado();
     detachListeners();
     pararQte();
+    painel.classList.remove("falha", "qte-feedback-acerto", "qte-countdown");
     cancelarInputQte = null;
     onFim(acertou);
   }
 
+  function agendarFeedbackFinal(acertou) {
+    limparFeedbackAgendado();
+    const espera = acertou ? QTE_FEEDBACK_ACERTO_MS : QTE_FEEDBACK_FALHA_MS;
+    feedbackTimer = setTimeout(() => {
+      feedbackTimer = null;
+      finalizar(acertou);
+    }, espera);
+  }
+
   function keyHandler(e) {
-    if (resolvido) return;
+    if (resolvido || feedbackTimer !== null) return;
     if (e.repeat) return;
     const k = e.key;
     if (k.length !== 1) return;
@@ -361,23 +593,66 @@ function iniciarQteLetra(params, onFim, opts) {
     e.preventDefault();
     e.stopPropagation();
     if (ch === alvo) {
-      finalizar(true);
+      detachListeners();
+      pararQte();
+      painel.classList.remove("falha", "qte-countdown");
+      painel.classList.add("qte-feedback-acerto");
+      sub.textContent = "Acerto!";
+      label.textContent = letra;
+      agendarFeedbackFinal(true);
       return;
     }
+    detachListeners();
+    pararQte();
     label.textContent = letra;
-    sub.textContent = "Tecla errada.";
+    sub.textContent = "Errado!";
     painel.classList.add("falha");
-    finalizar(false);
+    painel.classList.remove("qte-feedback-acerto", "qte-countdown");
+    agendarFeedbackFinal(false);
   }
 
-  window.addEventListener("keydown", keyHandler, true);
-
-  qteTimerLate = setTimeout(() => {
+  function comecarFaseTecla() {
     if (resolvido) return;
-    sub.textContent = "Tempo esgotado.";
-    painel.classList.add("falha");
-    finalizar(false);
-  }, tempoLimiteMs);
+    limparContagem();
+    painel.classList.remove("qte-countdown");
+    label.textContent = letra;
+    painel.setAttribute("aria-label", `Pressione a tecla ${letra} no teclado.`);
+    sub.textContent = textoInstrucao;
+
+    window.addEventListener("keydown", keyHandler, true);
+
+    qteTimerLate = setTimeout(() => {
+      if (resolvido || feedbackTimer !== null) return;
+      detachListeners();
+      sub.textContent = "Tempo esgotado!";
+      painel.classList.add("falha");
+      painel.classList.remove("qte-feedback-acerto", "qte-countdown");
+      agendarFeedbackFinal(false);
+    }, tempoLimiteMs);
+  }
+
+  function tickContagem(n) {
+    if (resolvido) return;
+    if (n <= 0) {
+      comecarFaseTecla();
+      return;
+    }
+    painel.classList.add("qte-countdown");
+    label.textContent = String(n);
+    sub.textContent = "Prepare-se…";
+    painel.setAttribute("aria-label", `Contagem: ${n}.`);
+    countdownLate = setTimeout(() => {
+      countdownLate = null;
+      tickContagem(n - 1);
+    }, intervaloContagemMs);
+  }
+
+  if (pularContagem) {
+    label.textContent = letra;
+    comecarFaseTecla();
+  } else {
+    tickContagem(3);
+  }
 }
 
 /**
@@ -487,11 +762,11 @@ function mostrarBannerIntervalo() {
 
 function esconderUiIntervalo() {
   els.intervaloBanner.hidden = true;
-  els.btnSegundoTempo.hidden = true;
   if (bannerEsconderTimer !== null) {
     clearTimeout(bannerEsconderTimer);
     bannerEsconderTimer = null;
   }
+  atualizarBtnCentroRodada();
 }
 
 function tentarSubstituicaoCpu() {
@@ -524,11 +799,11 @@ function aguardarSegundoTempo() {
   tentarSubstituicaoCpu();
   mostrarBannerIntervalo();
   appendLog(
-    "<strong>Intervalo.</strong> O relógio está parado — faça substituições e, quando quiser, clique em <strong>Começar 2º tempo</strong> abaixo do placar.",
+    "<strong>Intervalo.</strong> O relógio está parado — faça substituições e use o botão <strong>Começar 2º tempo</strong> no centro da tela.",
   );
-  els.btnSegundoTempo.hidden = false;
   return new Promise((resolve) => {
     resolveSegundoTempo = resolve;
+    atualizarBtnCentroRodada();
   });
 }
 
@@ -539,17 +814,23 @@ function aguardarSegundoTempo() {
 async function animarTempoJogo(de, ate) {
   tempoAnimando = true;
   let m = Math.floor(de);
-  const alvo = Math.min(90, Math.floor(ate));
+  const alvoBruto = Math.floor(ate);
+  const teto2 = minutoFimJogo();
+  const alvo =
+    segundoTempoAutorizado ? Math.min(alvoBruto, teto2) : alvoBruto;
+  const fim1 = minutoFimPrimeiroTempo();
   const msPorMinuto = 1200;
 
   while (m < alvo) {
-    if (m === 45 && alvo >= 46 && !segundoTempoAutorizado) {
+    if (m === fim1 && alvo > fim1 && !segundoTempoAutorizado) {
       tempoAnimando = false;
       await aguardarSegundoTempo();
       segundoTempoAutorizado = true;
       aguardandoSegundoTempo = false;
       tempoAnimando = true;
       tentarSubstituicaoCpu();
+      atualizarBtnCentroRodada();
+      m = 45;
     }
     m++;
     els.relogio.textContent = formatMinuto(m);
@@ -571,9 +852,8 @@ function ligarCliquesSubstituicao() {
       const li = ev.target.closest("li");
       if (!li) return;
 
-      if (!partidaAtiva) return;
-      if (!jogoPausado && !els.dueloOverlay.hidden) return;
-      if (substituicoesUsadas >= 5) return;
+      if (!jogoPausado && partidaAtiva && !els.dueloOverlay.hidden) return;
+      if (partidaAtiva && substituicoesUsadas >= 5) return;
 
       const id = li.dataset.id;
       const lista = ul === els.timeJogadorTit ? "tit" : "res";
@@ -618,7 +898,9 @@ function ligarCliquesSubstituicao() {
         return;
       }
 
-      substituicoesUsadas++;
+      if (partidaAtiva) {
+        substituicoesUsadas++;
+      }
       atualizarSubsHud();
       if (jogoPausado) pintarEstatisticasPausa();
       limparSelecaoSub();
@@ -628,16 +910,21 @@ function ligarCliquesSubstituicao() {
   });
 }
 
-els.btnSegundoTempo.addEventListener("click", () => {
-  if (!resolveSegundoTempo) return;
-  const r = resolveSegundoTempo;
-  resolveSegundoTempo = null;
-  els.btnSegundoTempo.hidden = true;
-  aguardandoSegundoTempo = false;
-  tentarSubstituicaoCpu();
-  appendLog("2º tempo autorizado — o relógio volta a correr.");
-  sincronizarUiPausa();
-  r();
+els.btnCentroRodada.addEventListener("click", () => {
+  if (resolveSegundoTempo) {
+    const r = resolveSegundoTempo;
+    resolveSegundoTempo = null;
+    aguardandoSegundoTempo = false;
+    tentarSubstituicaoCpu();
+    appendLog("2º tempo autorizado — o relógio volta a correr.");
+    sincronizarUiPausa();
+    atualizarBtnCentroRodada();
+    r();
+    return;
+  }
+  if (!partidaAtiva) {
+    iniciarPartida();
+  }
 });
 
 function alternarPausaPorTecla() {
@@ -680,10 +967,6 @@ window.addEventListener("keydown", (e) => {
   alternarPausaPorTecla();
 }, true);
 
-function posturaNome(p) {
-  return { equilibrado: "Equilíbrio", arrojado: "Arrojado", cauteloso: "Cauteloso" }[p];
-}
-
 function abrirModalLance(lance) {
   ctx = {
     minuto: lance.minuto,
@@ -691,7 +974,6 @@ function abrirModalLance(lance) {
     jogador: lance.jogador,
     adversario: lance.adversario,
     jogadorComBola: lance.jogadorComBola,
-    postura: "equilibrado",
     venceuPrim: false,
     tipoGol: null,
     forwardChute: null,
@@ -703,15 +985,12 @@ function abrirModalLance(lance) {
 
   els.dueloOverlay.hidden = false;
   els.dueloTitulo.textContent = "Lance importante";
-  mostrarFaseModal("postura");
   const ctxo = textoContextoPrimario(
     {
       zona: lance.zona,
       jogador: lance.jogador,
       adversario: lance.adversario,
       jogadorComBola: lance.jogadorComBola,
-      venceu: false,
-      posturaNome: "",
     },
     spanNomeJogador,
   );
@@ -721,32 +1000,17 @@ function abrirModalLance(lance) {
   setZonaVisual(lance.zona);
   renderEscalacoes({ jogador: lance.jogador.id, adversario: lance.adversario.id });
   sincronizarUiPausa();
-}
 
-function fecharModalLance() {
-  if (cancelarInputQte) cancelarInputQte();
-  els.dueloOverlay.hidden = true;
-  els.dueloRpgStrip.hidden = true;
-  els.dueloRpgStrip.innerHTML = "";
-  mostrarFaseModal("postura");
-  pararQte();
-  ctx = null;
-  sincronizarUiPausa();
-}
+  mostrarFaseModal("campo_pre_qte");
+  const metCampo = metricasDuelo(ctx.jogador, ctx.adversario, ctx.jogadorComBola);
+  const letraParamsCampo = parametrosLetra(metCampo.ratio);
+  els.qteDica.textContent = `Você tem ~${fmtSegundosAproximados(letraParamsCampo.tempoLimiteMs)} s para pressionar a tecla certa.`;
 
-/**
- * @param {Postura} postura
- */
-function escolherPostura(postura) {
-  if (!ctx || !partidaAtiva) return;
-  ctx.postura = postura;
-  mostrarFaseModal("qte");
-  pintarDueloRpgComPostura(ctx.jogador, ctx.adversario, ctx.jogadorComBola, postura);
-  const met = metricasDuelo(ctx.jogador, ctx.adversario, ctx.jogadorComBola, postura);
-  const letraParams = parametrosLetra(met.ratio);
-  els.qteDica.textContent = `Letra no teclado (${posturaNome(postura)}). Peso no lance: ${met.meuPeso.toFixed(0)} × ${met.pesoOponente.toFixed(0)} (${(met.ratio * 100).toFixed(0)}% seu) → ~${(letraParams.tempoLimiteMs / 1000).toFixed(1)} s para acertar.`;
-
-  iniciarQteLetra(letraParams, (acertou) => {
+  ctx.iniciarQteCampo = () => {
+    mostrarFaseModal("qte_campo");
+    iniciarQteLetra(letraParamsCampo, (acertou) => {
+    aplicarCansacoDueloCampo(ctx.jogador, ctx.adversario, ctx.jogadorComBola);
+    registrarResultadoDuelo(ctx.jogador, ctx.adversario, acertou, ctx.jogadorComBola);
     ctx.venceuPrim = acertou;
     ctx.linhasResultado = [];
     ctx.linhasResultado.push(
@@ -756,8 +1020,6 @@ function escolherPostura(postura) {
           jogador: ctx.jogador,
           adversario: ctx.adversario,
           jogadorComBola: ctx.jogadorComBola,
-          venceu: acertou,
-          posturaNome: posturaNome(postura),
         },
         spanNomeJogador,
       ),
@@ -804,21 +1066,39 @@ function escolherPostura(postura) {
         jogador: tipo === "jogador_chuta" ? ctx.forwardChute.id : ctx.goleiroDefesa.id,
         adversario: tipo === "jogador_chuta" ? ctx.goleiroDefesa.id : ctx.forwardChute.id,
       });
-      pintarDueloRpgGoleiro(ctx.forwardChute, ctx.goleiroDefesa, tipo === "jogador_chuta", ctx.postura);
+      pintarDueloRpgGoleiro(ctx.forwardChute, ctx.goleiroDefesa, tipo === "jogador_chuta");
       mostrarFaseModal("transicao");
       return;
     }
 
-    estadoGlobal.posseJogador = atualizarPosse(ctx.jogadorComBola, acertou);
+    const nz = proximaZonaEPosse(ctx.zona, acertou, ctx.jogadorComBola);
+    estadoGlobal.posseJogador = nz.posseJogador;
+    estadoGlobal.proximaZona = nz.proximaZona;
     mostrarResultadoFinal(false, false);
   });
+  };
+
+  requestAnimationFrame(() => {
+    els.btnIniciarDueloCampo.focus();
+  });
+}
+
+function fecharModalLance() {
+  if (cancelarInputQte) cancelarInputQte();
+  els.dueloOverlay.hidden = true;
+  els.dueloRpgStrip.hidden = true;
+  els.dueloRpgStrip.innerHTML = "";
+  mostrarFaseModal("reset");
+  pararQte();
+  ctx = null;
+  sincronizarUiPausa();
 }
 
 function iniciarQteGoleiro() {
   if (!ctx || !ctx.tipoGol) return;
   mostrarFaseModal("qte");
   const chuteJogador = ctx.tipoGol === "jogador_chuta";
-  pintarDueloRpgGoleiro(ctx.forwardChute, ctx.goleiroDefesa, chuteJogador, ctx.postura);
+  pintarDueloRpgGoleiro(ctx.forwardChute, ctx.goleiroDefesa, chuteJogador);
   let eu;
   let ele;
   let comBola;
@@ -831,40 +1111,57 @@ function iniciarQteGoleiro() {
     ele = ctx.forwardChute;
     comBola = false;
   }
-  const met = metricasDuelo(eu, ele, comBola, ctx.postura);
+  const met = metricasDuelo(eu, ele, comBola);
 
   function aoFimGoleiro(/** @type {boolean} */ acertou) {
-    ctx.linhasResultado.push(
-      textoDueloGoleiro(
-        {
-          venceu: acertou,
-          chuteJogador,
-          atacante: ctx.forwardChute,
-          goleiro: ctx.goleiroDefesa,
-        },
-        spanNomeJogador,
-      ),
-    );
+    aplicarCansacoDueloGoleiro(ctx.forwardChute, ctx.goleiroDefesa);
+    registrarResultadoDuelo(eu, ele, acertou, comBola);
+    const fmt = spanNomeJogador;
+    const pBase = {
+      chuteJogador,
+      atacante: ctx.forwardChute,
+      goleiro: ctx.goleiroDefesa,
+    };
+    const erraAposVencerGoleiro = (atacante) =>
+      Math.random() < chanceErrarFinalizacaoAposVencerGoleiro(atacante.ataque);
 
     let teveGol = false;
+
     if (chuteJogador && acertou) {
-      golsJogador++;
-      teveGol = true;
-      ctx.golParaJogador = true;
-      estadoGlobal.posseJogador = false;
+      if (erraAposVencerGoleiro(ctx.forwardChute)) {
+        ctx.linhasResultado.push(textoChuteParaForaAposDuelo(ctx.forwardChute, fmt));
+        ctx.golParaJogador = false;
+        estadoGlobal.posseJogador = false;
+      } else {
+        ctx.linhasResultado.push(textoDueloGoleiro({ ...pBase, venceu: true }, fmt));
+        golsJogador++;
+        teveGol = true;
+        ctx.golParaJogador = true;
+        estadoGlobal.posseJogador = false;
+      }
     } else if (chuteJogador && !acertou) {
+      ctx.linhasResultado.push(textoDueloGoleiro({ ...pBase, venceu: false }, fmt));
       ctx.golParaJogador = false;
       estadoGlobal.posseJogador = false;
     } else if (!chuteJogador && acertou) {
+      ctx.linhasResultado.push(textoDueloGoleiro({ ...pBase, venceu: true }, fmt));
       ctx.golParaJogador = false;
       estadoGlobal.posseJogador = true;
     } else {
-      golsCpu++;
-      teveGol = true;
-      ctx.golParaJogador = false;
-      estadoGlobal.posseJogador = true;
+      if (erraAposVencerGoleiro(ctx.forwardChute)) {
+        ctx.linhasResultado.push(textoChuteParaForaAposDuelo(ctx.forwardChute, fmt));
+        ctx.golParaJogador = false;
+        estadoGlobal.posseJogador = true;
+      } else {
+        ctx.linhasResultado.push(textoDueloGoleiro({ ...pBase, venceu: false }, fmt));
+        golsCpu++;
+        teveGol = true;
+        ctx.golParaJogador = false;
+        estadoGlobal.posseJogador = true;
+      }
     }
 
+    estadoGlobal.proximaZona = ZONES.MEIO_CAMPO;
     mostrarResultadoFinal(teveGol, ctx.golParaJogador);
   }
 
@@ -874,13 +1171,13 @@ function iniciarQteGoleiro() {
       parametrosLetra(met.ratio),
       parametrosLetra(met.ratio),
     ];
-    const tMedio = (seq.reduce((s, p) => s + p.tempoLimiteMs, 0) / 3 / 1000).toFixed(1);
-    els.qteDica.textContent = `Chute: ${met.meuPeso.toFixed(0)} × ${met.pesoOponente.toFixed(0)} (${(met.ratio * 100).toFixed(0)}% seu). Acerte 3 letras em sequência (≈${tMedio} s por letra em média); errar ou estourar o tempo em qualquer uma falha o lance.`;
+    const msPorLetra = seq.reduce((a, p) => a + p.tempoLimiteMs, 0) / 3;
+    els.qteDica.textContent = `Você tem ~${fmtSegundosAproximados(msPorLetra)} s por letra para pressionar cada tecla certa.`;
     iniciarQteLetraSequencia(seq, aoFimGoleiro);
   } else {
     const seq = [parametrosLetra(met.ratio), parametrosLetra(met.ratio)];
-    const tMedio = (seq.reduce((s, p) => s + p.tempoLimiteMs, 0) / 2 / 1000).toFixed(1);
-    els.qteDica.textContent = `Defesa: ${met.meuPeso.toFixed(0)} × ${met.pesoOponente.toFixed(0)} (${(met.ratio * 100).toFixed(0)}% seu). Acerte 2 letras em sequência (≈${tMedio} s por letra em média); errar ou estourar o tempo em qualquer uma falha a defesa.`;
+    const msPorLetra = seq.reduce((a, p) => a + p.tempoLimiteMs, 0) / 2;
+    els.qteDica.textContent = `Você tem ~${fmtSegundosAproximados(msPorLetra)} s por letra para pressionar cada tecla certa.`;
     iniciarQteLetraSequencia(seq, aoFimGoleiro);
   }
 }
@@ -895,6 +1192,15 @@ function mostrarResultadoFinal(teveGol, golParaJogador) {
   ctx.golParaJogador = golParaJogador;
   els.placar.textContent = `${golsJogador} × ${golsCpu}`;
   els.dueloRpgStrip.hidden = true;
+  let destaque = { jogador: ctx.jogador?.id, adversario: ctx.adversario?.id };
+  if (ctx.tipoGol && ctx.forwardChute && ctx.goleiroDefesa) {
+    const chuteJogador = ctx.tipoGol === "jogador_chuta";
+    destaque = {
+      jogador: chuteJogador ? ctx.forwardChute.id : ctx.goleiroDefesa.id,
+      adversario: chuteJogador ? ctx.goleiroDefesa.id : ctx.forwardChute.id,
+    };
+  }
+  renderEscalacoes(destaque);
   mostrarFaseModal("resultado");
   els.resultadoTexto.innerHTML = ctx.linhasResultado.map((t) => `<p>${t}</p>`).join("");
 }
@@ -905,11 +1211,11 @@ function encerrarComErro(msg) {
   encerrarPartida();
 }
 
-els.posturaBotoes.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const p = /** @type {Postura} */ (btn.dataset.postura);
-    escolherPostura(p);
-  });
+els.btnIniciarDueloCampo.addEventListener("click", () => {
+  const fn = ctx?.iniciarQteCampo;
+  if (!fn) return;
+  ctx.iniciarQteCampo = null;
+  fn();
 });
 
 els.btnEncararGoleiro.addEventListener("click", () => {
@@ -920,10 +1226,10 @@ els.btnFecharLance.addEventListener("click", async () => {
   const golParaJogador = ctx?.golParaJogador === true;
   const teveGol = ctx?._teveGol === true;
   const minutoLance = ctx?.minuto ?? estadoGlobal.minuto;
+  const blocos = ctx?.linhasResultado ?? [];
+  const resumo = blocos.map(htmlParaTextoLog).filter(Boolean).join(" ");
 
-  appendLog(
-    `<strong>${formatMinuto(minutoLance)}</strong> — Lance encerrado.${teveGol ? " <strong>Bola na rede.</strong>" : ""}`,
-  );
+  appendLog(`<strong>${formatMinuto(minutoLance)}</strong> — ${resumo || "Lance concluído."}`);
 
   fecharModalLance();
   renderEscalacoes(null);
@@ -959,9 +1265,10 @@ async function continuarRodadaAposLance() {
   const de = estadoGlobal.minuto;
   const salto = proximoIntervaloMinutos();
   const prox = de + salto;
-  if (prox > 90) {
-    estadoGlobal.minuto = Math.min(de, 90);
-    els.relogio.textContent = formatMinuto(90);
+  const fim = minutoFimJogo();
+  if (prox > fim) {
+    estadoGlobal.minuto = fim;
+    els.relogio.textContent = formatMinuto(fim);
     els.etapaTempo.textContent = "Fim";
     encerrarPartida();
     return;
@@ -972,7 +1279,11 @@ async function continuarRodadaAposLance() {
 }
 
 function dispararLance() {
-  const zona = sortearZona();
+  let zona = estadoGlobal.proximaZona;
+  if (!zona) {
+    zona = sortearZona();
+  }
+  estadoGlobal.proximaZona = null;
   const { jogador, adversario } = escolherDuelistas(zona, timeJogador.titulares, timeCpu.titulares);
   if (!jogador || !adversario) {
     appendLog("Erro ao escalar duelo — verifique posições.");
@@ -998,11 +1309,12 @@ function encerrarPartida() {
   aguardandoSegundoTempo = false;
   resolveSegundoTempo = null;
   esconderUiIntervalo();
-  estadoGlobal.minuto = Math.min(estadoGlobal.minuto, 90);
-  els.relogio.textContent = formatMinuto(90);
+  const fim = minutoFimJogo();
+  estadoGlobal.minuto = Math.min(estadoGlobal.minuto, fim);
+  els.relogio.textContent = formatMinuto(estadoGlobal.minuto);
   els.etapaTempo.textContent = "Fim";
-  els.btnIniciar.disabled = false;
   sincronizarUiPausa();
+  atualizarBtnCentroRodada();
   appendLog(`<strong>Fim de jogo.</strong> ${golsJogador} × ${golsCpu}`);
 }
 
@@ -1027,21 +1339,25 @@ async function iniciarPartida() {
   aguardandoSegundoTempo = false;
   resolveSegundoTempo = null;
   esconderUiIntervalo();
+  acrescimosPrimeiroTempo = sortearAcrescimosTempo();
+  acrescimosSegundoTempo = sortearAcrescimosTempo();
+  snapshotStatsInicioPartida();
   els.placar.textContent = "0 × 0";
   els.log.innerHTML = "";
   partidaAtiva = true;
   estadoGlobal = {
     minuto: 0,
     posseJogador: Math.random() < 0.5,
+    proximaZona: null,
   };
   els.relogio.textContent = "0′";
   els.etapaTempo.textContent = "1º tempo";
   setZonaVisual(null);
-  els.btnIniciar.disabled = true;
   atualizarSubsHud();
   sincronizarUiPausa();
+  atualizarBtnCentroRodada();
   appendLog(
-    "Apito inicial. Entre lances o relógio corre devagar; use <strong>Pausar</strong> (ou Esc) para ver números e trocar jogadores; no intervalo o relógio para até <strong>Começar 2º tempo</strong>.",
+    "Apito inicial. Entre lances o relógio corre devagar; use <strong>Pausar</strong> (ou Esc) para ver números e trocar jogadores; no intervalo use o botão central <strong>Começar 2º tempo</strong>.",
   );
 
   const primeiro = proximoIntervaloMinutos();
@@ -1050,19 +1366,6 @@ async function iniciarPartida() {
   dispararLance();
 }
 
-els.btnNovoTime.addEventListener("click", () => {
-  if (partidaAtiva) return;
-  timeJogador = gerarTime();
-  timeCpu = gerarTime();
-  substituicoesUsadas = 0;
-  substituicoesCpuUsadas = 0;
-  limparSelecaoSub();
-  atualizarSubsHud();
-  renderEscalacoes(null);
-});
-
-els.btnIniciar.addEventListener("click", iniciarPartida);
-
 ligarCliquesSubstituicao();
 renderEscalacoes(null);
 els.relogio.textContent = "0′";
@@ -1070,3 +1373,4 @@ els.etapaTempo.textContent = "—";
 els.placar.textContent = "0 × 0";
 atualizarSubsHud();
 sincronizarUiPausa();
+atualizarBtnCentroRodada();

@@ -3,6 +3,8 @@ import { ZONE_LABEL, ZONES } from "./constants.js";
 /** @typedef {(j: { nome: string }) => string} FmtNome */
 
 /**
+ * Contexto do lance: sempre alinha “quem tem a bola” com a ação descrita.
+ * `jogador` / `adversario` vêm de escolherDuelistas (seu zag/meia/ata × rival).
  * @param {object} p
  * @param {string} p.zona
  * @param {object} p.jogador
@@ -14,44 +16,86 @@ export function textoContextoPrimario(p, fmtNome = (j) => j.nome) {
   const setor = ZONE_LABEL[p.zona] || p.zona;
   const eu = fmtNome(p.jogador);
   const ele = fmtNome(p.adversario);
-  const bola = p.jogadorComBola ? `${eu} conduz a bola` : `${ele} pressiona com a posse`;
 
   if (p.zona === ZONES.DEFESA_JOGADOR) {
-    return `${setor}. ${bola}. ${eu} fecha o espaço na última linha contra ${ele}, que busca infiltrar.`;
+    if (p.jogadorComBola) {
+      return `${setor}. ${eu} tem a bola na saída da defesa; ${ele} avança da linha de ataque para pressionar e tentar roubar.`;
+    }
+    return `${setor}. ${ele} desce com a bola buscando infiltrar na última linha; ${eu} recua para fechar espaço e cortar a jogada.`;
   }
+
   if (p.zona === ZONES.MEIO_CAMPO) {
-    return `${setor}. ${bola}. ${eu} e ${ele} disputam o segundo tempo de bola no miolo.`;
+    if (p.jogadorComBola) {
+      return `${setor}. ${eu} comanda o meio com a posse; ${ele} gruda na marcação e disputa cada toque.`;
+    }
+    return `${setor}. ${ele} organiza o jogo com a bola no miolo; ${eu} pressiona, fecha linhas de passe e força o duelo.`;
   }
+
   if (p.zona === ZONES.ATAQUE_JOGADOR) {
-    return `${setor}. ${bola}. ${eu} encara ${ele} na referência da área rival.`;
+    if (p.jogadorComBola) {
+      return `${setor}. ${eu} encara ${ele} na referência da área rival, com opção de arrastar ou tocar na profundidade.`;
+    }
+    return `${setor}. ${ele} tenta progressão com a bola na zona alta; ${eu} volta na marcação para travar a subida.`;
   }
-  return `${setor}. ${eu} contra ${ele}.`;
+
+  return `${setor}. ${eu} e ${ele} se encontram no lance decisivo.`;
 }
 
 /**
+ * Resultado do duelo coerente com posse: vitória do humano = sucesso na ação que o QTE representa (ataque ou defesa).
  * @param {object} p
  * @param {boolean} p.venceu
+ * @param {boolean} p.jogadorComBola
  * @param {FmtNome} [fmtNome]
  */
 export function textoResultadoPrimario(p, fmtNome = (j) => j.nome) {
   const j = fmtNome(p.jogador);
   const a = fmtNome(p.adversario);
-  if (p.venceu) {
-    if (p.zona === ZONES.ATAQUE_JOGADOR) {
-      return `${j} ganha o corpo, abre ângulo e deixa o zagueiro para trás — a defesa rival pede cobertura.`;
-    }
-    if (p.zona === ZONES.DEFESA_JOGADOR) {
-      return `${j} antecipa o passe, corta a jogada e tira pressão do setor defensivo.`;
-    }
-    return `${j} sai na frente no duelo e impõe o ritmo no lance.`;
-  }
-  if (p.zona === ZONES.ATAQUE_JOGADOR) {
-    return `${a} fecha bem a porta, desarma ${j} e a bola volta para o meio.`;
-  }
+  const com = p.jogadorComBola;
+
   if (p.zona === ZONES.DEFESA_JOGADOR) {
-    return `${a} protege a bola, gira na marcação e mantém o ataque vivo em campo.`;
+    if (com) {
+      if (p.venceu) {
+        return `${j} se livra da pressão de ${a}, protege a bola e acha a saída — a defesa respira.`;
+      }
+      return `${a} acerta o bote, desarma ${j} e recupera a posse na entrada da área.`;
+    }
+    if (p.venceu) {
+      return `${j} antecipa o lance, fecha o corredor e corta a infiltração de ${a}.`;
+    }
+    return `${a} protege a bola na disputa, ganha o corpo e mantém o ataque vivo em campo.`;
   }
-  return `${a} leva a melhor no mano a mano e redefine o lance.`;
+
+  if (p.zona === ZONES.MEIO_CAMPO) {
+    if (com) {
+      if (p.venceu) {
+        return `${j} vence o mano a mano com a posse e impõe o ritmo no meio.`;
+      }
+      return `${a} desarma ${j}, rouba no miolo e vira o campo de ataque.`;
+    }
+    if (p.venceu) {
+      return `${j} recupera no combate, tira a bola de ${a} e devolve o controle ao time.`;
+    }
+    return `${a} segura a marcação de ${j}, conduz de lado e mantém o comando no meio.`;
+  }
+
+  if (p.zona === ZONES.ATAQUE_JOGADOR) {
+    if (com) {
+      if (p.venceu) {
+        return `${j} ganha o corpo, abre ângulo e deixa ${a} para trás — a defesa rival pede cobertura.`;
+      }
+      return `${a} fecha bem a porta, desarma ${j} e afasta o perigo da área.`;
+    }
+    if (p.venceu) {
+      return `${j} pressiona com critério, força o erro de ${a} e mata o avanço na lateral do ataque.`;
+    }
+    return `${a} sustenta a posse na subida, segura o duelo e segue na progressão.`;
+  }
+
+  if (p.venceu) {
+    return `${j} leva a melhor no lance e redefine o duelo.`;
+  }
+  return `${a} prevalece no mano a mano e muda o rumo da jogada.`;
 }
 
 export function textoTransicaoGoleiro(chuteJogador) {
@@ -80,4 +124,14 @@ export function textoDueloGoleiro(p, fmtNome = (j) => j.nome) {
     return `${gl} sai no contrapé, fecha o arco e nega o gol a ${at}.`;
   }
   return `${at} converte: a bola passa raspando as luvas de ${gl} e entra.`;
+}
+
+/**
+ * Após vencer o QTE contra o goleiro, o chute ainda pode sair ruim.
+ * @param {{ nome: string }} atacante
+ * @param {FmtNome} [fmtNome]
+ */
+export function textoChuteParaForaAposDuelo(atacante, fmtNome = (j) => j.nome) {
+  const at = fmtNome(atacante);
+  return `${at} tinha o goleiro batido, mas a finalização sobe demais — bola na arquibancada.`;
 }

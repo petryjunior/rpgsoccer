@@ -1,29 +1,11 @@
 import { POSITIONS, ZONES } from "./constants.js";
 
 /**
- * @typedef {'equilibrado' | 'arrojado' | 'cauteloso'} Postura
- */
-
-/**
  * @param {number} min
  * @param {number} max
  */
 function randomInt(min, max) {
   return min + Math.floor(Math.random() * (max - min + 1));
-}
-
-/** @param {{ ataque: number, defesa: number }} jogador @param {Postura} postura */
-function aplicarPostura(jogador, postura) {
-  let ataque = jogador.ataque;
-  let defesa = jogador.defesa;
-  if (postura === "arrojado") {
-    ataque *= 1.22;
-    defesa *= 0.88;
-  } else if (postura === "cauteloso") {
-    ataque *= 0.9;
-    defesa *= 1.22;
-  }
-  return { ataque, defesa };
 }
 
 /**
@@ -74,20 +56,18 @@ export function escolherDuelistas(zona, titPlayer, titCpu) {
  * Probabilidade de vitória do jogador humano no duelo (base do tamanho/velocidade do QTE).
  * @param {{ ataque: number, defesa: number }} eu
  * @param {{ ataque: number, defesa: number }} ele
- * @param {Postura} postura
  */
-export function calcularProbDuelo(eu, ele, jogadorComBola, postura) {
-  const mod = aplicarPostura(eu, postura);
+export function calcularProbDuelo(eu, ele, jogadorComBola) {
   const oA = ele.ataque;
   const oD = ele.defesa;
 
   let meuPeso;
   let pesoOponente;
   if (jogadorComBola) {
-    meuPeso = mod.ataque;
+    meuPeso = eu.ataque;
     pesoOponente = oD;
   } else {
-    meuPeso = mod.defesa;
+    meuPeso = eu.defesa;
     pesoOponente = oA;
   }
 
@@ -98,23 +78,22 @@ export function calcularProbDuelo(eu, ele, jogadorComBola, postura) {
 }
 
 /**
- * Pesos do duelo sem ruído — usado no QTE para a dificuldade refletir os atributos de verdade.
+ * Pesos do duelo — usado no QTE (tempo da letra).
+ * Com a posse, `eu` usa ataque × defesa do rival; sem posse, defesa × ataque.
  * @param {{ ataque: number, defesa: number }} eu
  * @param {{ ataque: number, defesa: number }} ele
- * @param {Postura} postura
  */
-export function metricasDuelo(eu, ele, jogadorComBola, postura) {
-  const mod = aplicarPostura(eu, postura);
+export function metricasDuelo(eu, ele, jogadorComBola) {
   const oA = ele.ataque;
   const oD = ele.defesa;
 
   let meuPeso;
   let pesoOponente;
   if (jogadorComBola) {
-    meuPeso = mod.ataque;
+    meuPeso = eu.ataque;
     pesoOponente = oD;
   } else {
-    meuPeso = mod.defesa;
+    meuPeso = eu.defesa;
     pesoOponente = oA;
   }
 
@@ -130,6 +109,11 @@ export function sortearZona() {
 
 export function proximoIntervaloMinutos() {
   return randomInt(1, 10);
+}
+
+/** Minutos de acréscimo (0–9) por tempo; sorteados ao iniciar cada partida. */
+export function sortearAcrescimosTempo() {
+  return randomInt(0, 9);
 }
 
 /**
@@ -149,4 +133,43 @@ export function tipoFinalizacaoGoleiro(zona, jogadorVenceuPrimario) {
 export function atualizarPosse(jogadorComBola, jogadorVenceu) {
   if (jogadorVenceu) return true;
   return false;
+}
+
+/**
+ * Próximo setor do lance e posse após duelo de campo (sem finalização com goleiro).
+ * Meio-campo: quem vence leva a bola ao seu ataque.
+ * @param {string} zona
+ * @param {boolean} jogadorVenceu
+ * @param {boolean} jogadorComBola
+ */
+export function proximaZonaEPosse(zona, jogadorVenceu, jogadorComBola) {
+  const posseJogador = atualizarPosse(jogadorComBola, jogadorVenceu);
+  if (zona === ZONES.MEIO_CAMPO) {
+    return {
+      posseJogador,
+      proximaZona: jogadorVenceu ? ZONES.ATAQUE_JOGADOR : ZONES.DEFESA_JOGADOR,
+    };
+  }
+  if (zona === ZONES.ATAQUE_JOGADOR) {
+    if (jogadorVenceu) {
+      return { posseJogador, proximaZona: ZONES.MEIO_CAMPO };
+    }
+    return { posseJogador, proximaZona: ZONES.DEFESA_JOGADOR };
+  }
+  if (zona === ZONES.DEFESA_JOGADOR) {
+    if (jogadorVenceu) {
+      return { posseJogador, proximaZona: ZONES.MEIO_CAMPO };
+    }
+    return { posseJogador, proximaZona: ZONES.ATAQUE_JOGADOR };
+  }
+  return { posseJogador, proximaZona: ZONES.MEIO_CAMPO };
+}
+
+/**
+ * Chance do atacante errar o chute mesmo após vencer o goleiro no QTE (0–1).
+ * Mais ataque ⇒ menos erro.
+ */
+export function chanceErrarFinalizacaoAposVencerGoleiro(ataque) {
+  const a = Number(ataque);
+  return Math.min(0.28, Math.max(0.035, (86 - a) / 200));
 }

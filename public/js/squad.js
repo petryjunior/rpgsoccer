@@ -21,6 +21,45 @@ const FIRST = [
   "Teixeira",
   "Dias",
   "Monteiro",
+  "Barbosa",
+  "Cardoso",
+  "Correia",
+  "Cavalcanti",
+  "Duarte",
+  "Freitas",
+  "Farias",
+  "Guimarães",
+  "Henrique",
+  "Machado",
+  "Moraes",
+  "Moreira",
+  "Nascimento",
+  "Pinto",
+  "Queiroz",
+  "Rezende",
+  "Siqueira",
+  "Tavares",
+  "Vieira",
+  "Xavier",
+  "Araújo",
+  "Batista",
+  "Campos",
+  "Coelho",
+  "Costa",
+  "Cunha",
+  "Dantas",
+  "Esteves",
+  "Fonseca",
+  "Franco",
+  "Garcia",
+  "Lopes",
+  "Macedo",
+  "Miranda",
+  "Neves",
+  "Pacheco",
+  "Ramos",
+  "Sales",
+  "Vasconcelos",
 ];
 
 const NICK = [
@@ -36,6 +75,74 @@ const NICK = [
   "Thi",
   "Kiko",
   "Nenê",
+  "Cacá",
+  "Pepe",
+  "Teco",
+  "Buiú",
+  "Cadu",
+  "Digo",
+  "Fê",
+  "Iuri",
+  "Jota",
+  "Kauã",
+  "Lipe",
+  "Muca",
+  "Nico",
+  "Piu",
+  "Tiquinho",
+  "Vitinho",
+  "Xande",
+  "Yuri",
+  "Zeca",
+  "Bambam",
+  "Ceará",
+  "Dedé",
+  "Foguinho",
+  "Galinho",
+  "Ita",
+  "Jajá",
+  "Keké",
+  "Lulinha",
+  "Marquinhos",
+  "Negueba",
+  "Pipoca",
+  "Russo",
+  "Tinga",
+  "Wesley",
+  "Yago",
+  "Zizão",
+  "Aranha",
+  "Bruxo",
+  "China",
+  "Dentinho",
+  "Elías",
+  "Formiga",
+  "Ganso",
+  "Helinho",
+  "Índio",
+  "Jairzinho",
+  "Klebinho",
+  "Luquinhas",
+  "Mengão",
+  "Naldo",
+  "Pitbull",
+  "Rômulo",
+  "Sapo",
+  "Tchê",
+  "Vampeta",
+  "Xexéu",
+];
+
+const SOBRENOME2 = [
+  "Neto",
+  "Filho",
+  "Júnior",
+  "Costa",
+  "Pereira",
+  "Santos",
+  "",
+  "",
+  "",
 ];
 
 let idSeq = 0;
@@ -49,7 +156,9 @@ function pick(arr) {
 }
 
 function randomName() {
-  return `${pick(NICK)} ${pick(FIRST)}`;
+  const s2 = pick(SOBRENOME2);
+  const base = `${pick(NICK)} ${pick(FIRST)}`;
+  return s2 ? `${base} ${s2}` : base;
 }
 
 /**
@@ -102,8 +211,12 @@ function montarTitulares() {
   return shuffle(titulares);
 }
 
+function countPos(arr, pos) {
+  return arr.filter((j) => j.posicao === pos).length;
+}
+
 /**
- * 11 reservas: pelo menos 1 de cada posição; o restante aleatório.
+ * 11 reservas: pelo menos 1 de cada posição; no máximo 2 goleiros no banco.
  */
 function montarReservas() {
   const reservas = [
@@ -112,14 +225,12 @@ function montarReservas() {
     criarJogador(POSITIONS.MEIA),
     criarJogador(POSITIONS.ATACANTE),
   ];
-  const todas = [
-    POSITIONS.GOLEIRO,
-    POSITIONS.ZAGUEIRO,
-    POSITIONS.MEIA,
-    POSITIONS.ATACANTE,
-  ];
+  const semGolExcesso = [POSITIONS.ZAGUEIRO, POSITIONS.MEIA, POSITIONS.ATACANTE];
+  const todas = [POSITIONS.GOLEIRO, ...semGolExcesso];
   while (reservas.length < 11) {
-    reservas.push(criarJogador(pick(todas)));
+    const gols = countPos(reservas, POSITIONS.GOLEIRO);
+    const pool = gols >= 2 ? semGolExcesso : todas;
+    reservas.push(criarJogador(pick(pool)));
   }
   return shuffle(reservas);
 }
@@ -171,6 +282,9 @@ export function validarElenco(titulares, reservas) {
     if (count(r, pos) < 1) {
       return { ok: false, msg: `Reservas: pelo menos 1 jogador na posição ${pos}.` };
     }
+  }
+  if (count(r, POSITIONS.GOLEIRO) > 2) {
+    return { ok: false, msg: "Reservas: no máximo 2 goleiros no banco." };
   }
   return { ok: true, msg: "" };
 }

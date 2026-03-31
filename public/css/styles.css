@@ -82,6 +82,35 @@ body {
   color: var(--muted);
 }
 
+.painel-esq {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.painel-esq-head h2 {
+  margin: 0 0 0.35rem;
+}
+
+.painel-esq-listas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.painel-esq .bloco-elenco h3 {
+  margin: 0 0 0.35rem;
+}
+
+.painel-esq .bloco-elenco .lista-jogadores {
+  margin: 0;
+  padding: 0.2rem 0;
+  border: 1px solid rgba(42, 53, 68, 0.55);
+  border-radius: 6px;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+}
+
 .lista-jogadores {
   list-style: none;
   margin: 0;
@@ -154,15 +183,16 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.lista-jogadores.reservas {
-  opacity: 0.92;
+.lista-jogadores .stats .stat-delta-neg {
+  color: #e85555;
 }
 
-.acoes-pre {
-  margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.lista-jogadores .stats .stat-delta-pos {
+  color: #3ecf8e;
+}
+
+.lista-jogadores.reservas {
+  opacity: 0.92;
 }
 
 .btn {
@@ -371,28 +401,43 @@ body {
   border: 1px solid rgba(201, 162, 39, 0.35);
   border-radius: 8px;
   padding: 0.65rem 0.75rem;
-  margin-bottom: 0.75rem;
-  font-size: 0.78rem;
-  line-height: 1.45;
+  font-size: 0.8rem;
+  line-height: 1.5;
   color: var(--texto);
 }
 
-.subs-tutorial strong {
-  display: block;
-  margin-bottom: 0.35rem;
+.subs-tutorial-titulo {
+  margin: 0 0 0.4rem;
+  font-size: 0.84rem;
+  font-weight: 700;
   color: var(--acento);
-  font-size: 0.82rem;
 }
 
-.subs-tutorial ol {
-  margin: 0 0 0.4rem;
-  padding-left: 1.15rem;
+.subs-tutorial-passos {
+  margin: 0 0 0.5rem;
+  color: var(--texto);
+}
+
+.subs-tutorial-passos strong {
+  color: var(--acento);
+  font-weight: 700;
 }
 
 .subs-tutorial-meta {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
+  line-height: 1.5;
   color: var(--muted);
+}
+
+.subs-tutorial-meta strong {
+  color: var(--acento);
+  font-weight: 700;
+}
+
+.subs-tutorial-rotulo {
+  font-weight: 700;
+  color: var(--acento);
 }
 
 .intervalo-banner {
@@ -410,13 +455,18 @@ body {
   color: #8ec8ff;
 }
 
-.btn-segundo-tempo {
+.btn-centro-rodada {
   display: block;
   width: 100%;
   max-width: 320px;
-  margin: 0 auto 1rem;
+  margin: 0 auto 0.35rem;
   font-size: 1rem;
   padding: 0.7rem 1rem;
+}
+
+/* Author `display: block` above beats the UA `[hidden]` rule — force hide when oculto via JS. */
+.btn-centro-rodada[hidden] {
+  display: none !important;
 }
 
 .lista-jogadores li.sel-sub {
@@ -496,7 +546,7 @@ body {
   transform: scale(1.35);
 }
 
-.dica-postura {
+.dica-jogo {
   font-size: 0.8rem;
   color: var(--muted);
   padding: 0.65rem 0.85rem;
@@ -505,8 +555,22 @@ body {
   border: 1px solid var(--borda);
 }
 
-.dica-postura strong {
+.dica-jogo strong {
   color: var(--texto);
+}
+
+.fase-intro-duelo {
+  margin-bottom: 0.35rem;
+}
+
+.fase-acao-inicio-duelo {
+  margin-top: 0.85rem;
+  display: flex;
+  justify-content: center;
+}
+
+.fase-acao-inicio-duelo[hidden] {
+  display: none !important;
 }
 
 .log {
@@ -535,12 +599,48 @@ body {
   z-index: 50;
 }
 
-/* Modal do duelo mais abaixo para não cobrir o HUD + mini-campo (setor da bola) */
-.overlay-duelo {
+/*
+ * Duelo: faixa superior sem escurecimento (mini-campo + HUD ficam visíveis no fluxo normal),
+ * escurecimento só abaixo; modal abaixo da faixa, sem cobrir o campo.
+ */
+.overlay.overlay-duelo {
+  --duelo-faixa-limpa: clamp(16rem, 40vh, 24rem);
   align-items: flex-start;
   justify-content: center;
-  padding-top: clamp(10.5rem, 28vh, 17rem);
-  padding-bottom: 1.25rem;
+  padding: 0.5rem 1rem 1.25rem;
+  overflow-y: auto;
+  background: transparent !important;
+  pointer-events: none;
+}
+
+.duelo-shield-top {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--duelo-faixa-limpa);
+  background: transparent;
+  pointer-events: auto;
+  z-index: 0;
+}
+
+.duelo-scrim {
+  position: fixed;
+  top: var(--duelo-faixa-limpa);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.72);
+  pointer-events: auto;
+  z-index: 0;
+}
+
+.overlay-duelo .modal-duelo {
+  position: relative;
+  z-index: 1;
+  margin-top: var(--duelo-faixa-limpa);
+  pointer-events: auto;
+  max-height: calc(100vh - var(--duelo-faixa-limpa) - 1.5rem);
   overflow-y: auto;
 }
 
@@ -622,6 +722,20 @@ body {
   cursor: default;
 }
 
+.qte-reacao.qte-countdown.qte-letra-painel {
+  background: linear-gradient(165deg, #2a2838 0%, #181620 100%);
+  border-color: #6b5a8a;
+}
+
+.qte-reacao.qte-countdown .qte-letra-gigante {
+  color: #c9b4f0;
+  text-shadow: 0 0 28px rgba(180, 150, 255, 0.45);
+}
+
+.qte-reacao.qte-countdown .qte-reacao-sub {
+  color: #a89bc4;
+}
+
 .qte-reacao:focus {
   outline: 2px solid var(--acento);
   outline-offset: 3px;
@@ -630,6 +744,27 @@ body {
 .qte-reacao.falha {
   background: linear-gradient(165deg, #5a3538 0%, #2d1a1c 100%);
   border-color: #c46a6a;
+}
+
+.qte-reacao.qte-feedback-acerto {
+  background: linear-gradient(165deg, #1a3d32 0%, #15261f 100%);
+  border-color: #3ecf8e;
+  box-shadow: 0 0 28px rgba(62, 207, 142, 0.35);
+}
+
+.qte-reacao.qte-feedback-acerto .qte-letra-gigante {
+  color: #7ef0be;
+  text-shadow: 0 0 20px rgba(126, 240, 190, 0.45);
+}
+
+.qte-reacao.qte-feedback-acerto .qte-reacao-sub {
+  color: #b8f5d9;
+  font-weight: 700;
+}
+
+.qte-reacao.falha .qte-reacao-sub {
+  color: #f0b4b4;
+  font-weight: 700;
 }
 
 .qte-letra-gigante {
@@ -771,13 +906,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.duelo-rpg-nota {
-  margin: 0.55rem 0 0;
-  font-size: 0.72rem;
-  color: var(--muted);
-  line-height: 1.35;
-}
-
 .duelo-texto {
   margin: 0 0 0.5rem;
   font-size: 0.95rem;
@@ -789,34 +917,3 @@ body {
   font-weight: 600;
 }
 
-.escolha-label {
-  margin: 0 0 0.5rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.posturas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.btn.postura {
-  flex: 1;
-  min-width: 100px;
-  background: var(--verde);
-  color: #fff;
-  font-weight: 600;
-}
-
-.btn.postura:hover {
-  filter: brightness(1.1);
-}
-
-.btn.postura[data-postura="arrojado"] {
-  background: #8b5a2b;
-}
-
-.btn.postura[data-postura="cauteloso"] {
-  background: #2a5580;
-}
