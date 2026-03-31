@@ -163,10 +163,9 @@ function randomName() {
 
 /**
  * @param {import('./constants.js').Position} position
- * @returns {{ id: string, nome: string, posicao: import('./constants.js').Position, ataque: number, defesa: number }}
+ * @returns {{ ataque: number, defesa: number }}
  */
-export function criarJogador(position) {
-  const id = `p${++idSeq}`;
+function sortearStatsPorPosicao(position) {
   let ataque = randomInt(35, 92);
   let defesa = randomInt(35, 92);
 
@@ -184,12 +183,42 @@ export function criarJogador(position) {
     defesa = randomInt(25, 75);
   }
 
+  return { ataque, defesa };
+}
+
+/**
+ * @param {import('./constants.js').Position} position
+ * @returns {{ id: string, nome: string, posicao: import('./constants.js').Position, ataque: number, defesa: number }}
+ */
+export function criarJogador(position) {
+  const id = `p${++idSeq}`;
+  const { ataque, defesa } = sortearStatsPorPosicao(position);
   return {
     id,
     nome: randomName(),
     posicao: position,
     ataque,
     defesa,
+  };
+}
+
+/**
+ * Jogador com atributos fixos (elencos de seleção). `ataque` e `defesa` em 1–99.
+ * @param {string} nome
+ * @param {import('./constants.js').Position} posicao
+ * @param {number} ataque
+ * @param {number} defesa
+ */
+export function criarJogadorFixo(nome, posicao, ataque, defesa) {
+  const id = `p${++idSeq}`;
+  const a = Math.min(99, Math.max(1, Math.round(ataque)));
+  const d = Math.min(99, Math.max(1, Math.round(defesa)));
+  return {
+    id,
+    nome,
+    posicao,
+    ataque: a,
+    defesa: d,
   };
 }
 

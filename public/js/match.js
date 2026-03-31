@@ -19,7 +19,9 @@ function comRuido(p) {
 
 /** @param {object[]} titulares @param {string} pos */
 function sortearPorPosicao(titulares, pos) {
-  const pool = titulares.filter((j) => j.posicao === pos);
+  let pool = titulares.filter((j) => j.posicao === pos && !j.expulso && !j.lesionado);
+  if (pool.length === 0) pool = titulares.filter((j) => j.posicao === pos && !j.expulso);
+  if (pool.length === 0) pool = titulares.filter((j) => j.posicao === pos);
   if (pool.length === 0) return null;
   return pool[randomInt(0, pool.length - 1)];
 }
@@ -27,6 +29,11 @@ function sortearPorPosicao(titulares, pos) {
 /** @param {object[]} titulares */
 export function sortearGoleiro(titulares) {
   return sortearPorPosicao(titulares, POSITIONS.GOLEIRO);
+}
+
+/** @param {object[]} titulares */
+export function sortearAtacanteTitular(titulares) {
+  return sortearPorPosicao(titulares, POSITIONS.ATACANTE);
 }
 
 /** @param {string} zona @param {object[]} titPlayer @param {object[]} titCpu */

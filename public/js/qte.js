@@ -9,7 +9,7 @@
  *
  * Fórmula: `tempoLimiteMs = BASE_MS + r * FAIXA_MS`
  *
- * - **BASE_MS** (hoje 250): tempo mínimo quando o duelo está péssimo para você (`r` no piso).
+ * - **BASE_MS** (hoje 350): tempo mínimo quando o duelo está péssimo para você (`r` no piso).
  *   Aumentar → mesmo no pior caso o jogador tem mais tempo (QTE mais fácil no limite inferior).
  *   Diminuir → piso mais cruel (mais difícil quando está em desvantagem).
  *
@@ -35,6 +35,6 @@
 export function parametrosLetra(ratio) {
   const r = Math.min(0.93, Math.max(0.07, ratio));
   const letra = String.fromCharCode(65 + Math.floor(Math.random() * 26));
-  const tempoLimiteMs = 250 + r * 800;
+  const tempoLimiteMs = 350 + r * 800;
   return { letra, tempoLimiteMs, ratioUsado: r };
 }

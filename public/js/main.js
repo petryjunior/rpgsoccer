@@ -1,8 +1,13 @@
-import { ZONE_LABEL, ZONES } from "./constants.js";
+import { POSITIONS, ZONE_LABEL, ZONES } from "./constants.js";
 import {
+  textoCartaoAmarelo,
   textoChuteParaForaAposDuelo,
   textoContextoPrimario,
   textoDueloGoleiro,
+  textoExpulsao,
+  textoFaltaMarcada,
+  textoLesaoPorFalta,
+  textoPenaltiMarcadoPorFalta,
   textoResultadoPrimario,
   textoTransicaoGoleiro,
 } from "./narrative.js";
@@ -13,15 +18,30 @@ import {
   proximaZonaEPosse,
   proximoIntervaloMinutos,
   sortearAcrescimosTempo,
+  sortearAtacanteTitular,
   sortearGoleiro,
   sortearZona,
   tipoFinalizacaoGoleiro,
 } from "./match.js";
 import { parametrosLetra } from "./qte.js";
+import { SELECOES, elencoDaSelecao, urlBandeira } from "./national-teams.js";
 import { ordenarPorPosicao } from "./squadSort.js";
-import { gerarTime, validarElenco } from "./squad.js";
+import { validarElenco } from "./squad.js";
 
 const els = {
+  jogoRoot: document.getElementById("jogo-root"),
+  telaInicio: document.getElementById("tela-inicio"),
+  telaAmistoso: document.getElementById("tela-amistoso"),
+  btnMenuAmistoso: document.getElementById("btn-menu-amistoso"),
+  amistosoCardsJogador: document.getElementById("amistoso-cards-jogador"),
+  amistosoCardsCpu: document.getElementById("amistoso-cards-cpu"),
+  btnConfirmarAmistoso: document.getElementById("btn-confirmar-amistoso"),
+  btnVoltarMenu: document.getElementById("btn-voltar-menu"),
+  amistosoErro: document.getElementById("amistoso-erro"),
+  bandeiraJogadorPainel: document.getElementById("bandeira-jogador-painel"),
+  nomeSelecaoJogadorPainel: document.getElementById("nome-selecao-jogador-painel"),
+  bandeiraCpuPainel: document.getElementById("bandeira-cpu-painel"),
+  nomeSelecaoCpuPainel: document.getElementById("nome-selecao-cpu-painel"),
   timeJogadorTit: document.getElementById("time-jogador-tit"),
   timeJogadorRes: document.getElementById("time-jogador-res"),
   timeCpuTit: document.getElementById("time-cpu-tit"),
@@ -34,6 +54,7 @@ const els = {
   campoMarcadores: document.querySelectorAll(".campo-zona .marcador"),
   log: document.getElementById("log"),
   btnCentroRodada: document.getElementById("btn-centro-rodada"),
+  btnVoltarMenuJogo: document.getElementById("btn-voltar-menu-jogo"),
   dueloOverlay: document.getElementById("duelo-overlay"),
   faseIntroDuelo: document.getElementById("fase-intro-duelo"),
   faseAcaoInicioDuelo: document.getElementById("fase-acao-inicio-duelo"),
@@ -44,6 +65,7 @@ const els = {
   dueloTitulo: document.getElementById("duelo-titulo"),
   dueloTexto: document.getElementById("duelo-texto"),
   dueloDetalhe: document.getElementById("duelo-detalhe"),
+  transicaoResumoCampo: document.getElementById("transicao-resumo-campo"),
   transicaoTexto: document.getElementById("transicao-texto"),
   transicaoPar: document.getElementById("transicao-par"),
   btnEncararGoleiro: document.getElementById("btn-encarar-goleiro"),
@@ -69,11 +91,22 @@ const CANSACO_DUELO = 3;
 const ATTR_MIN = 1;
 const ATTR_MAX = 99;
 const BONUS_STREAK_DUELO = 10;
+/** Chance do adversário “cometer falta” após vitória no duelo de campo (sem QTE). */
+const CPU_PROB_FALTA = 0.3;
+const FATOR_DEBUFF_EXPULSAO = 0.93;
+/** Chance de o jogador faltado (quem sofre a falta) se lesionar. */
+const PROB_LESAO_APOS_FALTA = 0.1;
 
 /** @type {Map<string, { ataque: number, defesa: number }>} */
 const statsBasePartida = new Map();
+/** Stats ao entrar no jogo (amistoso) — restauradas a cada nova partida. */
+const statsElencoLimpo = new Map();
+/** @type {Map<string, number>} faltas no jogo por id do jogador */
+const faltasPorJogador = new Map();
 /** @type {Map<string, { ataque: number, defesa: number }>} vitórias seguidas por papel (ataque/defesa) */
 const streakDueloPorJogador = new Map();
+/** Após expulsar titular/reserva seu, pausa ao fechar o lance para ajustar escalação. */
+let aguardandoPausaPorExpulsaoHumana = false;
 /** Tempo com o feedback na tela antes de seguir para o resultado (falha: tecla errada ou fim do tempo). */
 const QTE_FEEDBACK_FALHA_MS = 1150;
 const QTE_FEEDBACK_ACERTO_MS = 280;
@@ -111,6 +144,141 @@ function aplicarCansacoDueloCampo(jogador, adversario, jogadorComBola) {
 function aplicarCansacoDueloGoleiro(atacante, goleiro) {
   atacante.ataque = Math.max(ATTR_MIN, atacante.ataque - CANSACO_DUELO);
   goleiro.defesa = Math.max(ATTR_MIN, goleiro.defesa - CANSACO_DUELO);
+}
+
+function snapshotElencoLimpo() {
+  statsElencoLimpo.clear();
+  for (const j of [
+    ...timeJogador.titulares,
+    ...timeJogador.reservas,
+    ...timeCpu.titulares,
+    ...timeCpu.reservas,
+  ]) {
+    statsElencoLimpo.set(j.id, { ataque: j.ataque, defesa: j.defesa });
+  }
+}
+
+function restaurarElencoParaNovaPartida() {
+  for (const j of [
+    ...timeJogador.titulares,
+    ...timeJogador.reservas,
+    ...timeCpu.titulares,
+    ...timeCpu.reservas,
+  ]) {
+    const s = statsElencoLimpo.get(j.id);
+    if (s) {
+      j.ataque = s.ataque;
+      j.defesa = s.defesa;
+    }
+    delete j.expulso;
+    delete j.lesionado;
+  }
+  faltasPorJogador.clear();
+  timeJogador._debuffExpulsaoAplicado = false;
+  timeCpu._debuffExpulsaoAplicado = false;
+}
+
+/** @param {{ titulares: object[], reservas: object[] }} time */
+function aplicarDebuffPrimeiraExpulsao(time) {
+  if (time._debuffExpulsaoAplicado) return;
+  time._debuffExpulsaoAplicado = true;
+  for (const j of [...time.titulares, ...time.reservas]) {
+    j.ataque = Math.max(ATTR_MIN, Math.round(j.ataque * FATOR_DEBUFF_EXPULSAO));
+    j.defesa = Math.max(ATTR_MIN, Math.round(j.defesa * FATOR_DEBUFF_EXPULSAO));
+  }
+}
+
+/** @param {object} j */
+function timeDoElenco(j) {
+  if (timeJogador.titulares.includes(j) || timeJogador.reservas.includes(j)) return timeJogador;
+  return timeCpu;
+}
+
+/**
+ * Registra falta, cartões e expulsão; devolve linhas HTML para o resultado.
+ * @param {object} j
+ */
+function aplicarFaltaNoJogador(j) {
+  const n = (faltasPorJogador.get(j.id) ?? 0) + 1;
+  faltasPorJogador.set(j.id, n);
+  const fmt = spanNomeJogador;
+  const lines = [textoFaltaMarcada(j, fmt)];
+  if (n === 2 && !j.expulso) {
+    lines.push(textoCartaoAmarelo(j, fmt));
+  }
+  if (n >= 3) {
+    j.expulso = true;
+    lines.push(textoExpulsao(j, fmt));
+    aplicarDebuffPrimeiraExpulsao(timeDoElenco(j));
+    if (timeDoElenco(j) === timeJogador) aguardandoPausaPorExpulsaoHumana = true;
+  }
+  return lines;
+}
+
+/**
+ * Quem sofre a falta pode se lesionar (não confundir com o infrator).
+ * @param {object | null | undefined} vitima
+ * @returns {string[]}
+ */
+function tentarLesaoJogadorFaltado(vitima) {
+  if (!vitima || vitima.lesionado || vitima.expulso) return [];
+  if (Math.random() >= PROB_LESAO_APOS_FALTA) return [];
+  vitima.lesionado = true;
+  return [textoLesaoPorFalta(vitima, spanNomeJogador)];
+}
+
+function temTitularLesionadoHumano() {
+  return timeJogador.titulares.some((j) => j.lesionado);
+}
+
+/** True enquanto o relógio não pode avançar até trocar o lesionado. */
+let precisaResolverLesaoHumano = false;
+
+function bloquearPorLesaoHumanoAposLance() {
+  precisaResolverLesaoHumano = true;
+  jogoPausado = true;
+  pintarEstatisticasPausa();
+  sincronizarUiPausa();
+  appendLog(
+    "<strong>Lesão.</strong> Substitua o titular lesionado (símbolo na escalação) por um reserva. Esta troca não conta nas 5 substituições.",
+  );
+  alert(
+    "Um titular está lesionado. Use Pausar (se necessário), clique no titular lesionado e em um reserva para trocar. Essa substituição não consome uma das 5 trocas.",
+  );
+}
+
+/** Troca automaticamente titulares lesionados do CPU por reservas válidas. */
+function substituirLesionadosTitularCpu() {
+  let mudou = false;
+  for (let ti = 0; ti < timeCpu.titulares.length; ti++) {
+    const tit = timeCpu.titulares[ti];
+    if (!tit.lesionado) continue;
+    let swapped = false;
+    for (let k = 0; k < 120; k++) {
+      const ri = Math.floor(Math.random() * timeCpu.reservas.length);
+      const res = timeCpu.reservas[ri];
+      [timeCpu.titulares[ti], timeCpu.reservas[ri]] = [timeCpu.reservas[ri], timeCpu.titulares[ti]];
+      const v = validarElenco(timeCpu.titulares, timeCpu.reservas);
+      if (v.ok) {
+        appendLog(
+          `Lesão no adversário: ${res.nome} entra no lugar de ${tit.nome}.`,
+        );
+        swapped = true;
+        mudou = true;
+        break;
+      }
+      [timeCpu.titulares[ti], timeCpu.reservas[ri]] = [timeCpu.reservas[ri], timeCpu.titulares[ti]];
+    }
+    if (!swapped) {
+      appendLog(
+        `O adversário não conseguiu substituir o lesionado ${tit.nome} mantendo o elenco válido.`,
+      );
+    }
+  }
+  if (mudou) {
+    renderEscalacoes(null);
+    atualizarSubsHud();
+  }
 }
 
 function snapshotStatsInicioPartida() {
@@ -189,9 +357,29 @@ function htmlStatVersusPartida(j, attr) {
   return `${v}<span class="${cls}">(${par})</span>`;
 }
 
-let timeJogador = gerarTime();
-let timeCpu = gerarTime();
+/** @type {{ titulares: object[], reservas: object[] }} */
+let timeJogador = { titulares: [], reservas: [] };
+/** @type {{ titulares: object[], reservas: object[] }} */
+let timeCpu = { titulares: [], reservas: [] };
+/** Metadados da seleção escolhida (bandeira, nome, sigla do placar). */
+/** @type {{ id: string, nome: string, sigla: string, iso: string } | null} */
+let metaSelecaoJogador = null;
+/** @type {{ id: string, nome: string, sigla: string, iso: string } | null} */
+let metaSelecaoCpu = null;
+
+/** @type {string | null} */
+let idSelecaoJogadorEscolhida = null;
+/** @type {string | null} */
+let idSelecaoCpuEscolhida = null;
+
+let amistosoCardsMontados = false;
+
 let partidaAtiva = false;
+/**
+ * Fora de partida: primeira entrada no jogo | logo após fim (Nova partida) | ajustando elenco antes de reiniciar.
+ * @type {"pre_jogo" | "pos_fim" | "nova_prep"}
+ */
+let fluxoForaDePartida = "pre_jogo";
 let substituicoesUsadas = 0;
 let substituicoesCpuUsadas = 0;
 /** Após o 1º tempo, só avança o relógio para o 2º quando o jogador confirmar */
@@ -296,12 +484,13 @@ function pintarDueloRpgPrimario(jogador, adversario, jogadorComBola) {
   }
 }
 
-function pintarDueloRpgGoleiro(atacante, goleiro, chuteJogador) {
+function pintarDueloRpgGoleiro(atacante, goleiro, chuteJogador, penalti = false) {
   const el = els.dueloRpgStrip;
   el.hidden = false;
+  const rotulo = penalti ? "Pênalti — " : "";
   if (chuteJogador) {
     el.innerHTML = `
-      <p class="duelo-rpg-contexto"><strong>Chute:</strong> ataque do finalizador × defesa do goleiro.</p>
+      <p class="duelo-rpg-contexto"><strong>${rotulo}Cobrança:</strong> seu ataque na bola × defesa do goleiro rival.</p>
       <div class="duelo-rpg-linhas">
         <div class="duelo-rpg-card seu">
           <div class="duelo-rpg-tag">Finalização</div>
@@ -319,7 +508,7 @@ function pintarDueloRpgGoleiro(atacante, goleiro, chuteJogador) {
       </div>`;
   } else {
     el.innerHTML = `
-      <p class="duelo-rpg-contexto"><strong>Defesa do gol:</strong> sua defesa de goleiro × ataque do chutador.</p>
+      <p class="duelo-rpg-contexto"><strong>${rotulo}Defesa do gol:</strong> seu goleiro na linha × cobrança do adversário.</p>
       <div class="duelo-rpg-linhas">
         <div class="duelo-rpg-card seu">
           <div class="duelo-rpg-tag">Seu goleiro</div>
@@ -342,6 +531,34 @@ function formatMinuto(m) {
   return `${Math.floor(m)}′`;
 }
 
+function atualizarPlacar() {
+  if (!metaSelecaoJogador || !metaSelecaoCpu) {
+    els.placar.textContent = "0 × 0";
+    return;
+  }
+  const j = metaSelecaoJogador.sigla;
+  const c = metaSelecaoCpu.sigla;
+  els.placar.textContent = `${j} ${golsJogador} × ${golsCpu} ${c}`;
+}
+
+function aplicarCabecalhosPainelSelecoes() {
+  if (!metaSelecaoJogador || !metaSelecaoCpu) return;
+  const bj = els.bandeiraJogadorPainel;
+  const nj = els.nomeSelecaoJogadorPainel;
+  const bc = els.bandeiraCpuPainel;
+  const nc = els.nomeSelecaoCpuPainel;
+  if (bj) {
+    bj.src = urlBandeira(metaSelecaoJogador.iso, 80);
+    bj.alt = `Bandeira de ${metaSelecaoJogador.nome}`;
+  }
+  if (nj) nj.textContent = metaSelecaoJogador.nome;
+  if (bc) {
+    bc.src = urlBandeira(metaSelecaoCpu.iso, 80);
+    bc.alt = `Bandeira de ${metaSelecaoCpu.nome}`;
+  }
+  if (nc) nc.textContent = metaSelecaoCpu.nome;
+}
+
 function labelEtapa(/** @type {number} */ _minuto) {
   if (!segundoTempoAutorizado) return "1º tempo";
   return "2º tempo";
@@ -361,6 +578,33 @@ function sigla(pos) {
 }
 
 /**
+ * Mini-cartões na escalação (só com partida em andamento).
+ * @param {object} j
+ */
+function htmlIndicadoresDisciplina(j) {
+  if (!partidaAtiva) return "";
+  const bits = [];
+  if (j.lesionado) {
+    bits.push(
+      `<span class="lineup-disc lineup-lesao-wrap" title="Lesionado — deve sair" aria-label="Lesionado"><span class="lineup-lesao">✚</span></span>`,
+    );
+  }
+  if (j.expulso) {
+    bits.push(
+      `<span class="lineup-disc" title="Expulso" aria-label="Expulso"><span class="lineup-cartao lineup-cartao--vermelho"></span></span>`,
+    );
+  } else {
+    const f = faltasPorJogador.get(j.id) ?? 0;
+    if (f >= 2) {
+      bits.push(
+        `<span class="lineup-disc" title="Cartão amarelo" aria-label="Cartão amarelo"><span class="lineup-cartao lineup-cartao--amarelo"></span></span>`,
+      );
+    }
+  }
+  return bits.join("");
+}
+
+/**
  * @param {boolean} listaDoTimeHumano — true = painel esquerdo (seu time)
  */
 function renderLista(ul, jogadores, destaqueId, listaDoTimeHumano) {
@@ -371,14 +615,18 @@ function renderLista(ul, jogadores, destaqueId, listaDoTimeHumano) {
     const li = document.createElement("li");
     li.dataset.id = j.id;
     if (j.id === destaqueId) li.classList.add("em-lance");
+    if (j.expulso) li.classList.add("jogador-expulso");
+    if (j.lesionado) li.classList.add("jogador-lesionado");
     const stA = htmlStatVersusPartida(j, "ataque");
     const stD = htmlStatVersusPartida(j, "defesa");
-    li.innerHTML = `<span class="sigla">${sigla(j.posicao)}</span> <span class="nome ${clsNome}">${escapeHtml(j.nome)}</span><span class="stats"> ${stA}/${stD}</span>`;
+    const disc = htmlIndicadoresDisciplina(j);
+    li.innerHTML = `<span class="sigla">${sigla(j.posicao)}</span> <span class="nome ${clsNome}">${escapeHtml(j.nome)}</span><span class="stats">${disc} ${stA}/${stD}</span>`;
     ul.appendChild(li);
   }
 }
 
 function renderEscalacoes(destaque) {
+  if (!metaSelecaoJogador || !metaSelecaoCpu) return;
   renderLista(els.timeJogadorTit, timeJogador.titulares, destaque?.jogador, true);
   renderLista(els.timeJogadorRes, timeJogador.reservas, null, true);
   renderLista(els.timeCpuTit, timeCpu.titulares, destaque?.adversario, false);
@@ -396,14 +644,21 @@ function atualizarSubsHud() {
 
 function atualizarBtnCentroRodada() {
   const el = els.btnCentroRodada;
+  const vol = els.btnVoltarMenuJogo;
   if (!partidaAtiva) {
     el.hidden = false;
     el.disabled = false;
-    el.textContent = "Iniciar partida";
+    el.textContent = fluxoForaDePartida === "pos_fim" ? "Nova partida" : "Iniciar partida";
     el.classList.remove("sec");
     el.classList.add("pri");
+    if (vol) {
+      const mostrarVoltar = fluxoForaDePartida === "pos_fim" || fluxoForaDePartida === "nova_prep";
+      vol.hidden = !mostrarVoltar;
+      vol.disabled = false;
+    }
     return;
   }
+  if (vol) vol.hidden = true;
   if (aguardandoSegundoTempo && resolveSegundoTempo) {
     el.hidden = false;
     el.disabled = false;
@@ -485,6 +740,27 @@ function mostrarFaseModal(fase) {
   qte.hidden = true;
   trans.hidden = true;
   res.hidden = true;
+  limparTransicaoResumoCampo();
+}
+
+/** Bloco “o que aconteceu no campo” antes do texto da finalização (faltas, cartões, pênalti marcado). */
+function limparTransicaoResumoCampo() {
+  const el = els.transicaoResumoCampo;
+  if (!el) return;
+  el.innerHTML = "";
+  el.hidden = true;
+}
+
+/** @param {string[]} linhasHtml parágrafos já com markup (ex.: span de nome) */
+function pintarTransicaoResumoCampo(linhasHtml) {
+  const el = els.transicaoResumoCampo;
+  if (!el) return;
+  if (!linhasHtml.length) {
+    limparTransicaoResumoCampo();
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = linhasHtml.map((t) => `<p class="transicao-resumo-par">${t}</p>`).join("");
 }
 
 function pararQte() {
@@ -495,9 +771,14 @@ function pararQte() {
 }
 
 /**
+ * @typedef {{ acertou: boolean, falhaPorTeclaErrada?: boolean }} QteLetraOutcome
+ * `falhaPorTeclaErrada` só é true quando o jogador pressionou outra letra (não por tempo esgotado).
+ */
+
+/**
  * QTE: letra aleatória A–Z; acertar a tecla no prazo (tempo depende dos atributos).
  * @param {{ letra: string, tempoLimiteMs: number }} params
- * @param {(acertou: boolean) => void} onFim
+ * @param {(o: QteLetraOutcome) => void} onFim
  * @param {{ indice: number, total: number } | undefined} opts sequência (ex.: 2 de 3)
  */
 function iniciarQteLetra(params, onFim, opts) {
@@ -562,7 +843,8 @@ function iniciarQteLetra(params, onFim, opts) {
     cancelarInputQte = null;
   };
 
-  function finalizar(acertou) {
+  /** @param {QteLetraOutcome} outcome */
+  function finalizar(outcome) {
     if (resolvido) return;
     resolvido = true;
     limparContagem();
@@ -571,15 +853,16 @@ function iniciarQteLetra(params, onFim, opts) {
     pararQte();
     painel.classList.remove("falha", "qte-feedback-acerto", "qte-countdown");
     cancelarInputQte = null;
-    onFim(acertou);
+    onFim(outcome);
   }
 
-  function agendarFeedbackFinal(acertou) {
+  /** @param {QteLetraOutcome} outcome */
+  function agendarFeedbackFinal(outcome) {
     limparFeedbackAgendado();
-    const espera = acertou ? QTE_FEEDBACK_ACERTO_MS : QTE_FEEDBACK_FALHA_MS;
+    const espera = outcome.acertou ? QTE_FEEDBACK_ACERTO_MS : QTE_FEEDBACK_FALHA_MS;
     feedbackTimer = setTimeout(() => {
       feedbackTimer = null;
-      finalizar(acertou);
+      finalizar(outcome);
     }, espera);
   }
 
@@ -599,7 +882,7 @@ function iniciarQteLetra(params, onFim, opts) {
       painel.classList.add("qte-feedback-acerto");
       sub.textContent = "Acerto!";
       label.textContent = letra;
-      agendarFeedbackFinal(true);
+      agendarFeedbackFinal({ acertou: true });
       return;
     }
     detachListeners();
@@ -608,7 +891,7 @@ function iniciarQteLetra(params, onFim, opts) {
     sub.textContent = "Errado!";
     painel.classList.add("falha");
     painel.classList.remove("qte-feedback-acerto", "qte-countdown");
-    agendarFeedbackFinal(false);
+    agendarFeedbackFinal({ acertou: false, falhaPorTeclaErrada: true });
   }
 
   function comecarFaseTecla() {
@@ -627,7 +910,7 @@ function iniciarQteLetra(params, onFim, opts) {
       sub.textContent = "Tempo esgotado!";
       painel.classList.add("falha");
       painel.classList.remove("qte-feedback-acerto", "qte-countdown");
-      agendarFeedbackFinal(false);
+      agendarFeedbackFinal({ acertou: false, falhaPorTeclaErrada: false });
     }, tempoLimiteMs);
   }
 
@@ -656,13 +939,13 @@ function iniciarQteLetra(params, onFim, opts) {
 }
 
 /**
- * Vários QTEs em sequência; só chama onFim(true) se todos forem acertados.
+ * Vários QTEs em sequência; só chama onFim com acertou true se todos forem acertados.
  * @param {{ letra: string, tempoLimiteMs: number }[]} paramsArr
- * @param {(acertou: boolean) => void} onFim
+ * @param {(o: QteLetraOutcome) => void} onFim
  */
 function iniciarQteLetraSequencia(paramsArr, onFim) {
   if (paramsArr.length === 0) {
-    onFim(false);
+    onFim({ acertou: false, falhaPorTeclaErrada: false });
     return;
   }
   if (paramsArr.length === 1) {
@@ -671,14 +954,15 @@ function iniciarQteLetraSequencia(paramsArr, onFim) {
   }
   const total = paramsArr.length;
   let i = 0;
-  function proximo(acertou) {
-    if (!acertou) {
-      onFim(false);
+  /** @param {QteLetraOutcome} outcome */
+  function proximo(outcome) {
+    if (!outcome.acertou) {
+      onFim(outcome);
       return;
     }
     i++;
     if (i >= total) {
-      onFim(true);
+      onFim({ acertou: true });
       return;
     }
     iniciarQteLetra(paramsArr[i], proximo, { indice: i + 1, total });
@@ -848,12 +1132,12 @@ function limparSelecaoSub() {
 
 function ligarCliquesSubstituicao() {
   [els.timeJogadorTit, els.timeJogadorRes].forEach((ul) => {
+    if (!ul) return;
     ul.addEventListener("click", (ev) => {
       const li = ev.target.closest("li");
       if (!li) return;
 
       if (!jogoPausado && partidaAtiva && !els.dueloOverlay.hidden) return;
-      if (partidaAtiva && substituicoesUsadas >= 5) return;
 
       const id = li.dataset.id;
       const lista = ul === els.timeJogadorTit ? "tit" : "res";
@@ -888,6 +1172,13 @@ function ligarCliquesSubstituicao() {
 
       const tit = timeJogador.titulares[ti];
       const res = timeJogador.reservas[ri];
+      const trocaPorLesao = partidaAtiva && tit.lesionado;
+      if (partidaAtiva && substituicoesUsadas >= 5 && !trocaPorLesao) {
+        limparSelecaoSub();
+        alert("Limite de 5 substituições atingido.");
+        return;
+      }
+
       [timeJogador.titulares[ti], timeJogador.reservas[ri]] = [timeJogador.reservas[ri], timeJogador.titulares[ti]];
 
       const v = validarElenco(timeJogador.titulares, timeJogador.reservas);
@@ -899,18 +1190,93 @@ function ligarCliquesSubstituicao() {
       }
 
       if (partidaAtiva) {
-        substituicoesUsadas++;
+        if (!trocaPorLesao) substituicoesUsadas++;
+        appendLog(
+          trocaPorLesao
+            ? `Substituição por lesão: ${res.nome} entra no lugar de ${tit.nome}.`
+            : `Substituição: ${res.nome} entra no lugar de ${tit.nome}.`,
+        );
       }
       atualizarSubsHud();
       if (jogoPausado) pintarEstatisticasPausa();
       limparSelecaoSub();
       renderEscalacoes(null);
-      appendLog(`Substituição: ${res.nome} entra no lugar de ${tit.nome}.`);
+      if (precisaResolverLesaoHumano && !temTitularLesionadoHumano()) {
+        precisaResolverLesaoHumano = false;
+        jogoPausado = false;
+        sincronizarUiPausa();
+        void continuarRodadaAposLance();
+      }
     });
   });
 }
 
-els.btnCentroRodada.addEventListener("click", () => {
+function entrarNoJogoComSelecoes() {
+  if (!idSelecaoJogadorEscolhida || !idSelecaoCpuEscolhida) return;
+  if (idSelecaoJogadorEscolhida === idSelecaoCpuEscolhida) return;
+  try {
+    timeJogador = elencoDaSelecao(idSelecaoJogadorEscolhida);
+    timeCpu = elencoDaSelecao(idSelecaoCpuEscolhida);
+    snapshotElencoLimpo();
+    metaSelecaoJogador = SELECOES.find((x) => x.id === idSelecaoJogadorEscolhida) ?? null;
+    metaSelecaoCpu = SELECOES.find((x) => x.id === idSelecaoCpuEscolhida) ?? null;
+    aplicarCabecalhosPainelSelecoes();
+    if (els.telaAmistoso) {
+      els.telaAmistoso.setAttribute("hidden", "");
+      els.telaAmistoso.style.display = "none";
+    }
+    if (els.jogoRoot) {
+      els.jogoRoot.removeAttribute("hidden");
+      els.jogoRoot.style.removeProperty("display");
+    }
+    golsJogador = 0;
+    golsCpu = 0;
+    partidaAtiva = false;
+    jogoPausado = false;
+    fluxoForaDePartida = "pre_jogo";
+    precisaResolverLesaoHumano = false;
+    aguardandoPausaPorExpulsaoHumana = false;
+    substituicoesUsadas = 0;
+    substituicoesCpuUsadas = 0;
+    segundoTempoAutorizado = false;
+    aguardandoSegundoTempo = false;
+    resolveSegundoTempo = null;
+    esconderUiIntervalo();
+    renderEscalacoes(null);
+    atualizarPlacar();
+    atualizarSubsHud();
+    if (els.relogio) els.relogio.textContent = "0′";
+    if (els.etapaTempo) els.etapaTempo.textContent = "—";
+    if (els.log) els.log.innerHTML = "";
+    setZonaVisual(null);
+    atualizarBtnCentroRodada();
+    sincronizarUiPausa();
+  } catch (err) {
+    console.error(err);
+    alert("Não foi possível iniciar o jogo. Veja o console (F12) para detalhes.");
+  }
+}
+
+window.__rpgsoccerEntrarJogo = entrarNoJogoComSelecoes;
+
+/** Chamado pelo script inline em index.html ao abrir a tela Amistoso (monta cartões e limpa escolha). */
+window.__rpgsoccerAoAbrirAmistoso = function rpgsoccerAoAbrirAmistoso() {
+  if (!els.amistosoCardsJogador || !els.amistosoCardsCpu) return;
+  if (!amistosoCardsMontados) {
+    montarCardsAmistoso();
+    amistosoCardsMontados = true;
+  }
+  resetAmistosoUi();
+};
+
+(function sincronizarAmistosoSeJaVisivel() {
+  const ami = document.getElementById("tela-amistoso");
+  if (ami && !ami.hasAttribute("hidden") && !amistosoCardsMontados) {
+    window.__rpgsoccerAoAbrirAmistoso();
+  }
+})();
+
+els.btnCentroRodada?.addEventListener("click", () => {
   if (resolveSegundoTempo) {
     const r = resolveSegundoTempo;
     resolveSegundoTempo = null;
@@ -923,12 +1289,52 @@ els.btnCentroRodada.addEventListener("click", () => {
     return;
   }
   if (!partidaAtiva) {
-    iniciarPartida();
+    if (fluxoForaDePartida === "pos_fim") {
+      fluxoForaDePartida = "nova_prep";
+      atualizarBtnCentroRodada();
+      atualizarSubsHud();
+      appendLog(
+        "Ajuste a escalação se quiser e use <strong>Iniciar partida</strong> quando estiver pronto.",
+      );
+      return;
+    }
+    void iniciarPartida();
   }
+});
+
+function voltarAoMenuPrincipalDoJogo() {
+  if (partidaAtiva) return;
+  limparSelecaoSub();
+  if (els.telaAmistoso) {
+    els.telaAmistoso.setAttribute("hidden", "");
+    els.telaAmistoso.style.display = "none";
+  }
+  if (els.jogoRoot) {
+    els.jogoRoot.setAttribute("hidden", "");
+    els.jogoRoot.style.display = "none";
+  }
+  if (els.telaInicio) {
+    els.telaInicio.removeAttribute("hidden");
+    els.telaInicio.style.removeProperty("display");
+  }
+  jogoPausado = false;
+  precisaResolverLesaoHumano = false;
+  aguardandoPausaPorExpulsaoHumana = false;
+  fluxoForaDePartida = "pre_jogo";
+  if (els.pausePanel) els.pausePanel.hidden = true;
+  sincronizarUiPausa();
+}
+
+els.btnVoltarMenuJogo?.addEventListener("click", () => {
+  voltarAoMenuPrincipalDoJogo();
 });
 
 function alternarPausaPorTecla() {
   if (jogoPausado) {
+    if (partidaAtiva && precisaResolverLesaoHumano && temTitularLesionadoHumano()) {
+      alert("Substitua o titular lesionado antes de sair da pausa.");
+      return;
+    }
     jogoPausado = false;
     sincronizarUiPausa();
     return;
@@ -946,13 +1352,17 @@ function alternarPausaPorTecla() {
   sincronizarUiPausa();
 }
 
-els.btnPausa.addEventListener("click", () => {
+els.btnPausa?.addEventListener("click", () => {
   jogoPausado = true;
   pintarEstatisticasPausa();
   sincronizarUiPausa();
 });
 
-els.btnContinuarPausa.addEventListener("click", () => {
+els.btnContinuarPausa?.addEventListener("click", () => {
+  if (partidaAtiva && precisaResolverLesaoHumano && temTitularLesionadoHumano()) {
+    alert("Substitua o titular lesionado antes de continuar.");
+    return;
+  }
   jogoPausado = false;
   sincronizarUiPausa();
 });
@@ -960,7 +1370,9 @@ els.btnContinuarPausa.addEventListener("click", () => {
 window.addEventListener("keydown", (e) => {
   if (e.code !== "Escape") return;
   if (!partidaAtiva) return;
-  if (!jogoPausado && (!els.dueloOverlay.hidden || aguardandoSegundoTempo || !els.golOverlay.hidden)) {
+  const dueloAberto = els.dueloOverlay && !els.dueloOverlay.hidden;
+  const golAberto = els.golOverlay && !els.golOverlay.hidden;
+  if (!jogoPausado && (dueloAberto || aguardandoSegundoTempo || golAberto)) {
     return;
   }
   e.preventDefault();
@@ -968,6 +1380,7 @@ window.addEventListener("keydown", (e) => {
 }, true);
 
 function abrirModalLance(lance) {
+  limparTransicaoResumoCampo();
   ctx = {
     minuto: lance.minuto,
     zona: lance.zona,
@@ -981,6 +1394,8 @@ function abrirModalLance(lance) {
     linhasResultado: [],
     _teveGol: false,
     golParaJogador: false,
+    penaltiPorFaltaCpu: false,
+    finalizacaoEhPenalti: false,
   };
 
   els.dueloOverlay.hidden = false;
@@ -1008,74 +1423,114 @@ function abrirModalLance(lance) {
 
   ctx.iniciarQteCampo = () => {
     mostrarFaseModal("qte_campo");
-    iniciarQteLetra(letraParamsCampo, (acertou) => {
-    aplicarCansacoDueloCampo(ctx.jogador, ctx.adversario, ctx.jogadorComBola);
-    registrarResultadoDuelo(ctx.jogador, ctx.adversario, acertou, ctx.jogadorComBola);
-    ctx.venceuPrim = acertou;
-    ctx.linhasResultado = [];
-    ctx.linhasResultado.push(
-      textoContextoPrimario(
-        {
-          zona: ctx.zona,
-          jogador: ctx.jogador,
-          adversario: ctx.adversario,
-          jogadorComBola: ctx.jogadorComBola,
-        },
-        spanNomeJogador,
-      ),
-    );
-    ctx.linhasResultado.push(
-      textoResultadoPrimario(
-        {
-          zona: ctx.zona,
-          jogador: ctx.jogador,
-          adversario: ctx.adversario,
-          venceu: acertou,
-          jogadorComBola: ctx.jogadorComBola,
-        },
-        spanNomeJogador,
-      ),
-    );
+    iniciarQteLetra(letraParamsCampo, (outcome) => {
+      const acertou = outcome.acertou;
+      const teclaErrada = outcome.falhaPorTeclaErrada === true;
+      aplicarCansacoDueloCampo(ctx.jogador, ctx.adversario, ctx.jogadorComBola);
+      registrarResultadoDuelo(ctx.jogador, ctx.adversario, acertou, ctx.jogadorComBola);
+      ctx.venceuPrim = acertou;
+      ctx.penaltiPorFaltaCpu = false;
+      ctx.linhasResultado = [];
+      ctx.linhasResultado.push(
+        textoContextoPrimario(
+          {
+            zona: ctx.zona,
+            jogador: ctx.jogador,
+            adversario: ctx.adversario,
+            jogadorComBola: ctx.jogadorComBola,
+          },
+          spanNomeJogador,
+        ),
+      );
+      ctx.linhasResultado.push(
+        textoResultadoPrimario(
+          {
+            zona: ctx.zona,
+            jogador: ctx.jogador,
+            adversario: ctx.adversario,
+            venceu: acertou,
+            jogadorComBola: ctx.jogadorComBola,
+          },
+          spanNomeJogador,
+        ),
+      );
 
-    const tipo = tipoFinalizacaoGoleiro(ctx.zona, acertou);
-    if (tipo) {
-      ctx.tipoGol = tipo;
-      if (tipo === "jogador_chuta") {
-        ctx.forwardChute = ctx.jogador;
-        ctx.goleiroDefesa = sortearGoleiro(timeCpu.titulares);
-      } else {
-        ctx.forwardChute = ctx.adversario;
-        ctx.goleiroDefesa = sortearGoleiro(timeJogador.titulares);
+      let tipo = tipoFinalizacaoGoleiro(ctx.zona, acertou);
+      if (tipo === "cpu_chuta" && !teclaErrada) {
+        tipo = null;
       }
-      if (!ctx.goleiroDefesa) {
-        encerrarComErro("Sem goleiro titular para o duelo na área.");
+
+      if (!acertou && teclaErrada) {
+        ctx.linhasResultado.push(...aplicarFaltaNoJogador(ctx.jogador));
+        ctx.linhasResultado.push(...tentarLesaoJogadorFaltado(ctx.adversario));
+        const penaltiZagEmAtacante =
+          ctx.jogador.posicao === POSITIONS.ZAGUEIRO &&
+          ctx.adversario.posicao === POSITIONS.ATACANTE &&
+          ctx.zona === ZONES.DEFESA_JOGADOR &&
+          !ctx.jogadorComBola;
+        if (penaltiZagEmAtacante) {
+          ctx.linhasResultado.push(textoPenaltiMarcadoPorFalta(ctx.jogador, spanNomeJogador));
+        } else if (tipo === "cpu_chuta") {
+          tipo = null;
+        }
+      } else if (acertou && Math.random() < CPU_PROB_FALTA) {
+        ctx.linhasResultado.push(...aplicarFaltaNoJogador(ctx.adversario));
+        ctx.linhasResultado.push(...tentarLesaoJogadorFaltado(ctx.jogador));
+        const penaltiZagCpuNoSeuAta =
+          ctx.adversario.posicao === POSITIONS.ZAGUEIRO &&
+          ctx.jogador.posicao === POSITIONS.ATACANTE &&
+          ctx.zona === ZONES.ATAQUE_JOGADOR &&
+          ctx.jogadorComBola;
+        if (penaltiZagCpuNoSeuAta) {
+          ctx.penaltiPorFaltaCpu = true;
+          ctx.linhasResultado.push(textoPenaltiMarcadoPorFalta(ctx.adversario, spanNomeJogador));
+          if (!tipo) tipo = "jogador_chuta";
+        }
+      }
+
+      ctx.finalizacaoEhPenalti = tipo === "cpu_chuta" || ctx.penaltiPorFaltaCpu;
+
+      if (tipo) {
+        ctx.tipoGol = tipo;
+        const chuteJogador = tipo === "jogador_chuta";
+        if (chuteJogador) {
+          ctx.forwardChute = ctx.penaltiPorFaltaCpu
+            ? sortearAtacanteTitular(timeJogador.titulares) ?? ctx.jogador
+            : ctx.jogador;
+          ctx.goleiroDefesa = sortearGoleiro(timeCpu.titulares);
+        } else {
+          ctx.forwardChute = ctx.adversario;
+          ctx.goleiroDefesa = sortearGoleiro(timeJogador.titulares);
+        }
+        if (!ctx.goleiroDefesa) {
+          encerrarComErro("Sem goleiro titular para o duelo na área.");
+          return;
+        }
+
+        const penalti = ctx.finalizacaoEhPenalti;
+        pintarTransicaoResumoCampo([...ctx.linhasResultado]);
+        ctx.linhasResultado.push(textoTransicaoGoleiro(chuteJogador, { penalti }));
+        els.dueloTitulo.textContent = penalti ? "Pênalti" : "Finalização";
+        els.transicaoTexto.textContent = textoTransicaoGoleiro(chuteJogador, { penalti });
+        els.transicaoPar.innerHTML = chuteJogador
+          ? `${spanNomeJogador(ctx.forwardChute)} × ${spanNomeJogador(ctx.goleiroDefesa)}`
+          : `${spanNomeJogador(ctx.goleiroDefesa)} × ${spanNomeJogador(ctx.forwardChute)}`;
+        els.btnEncararGoleiro.textContent = chuteJogador ? "Encarar o goleiro" : "Defender";
+
+        renderEscalacoes({
+          jogador: chuteJogador ? ctx.forwardChute.id : ctx.goleiroDefesa.id,
+          adversario: chuteJogador ? ctx.goleiroDefesa.id : ctx.forwardChute.id,
+        });
+        pintarDueloRpgGoleiro(ctx.forwardChute, ctx.goleiroDefesa, chuteJogador, penalti);
+        mostrarFaseModal("transicao");
         return;
       }
 
-      ctx.linhasResultado.push(textoTransicaoGoleiro(tipo === "jogador_chuta"));
-      els.dueloTitulo.textContent = "Finalização";
-      els.transicaoTexto.textContent = textoTransicaoGoleiro(tipo === "jogador_chuta");
-      els.transicaoPar.innerHTML =
-        tipo === "jogador_chuta"
-          ? `${spanNomeJogador(ctx.forwardChute)} × ${spanNomeJogador(ctx.goleiroDefesa)}`
-          : `${spanNomeJogador(ctx.goleiroDefesa)} × ${spanNomeJogador(ctx.forwardChute)}`;
-      els.btnEncararGoleiro.textContent =
-        tipo === "jogador_chuta" ? "Encarar o goleiro" : "Defender";
-
-      renderEscalacoes({
-        jogador: tipo === "jogador_chuta" ? ctx.forwardChute.id : ctx.goleiroDefesa.id,
-        adversario: tipo === "jogador_chuta" ? ctx.goleiroDefesa.id : ctx.forwardChute.id,
-      });
-      pintarDueloRpgGoleiro(ctx.forwardChute, ctx.goleiroDefesa, tipo === "jogador_chuta");
-      mostrarFaseModal("transicao");
-      return;
-    }
-
-    const nz = proximaZonaEPosse(ctx.zona, acertou, ctx.jogadorComBola);
-    estadoGlobal.posseJogador = nz.posseJogador;
-    estadoGlobal.proximaZona = nz.proximaZona;
-    mostrarResultadoFinal(false, false);
-  });
+      const nz = proximaZonaEPosse(ctx.zona, acertou, ctx.jogadorComBola);
+      estadoGlobal.posseJogador = nz.posseJogador;
+      estadoGlobal.proximaZona = nz.proximaZona;
+      mostrarResultadoFinal(false, false);
+    });
   };
 
   requestAnimationFrame(() => {
@@ -1085,6 +1540,7 @@ function abrirModalLance(lance) {
 
 function fecharModalLance() {
   if (cancelarInputQte) cancelarInputQte();
+  limparTransicaoResumoCampo();
   els.dueloOverlay.hidden = true;
   els.dueloRpgStrip.hidden = true;
   els.dueloRpgStrip.innerHTML = "";
@@ -1098,7 +1554,8 @@ function iniciarQteGoleiro() {
   if (!ctx || !ctx.tipoGol) return;
   mostrarFaseModal("qte");
   const chuteJogador = ctx.tipoGol === "jogador_chuta";
-  pintarDueloRpgGoleiro(ctx.forwardChute, ctx.goleiroDefesa, chuteJogador);
+  const penalti = ctx.finalizacaoEhPenalti === true;
+  pintarDueloRpgGoleiro(ctx.forwardChute, ctx.goleiroDefesa, chuteJogador, penalti);
   let eu;
   let ele;
   let comBola;
@@ -1113,12 +1570,17 @@ function iniciarQteGoleiro() {
   }
   const met = metricasDuelo(eu, ele, comBola);
 
-  function aoFimGoleiro(/** @type {boolean} */ acertou) {
-    aplicarCansacoDueloGoleiro(ctx.forwardChute, ctx.goleiroDefesa);
+  /** @param {QteLetraOutcome} outcome */
+  function aoFimGoleiro(outcome) {
+    const acertou = outcome.acertou;
+    if (!penalti) {
+      aplicarCansacoDueloGoleiro(ctx.forwardChute, ctx.goleiroDefesa);
+    }
     registrarResultadoDuelo(eu, ele, acertou, comBola);
     const fmt = spanNomeJogador;
     const pBase = {
       chuteJogador,
+      penalti,
       atacante: ctx.forwardChute,
       goleiro: ctx.goleiroDefesa,
     };
@@ -1165,21 +1627,15 @@ function iniciarQteGoleiro() {
     mostrarResultadoFinal(teveGol, ctx.golParaJogador);
   }
 
-  if (chuteJogador) {
-    const seq = [
-      parametrosLetra(met.ratio),
-      parametrosLetra(met.ratio),
-      parametrosLetra(met.ratio),
-    ];
-    const msPorLetra = seq.reduce((a, p) => a + p.tempoLimiteMs, 0) / 3;
-    els.qteDica.textContent = `Você tem ~${fmtSegundosAproximados(msPorLetra)} s por letra para pressionar cada tecla certa.`;
-    iniciarQteLetraSequencia(seq, aoFimGoleiro);
-  } else {
-    const seq = [parametrosLetra(met.ratio), parametrosLetra(met.ratio)];
-    const msPorLetra = seq.reduce((a, p) => a + p.tempoLimiteMs, 0) / 2;
-    els.qteDica.textContent = `Você tem ~${fmtSegundosAproximados(msPorLetra)} s por letra para pressionar cada tecla certa.`;
-    iniciarQteLetraSequencia(seq, aoFimGoleiro);
-  }
+  const nLetras = chuteJogador ? (penalti ? 2 : 3) : penalti ? 4 : 2;
+  const seq = Array.from({ length: nLetras }, () => parametrosLetra(met.ratio));
+  const msPorLetra = seq.reduce((a, pr) => a + pr.tempoLimiteMs, 0) / nLetras;
+  /** @type {Record<number, string>} */
+  const porExtenso = { 2: "duas", 3: "três", 4: "quatro" };
+  const alvo = porExtenso[nLetras];
+  const prefix = penalti ? "Pênalti — " : "";
+  els.qteDica.textContent = `${prefix}Acerte ${alvo} letras seguidas (~${fmtSegundosAproximados(msPorLetra)} s por letra).`;
+  iniciarQteLetraSequencia(seq, aoFimGoleiro);
 }
 
 /**
@@ -1190,7 +1646,7 @@ function mostrarResultadoFinal(teveGol, golParaJogador) {
   if (!ctx) return;
   ctx._teveGol = teveGol;
   ctx.golParaJogador = golParaJogador;
-  els.placar.textContent = `${golsJogador} × ${golsCpu}`;
+  atualizarPlacar();
   els.dueloRpgStrip.hidden = true;
   let destaque = { jogador: ctx.jogador?.id, adversario: ctx.adversario?.id };
   if (ctx.tipoGol && ctx.forwardChute && ctx.goleiroDefesa) {
@@ -1211,18 +1667,18 @@ function encerrarComErro(msg) {
   encerrarPartida();
 }
 
-els.btnIniciarDueloCampo.addEventListener("click", () => {
+els.btnIniciarDueloCampo?.addEventListener("click", () => {
   const fn = ctx?.iniciarQteCampo;
   if (!fn) return;
   ctx.iniciarQteCampo = null;
   fn();
 });
 
-els.btnEncararGoleiro.addEventListener("click", () => {
+els.btnEncararGoleiro?.addEventListener("click", () => {
   iniciarQteGoleiro();
 });
 
-els.btnFecharLance.addEventListener("click", async () => {
+els.btnFecharLance?.addEventListener("click", async () => {
   const golParaJogador = ctx?.golParaJogador === true;
   const teveGol = ctx?._teveGol === true;
   const minutoLance = ctx?.minuto ?? estadoGlobal.minuto;
@@ -1233,9 +1689,15 @@ els.btnFecharLance.addEventListener("click", async () => {
 
   fecharModalLance();
   renderEscalacoes(null);
+  substituirLesionadosTitularCpu();
 
   if (teveGol) {
     mostrarPopupGol(golParaJogador);
+    return;
+  }
+
+  if (temTitularLesionadoHumano()) {
+    bloquearPorLesaoHumanoAposLance();
     return;
   }
 
@@ -1254,13 +1716,30 @@ function mostrarPopupGol(golAFavor) {
   }
 }
 
-els.btnGolOk.addEventListener("click", async () => {
+els.btnGolOk?.addEventListener("click", async () => {
   els.golOverlay.hidden = true;
   sincronizarUiPausa();
+  substituirLesionadosTitularCpu();
+  if (temTitularLesionadoHumano()) {
+    bloquearPorLesaoHumanoAposLance();
+    return;
+  }
   await continuarRodadaAposLance();
 });
 
+function aplicarPausaPorExpulsaoHumanaSeMarcada() {
+  if (!aguardandoPausaPorExpulsaoHumana) return;
+  aguardandoPausaPorExpulsaoHumana = false;
+  jogoPausado = true;
+  pintarEstatisticasPausa();
+  sincronizarUiPausa();
+  appendLog(
+    "<strong>Expulsão.</strong> O jogo pausou — ajuste a escalação se quiser e use <strong>Continuar</strong> na pausa quando estiver pronto.",
+  );
+}
+
 async function continuarRodadaAposLance() {
+  aplicarPausaPorExpulsaoHumanaSeMarcada();
   tentarSubstituicaoCpu();
   const de = estadoGlobal.minuto;
   const salto = proximoIntervaloMinutos();
@@ -1279,6 +1758,14 @@ async function continuarRodadaAposLance() {
 }
 
 function dispararLance() {
+  if (partidaAtiva && temTitularLesionadoHumano()) {
+    jogoPausado = true;
+    precisaResolverLesaoHumano = true;
+    pintarEstatisticasPausa();
+    sincronizarUiPausa();
+    appendLog("Jogo parado: há titular lesionado na escalação — faça a substituição.");
+    return;
+  }
   let zona = estadoGlobal.proximaZona;
   if (!zona) {
     zona = sortearZona();
@@ -1305,6 +1792,9 @@ function dispararLance() {
 function encerrarPartida() {
   partidaAtiva = false;
   jogoPausado = false;
+  precisaResolverLesaoHumano = false;
+  aguardandoPausaPorExpulsaoHumana = false;
+  fluxoForaDePartida = "pos_fim";
   els.pausePanel.hidden = true;
   aguardandoSegundoTempo = false;
   resolveSegundoTempo = null;
@@ -1315,7 +1805,11 @@ function encerrarPartida() {
   els.etapaTempo.textContent = "Fim";
   sincronizarUiPausa();
   atualizarBtnCentroRodada();
-  appendLog(`<strong>Fim de jogo.</strong> ${golsJogador} × ${golsCpu}`);
+  const j = metaSelecaoJogador?.sigla ?? "";
+  const c = metaSelecaoCpu?.sigla ?? "";
+  const placarTxt =
+    j && c ? `${j} ${golsJogador} × ${golsCpu} ${c}` : `${golsJogador} × ${golsCpu}`;
+  appendLog(`<strong>Fim de jogo.</strong> ${placarTxt}`);
 }
 
 async function iniciarPartida() {
@@ -1332,6 +1826,8 @@ async function iniciarPartida() {
   golsJogador = 0;
   golsCpu = 0;
   jogoPausado = false;
+  precisaResolverLesaoHumano = false;
+  aguardandoPausaPorExpulsaoHumana = false;
   els.pausePanel.hidden = true;
   substituicoesUsadas = 0;
   substituicoesCpuUsadas = 0;
@@ -1341,8 +1837,9 @@ async function iniciarPartida() {
   esconderUiIntervalo();
   acrescimosPrimeiroTempo = sortearAcrescimosTempo();
   acrescimosSegundoTempo = sortearAcrescimosTempo();
+  restaurarElencoParaNovaPartida();
   snapshotStatsInicioPartida();
-  els.placar.textContent = "0 × 0";
+  atualizarPlacar();
   els.log.innerHTML = "";
   partidaAtiva = true;
   estadoGlobal = {
@@ -1367,10 +1864,85 @@ async function iniciarPartida() {
 }
 
 ligarCliquesSubstituicao();
-renderEscalacoes(null);
+
+function montarCardsAmistoso() {
+  const montarColuna = (/** @type {"jogador" | "cpu"} */ lado) => {
+    const wrap = lado === "jogador" ? els.amistosoCardsJogador : els.amistosoCardsCpu;
+    if (!wrap) return;
+    wrap.replaceChildren();
+    for (const s of SELECOES) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "card-selecao";
+      btn.dataset.selecaoId = s.id;
+      const img = document.createElement("img");
+      img.src = urlBandeira(s.iso, 160);
+      img.alt = `Bandeira de ${s.nome}`;
+      img.width = 88;
+      img.height = 66;
+      img.loading = "lazy";
+      const span = document.createElement("span");
+      span.className = "card-selecao-nome";
+      span.textContent = s.nome;
+      btn.append(img, span);
+      btn.addEventListener("click", () => {
+        if (lado === "jogador") idSelecaoJogadorEscolhida = s.id;
+        else idSelecaoCpuEscolhida = s.id;
+        const escolha = lado === "jogador" ? idSelecaoJogadorEscolhida : idSelecaoCpuEscolhida;
+        wrap.querySelectorAll(".card-selecao").forEach((b) => {
+          b.classList.toggle("card-selecao--ativa", b.dataset.selecaoId === escolha);
+        });
+        sincronizarEscolhaAmistoso();
+      });
+      wrap.appendChild(btn);
+    }
+  };
+  montarColuna("jogador");
+  montarColuna("cpu");
+}
+
+function sincronizarEscolhaAmistoso() {
+  const btn = els.btnConfirmarAmistoso;
+  if (!btn) return;
+  const mesmo =
+    Boolean(idSelecaoJogadorEscolhida) &&
+    Boolean(idSelecaoCpuEscolhida) &&
+    idSelecaoJogadorEscolhida === idSelecaoCpuEscolhida;
+  const ambos = Boolean(idSelecaoJogadorEscolhida) && Boolean(idSelecaoCpuEscolhida);
+  const podeIr = ambos && !mesmo;
+  btn.disabled = !podeIr;
+  if (podeIr) btn.removeAttribute("disabled");
+  else btn.setAttribute("disabled", "");
+  const errEl = els.amistosoErro;
+  if (errEl) {
+    if (mesmo) {
+      errEl.hidden = false;
+      errEl.textContent = "Escolha dois times diferentes.";
+    } else {
+      errEl.hidden = true;
+    }
+  }
+}
+
+function resetAmistosoUi() {
+  idSelecaoJogadorEscolhida = null;
+  idSelecaoCpuEscolhida = null;
+  els.amistosoCardsJogador?.querySelectorAll(".card-selecao").forEach((b) => {
+    b.classList.remove("card-selecao--ativa");
+  });
+  els.amistosoCardsCpu?.querySelectorAll(".card-selecao").forEach((b) => {
+    b.classList.remove("card-selecao--ativa");
+  });
+  if (els.btnConfirmarAmistoso) {
+    els.btnConfirmarAmistoso.disabled = true;
+    els.btnConfirmarAmistoso.setAttribute("disabled", "");
+  }
+  if (els.amistosoErro) els.amistosoErro.hidden = true;
+}
+
 els.relogio.textContent = "0′";
 els.etapaTempo.textContent = "—";
-els.placar.textContent = "0 × 0";
+atualizarPlacar();
 atualizarSubsHud();
 sincronizarUiPausa();
 atualizarBtnCentroRodada();

@@ -191,6 +191,56 @@ body {
   color: #3ecf8e;
 }
 
+.lista-jogadores li.jogador-expulso {
+  opacity: 0.62;
+}
+
+.lineup-disc {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.3rem;
+  vertical-align: middle;
+}
+
+.lineup-cartao {
+  display: inline-block;
+  width: 7px;
+  height: 10px;
+  border-radius: 1px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.lineup-cartao--amarelo {
+  background: linear-gradient(160deg, #f0d040, #c9a010);
+}
+
+.lineup-cartao--vermelho {
+  background: linear-gradient(160deg, #e85a5a, #a82020);
+}
+
+.lineup-lesao-wrap {
+  margin-right: 0.25rem;
+}
+
+.lineup-lesao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.95rem;
+  height: 0.95rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffb8b8;
+  background: rgba(196, 76, 76, 0.45);
+  border: 1px solid rgba(255, 140, 140, 0.65);
+  border-radius: 3px;
+}
+
+.lista-jogadores li.jogador-lesionado {
+  box-shadow: inset 2px 0 0 rgba(196, 76, 76, 0.55);
+}
+
 .lista-jogadores.reservas {
   opacity: 0.92;
 }
@@ -455,17 +505,35 @@ body {
   color: #8ec8ff;
 }
 
+.centro-rodada-wrap {
+  max-width: 320px;
+  margin: 0 auto 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
 .btn-centro-rodada {
   display: block;
   width: 100%;
-  max-width: 320px;
-  margin: 0 auto 0.35rem;
   font-size: 1rem;
   padding: 0.7rem 1rem;
 }
 
+.btn-voltar-menu-jogo {
+  display: block;
+  width: 100%;
+  font-size: 0.92rem;
+  padding: 0.55rem 1rem;
+}
+
 /* Author `display: block` above beats the UA `[hidden]` rule — force hide when oculto via JS. */
 .btn-centro-rodada[hidden] {
+  display: none !important;
+}
+
+.btn-voltar-menu-jogo[hidden] {
   display: none !important;
 }
 
@@ -678,6 +746,27 @@ body {
 
 .fase-modal {
   margin-top: 0.25rem;
+}
+
+.transicao-resumo-campo {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border-left: 3px solid var(--acento);
+  background: rgba(201, 162, 39, 0.1);
+  border-radius: 0 6px 6px 0;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.transicao-resumo-par {
+  margin: 0 0 0.45rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--texto);
+}
+
+.transicao-resumo-par:last-child {
+  margin-bottom: 0;
 }
 
 .resultado-titulo {
@@ -915,5 +1004,202 @@ body {
   margin: 0 0 1rem;
   color: var(--acento);
   font-weight: 600;
+}
+
+/* ——— Menu inicial e escolha de seleções ——— */
+.tela-menu {
+  position: relative;
+  z-index: 100;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  background: var(--bg);
+}
+
+.tela-menu-inner,
+.tela-amistoso-inner {
+  width: 100%;
+  max-width: 42rem;
+  text-align: center;
+}
+
+.tela-amistoso-inner {
+  max-width: 960px;
+}
+
+.tela-inicio-marca {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.85rem, 5vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--texto);
+}
+
+.tela-menu-titulo {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+  color: var(--acento);
+}
+
+.tela-menu-sub {
+  margin: 0 0 1.25rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.tela-menu-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.menu-mod-btn {
+  min-width: 12rem;
+  padding: 0.65rem 1.5rem;
+  font-size: 1rem;
+}
+
+.amistoso-colunas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem 1.5rem;
+  text-align: left;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 720px) {
+  .amistoso-colunas {
+    grid-template-columns: 1fr;
+  }
+}
+
+.amistoso-lado-titulo {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.selecoes-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+@media (max-width: 520px) {
+  .selecoes-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.card-selecao {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.5rem 0.35rem 0.55rem;
+  font: inherit;
+  color: var(--texto);
+  background: var(--painel);
+  border: 2px solid var(--borda);
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.card-selecao:hover {
+  border-color: var(--acento);
+  background: #1a2430;
+}
+
+.card-selecao:focus-visible {
+  outline: 2px solid var(--verde-claro);
+  outline-offset: 2px;
+}
+
+.card-selecao img {
+  display: block;
+  width: 100%;
+  max-width: 5.5rem;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.card-selecao-nome {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+  color: var(--muted);
+}
+
+.card-selecao--ativa {
+  border-color: var(--verde-claro);
+  box-shadow: 0 0 0 1px rgba(45, 157, 108, 0.45);
+  background: #18221c;
+}
+
+.card-selecao--ativa .card-selecao-nome {
+  color: var(--texto);
+}
+
+.amistoso-erro {
+  margin: 0 0 0.75rem;
+  color: var(--perigo);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.tela-menu-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: center;
+  margin-top: 0.25rem;
+}
+
+.jogo-root {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+.jogo-root[hidden] {
+  display: none !important;
+}
+
+.painel-time-cabeca {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  color: var(--acento);
+  font-weight: 700;
+}
+
+.painel-dir .painel-time-cabeca {
+  align-items: flex-start;
+}
+
+.painel-bandeira {
+  display: block;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  object-fit: cover;
 }
 

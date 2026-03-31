@@ -98,30 +98,85 @@ export function textoResultadoPrimario(p, fmtNome = (j) => j.nome) {
   return `${a} prevalece no mano a mano e muda o rumo da jogada.`;
 }
 
-export function textoTransicaoGoleiro(chuteJogador) {
+/**
+ * @param {boolean} chuteJogador
+ * @param {{ penalti?: boolean }} [opts]
+ */
+export function textoTransicaoGoleiro(chuteJogador, opts) {
+  const penalti = opts?.penalti === true;
+  if (penalti) {
+    if (chuteJogador) {
+      return "Pênalti a seu favor. A bola vai para a marca da cal; quem bate encara o goleiro de frente.";
+    }
+    return "Pênalti para o adversário. O atacante posiciona a bola; você entra no duelo como goleiro.";
+  }
   if (chuteJogador) {
     return "A zaga não conteve — sobra finalização cara a cara com o goleiro.";
   }
   return "A defesa cedeu espaço: o atacante entra na grande área para bater no gol.";
 }
 
+/** @param {FmtNome} [fmtNome] */
+export function textoFaltaMarcada(j, fmtNome = (x) => x.nome) {
+  return `${fmtNome(j)} comete uma falta.`;
+}
+
+/** @param {FmtNome} [fmtNome] */
+export function textoCartaoAmarelo(j, fmtNome = (x) => x.nome) {
+  return `Segunda falta no jogo — ${fmtNome(j)} recebe cartão amarelo.`;
+}
+
+/** @param {FmtNome} [fmtNome] */
+export function textoExpulsao(j, fmtNome = (x) => x.nome) {
+  return `Terceira falta — ${fmtNome(j)} é expulso. O time fica um jogador a menos e o elenco perde 7% em ataque e defesa pelo restante da partida.`;
+}
+
+/**
+ * Após falta do zagueiro na área (tecla errada ou infração equivalente).
+ * @param {FmtNome} [fmtNome]
+ */
+export function textoPenaltiMarcadoPorFalta(j, fmtNome = (x) => x.nome) {
+  return `Dentro da área, a infração de ${fmtNome(j)} é punida com pênalti.`;
+}
+
+/** Quem sofreu a falta fica lesionado e precisa sair de campo. @param {FmtNome} [fmtNome] */
+export function textoLesaoPorFalta(j, fmtNome = (x) => x.nome) {
+  return `${fmtNome(j)} sente o choque da entrada e não pode continuar — lesão; precisa ser substituído.`;
+}
+
 /**
  * @param {object} p
  * @param {boolean} p.venceu
- * @param {boolean} p.chuteJogador
+ * @param {boolean} p.chuteJogador você no ataque (chute) ou no gol (defesa)
+ * @param {boolean} [p.penalti]
  * @param {FmtNome} [fmtNome]
  */
 export function textoDueloGoleiro(p, fmtNome = (j) => j.nome) {
   const at = fmtNome(p.atacante);
   const gl = fmtNome(p.goleiro);
+  const pen = p.penalti === true;
+
   if (p.chuteJogador) {
     if (p.venceu) {
+      if (pen) {
+        return `${at} cobra com calma da marca da cal; ${gl} parte para um canto, mas a bola vai no outro — gol.`;
+      }
       return `${at} enche o pé; o goleiro ${gl} ainda reage, mas não alcança — bola no fundo das redes.`;
+    }
+    if (pen) {
+      return `${gl} lê a batida e encaixa a defesa na hora — pênalti defendido.`;
     }
     return `${gl} fecha o ângulo, estica o braço e encaixa a defesa. O estádio segura o grito.`;
   }
+
   if (p.venceu) {
+    if (pen) {
+      return `No pênalti, ${gl} vai firme ao canto e empurra a finalização de ${at} — defesa.`;
+    }
     return `${gl} sai no contrapé, fecha o arco e nega o gol a ${at}.`;
+  }
+  if (pen) {
+    return `${at}, da marca dos onze metros, bate seco; ${gl} ainda desvia, mas a bola entra — gol.`;
   }
   return `${at} converte: a bola passa raspando as luvas de ${gl} e entra.`;
 }
