@@ -26,6 +26,29 @@ function sortearPorPosicao(titulares, pos) {
   return pool[randomInt(0, pool.length - 1)];
 }
 
+/**
+ * Quem conduz o ataque no duelo da área: 60% atacante, 30% meia, 10% zagueiro.
+ * Se a posição sorteada não existir no elenco, tenta as outras nessa ordem de preferência.
+ * @param {object[]} titulares
+ */
+function sortearJogadorLadoAtaque(titulares) {
+  const r = Math.random();
+  let ordem;
+  if (r < 0.6) ordem = [POSITIONS.ATACANTE, POSITIONS.MEIA, POSITIONS.ZAGUEIRO];
+  else if (r < 0.9) ordem = [POSITIONS.MEIA, POSITIONS.ATACANTE, POSITIONS.ZAGUEIRO];
+  else ordem = [POSITIONS.ZAGUEIRO, POSITIONS.ATACANTE, POSITIONS.MEIA];
+  for (const pos of ordem) {
+    const j = sortearPorPosicao(titulares, pos);
+    if (j) return j;
+  }
+  let pool = titulares.filter((j) => j.posicao !== POSITIONS.GOLEIRO && !j.expulso && !j.lesionado);
+  if (pool.length === 0) pool = titulares.filter((j) => j.posicao !== POSITIONS.GOLEIRO && !j.expulso);
+  if (pool.length === 0) pool = titulares.filter((j) => j.posicao !== POSITIONS.GOLEIRO);
+  if (pool.length === 0) pool = titulares.filter((j) => !j.expulso);
+  if (pool.length === 0) return titulares[0] ?? null;
+  return pool[randomInt(0, pool.length - 1)];
+}
+
 /** @param {object[]} titulares */
 export function sortearGoleiro(titulares) {
   return sortearPorPosicao(titulares, POSITIONS.GOLEIRO);
@@ -41,7 +64,7 @@ export function escolherDuelistas(zona, titPlayer, titCpu) {
   if (zona === ZONES.DEFESA_JOGADOR) {
     return {
       jogador: sortearPorPosicao(titPlayer, POSITIONS.ZAGUEIRO),
-      adversario: sortearPorPosicao(titCpu, POSITIONS.ATACANTE),
+      adversario: sortearJogadorLadoAtaque(titCpu),
     };
   }
   if (zona === ZONES.MEIO_CAMPO) {
@@ -52,7 +75,7 @@ export function escolherDuelistas(zona, titPlayer, titCpu) {
   }
   if (zona === ZONES.ATAQUE_JOGADOR) {
     return {
-      jogador: sortearPorPosicao(titPlayer, POSITIONS.ATACANTE),
+      jogador: sortearJogadorLadoAtaque(titPlayer),
       adversario: sortearPorPosicao(titCpu, POSITIONS.ZAGUEIRO),
     };
   }
@@ -123,8 +146,13 @@ export function sortearAcrescimosTempo() {
   return randomInt(0, 9);
 }
 
+/** Acréscimos em cada tempo da prorrogação (Copa): 1–4 min. */
+export function sortearAcrescimosProrrogacao() {
+  return randomInt(1, 4);
+}
+
 /**
- * Após zagueiro × atacante na área: ataque vencedor enfrenta o goleiro.
+ * Após duelo na área (defesa sempre zagueiro; ataque sorteado): vencedor com posse de ataque enfrenta o goleiro.
  * @returns {'jogador_chuta' | 'cpu_chuta' | null}
  */
 export function tipoFinalizacaoGoleiro(zona, jogadorVenceuPrimario) {

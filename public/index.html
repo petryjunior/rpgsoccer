@@ -18,11 +18,41 @@
             type="button"
             id="btn-menu-amistoso"
             class="btn pri menu-mod-btn"
-            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');if(i){i.style.display='none';i.setAttribute('hidden','');}if(a){a.style.removeProperty('display');a.removeAttribute('hidden');}var fn=window.__rpgsoccerAoAbrirAmistoso;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
+            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');if(i){i.style.display='none';i.setAttribute('hidden','');}if(c){c.style.display='none';c.setAttribute('hidden','');}if(a){a.style.removeProperty('display');a.removeAttribute('hidden');}var fn=window.__rpgsoccerAoAbrirAmistoso;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
           >
             Amistoso
           </button>
+          <button
+            type="button"
+            id="btn-menu-copa"
+            class="btn pri menu-mod-btn"
+            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');if(i){i.style.display='none';i.setAttribute('hidden','');}if(a){a.style.display='none';a.setAttribute('hidden','');}if(c){c.style.removeProperty('display');c.removeAttribute('hidden');}var fn=window.__rpgsoccerAoAbrirCopa;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
+          >
+            Copa do Mundo
+          </button>
+          <button
+            type="button"
+            id="btn-menu-carregar-copa"
+            class="btn sec menu-mod-btn"
+            onclick="(function(){var fn=window.__rpgsoccerAbrirTelaCarregarCopa;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
+          >
+            Carregar Copa
+          </button>
         </nav>
+      </div>
+    </div>
+
+    <div id="tela-carregar-copa" class="tela-menu tela-carregar-copa" hidden>
+      <div class="tela-menu-inner tela-carregar-copa-inner">
+        <h2 class="tela-menu-titulo">Carregar Copa</h2>
+        <p class="tela-menu-sub">Campeonatos salvos neste navegador. Carregar substitui qualquer partida em andamento.</p>
+        <div id="carregar-copa-lista" class="copa-saves-lista" role="list"></div>
+        <p id="carregar-copa-vazio" class="copa-carregar-vazio tela-menu-sub" hidden>
+          Nenhum save ainda. Inicie a Copa do Mundo e use <strong>Salvar progresso</strong> no hub entre as rodadas.
+        </p>
+        <div class="tela-menu-acoes">
+          <button type="button" id="btn-carregar-copa-voltar" class="btn sec">Voltar ao menu</button>
+        </div>
       </div>
     </div>
 
@@ -55,11 +85,111 @@
             type="button"
             id="btn-voltar-menu"
             class="btn sec"
-            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');if(a){a.style.display='none';a.setAttribute('hidden','');}if(i){i.style.removeProperty('display');i.removeAttribute('hidden');}})()"
+            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');if(a){a.style.display='none';a.setAttribute('hidden','');}if(c){c.style.display='none';c.setAttribute('hidden','');}if(i){i.style.removeProperty('display');i.removeAttribute('hidden');}})()"
           >
             Voltar
           </button>
         </div>
+      </div>
+    </div>
+
+    <div id="tela-copa" class="tela-menu tela-copa" hidden>
+      <div class="tela-copa-inner">
+        <h2 class="tela-menu-titulo">Copa do Mundo</h2>
+        <div id="copa-passo-selecao" class="copa-passo">
+          <p class="tela-menu-sub">Escolha a seleção que você vai comandar. Os grupos serão sorteados na sequência.</p>
+          <div id="copa-cards-jogador" class="selecoes-cards" role="group" aria-label="Sua seleção na Copa"></div>
+          <div class="tela-menu-acoes">
+            <button type="button" id="btn-copa-sortear-grupos" class="btn pri" disabled>Ver grupos</button>
+            <button
+              type="button"
+              id="btn-copa-voltar-inicio"
+              class="btn sec"
+              onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');if(c){c.style.display='none';c.setAttribute('hidden','');}if(a){a.style.display='none';a.setAttribute('hidden','');}if(i){i.style.removeProperty('display');i.removeAttribute('hidden');}})()"
+            >
+              Voltar
+            </button>
+          </div>
+        </div>
+        <div id="copa-passo-grupos" class="copa-passo" hidden>
+          <p id="copa-grupos-intro" class="tela-menu-sub"></p>
+          <div id="copa-grupos-grid" class="copa-grupos-grid" aria-label="Grupos da Copa"></div>
+          <div id="copa-classificacao-wrap" class="copa-classificacao-wrap" hidden>
+            <h3 id="copa-ancora-classificacao" class="copa-subtitulo">Classificação — seu grupo</h3>
+            <div id="copa-tabela-grupo" class="copa-tabela-grupo"></div>
+          </div>
+          <div id="copa-classificacao-todos-wrap" class="copa-classificacao-todos-wrap" hidden>
+            <h3 class="copa-subtitulo">Classificação — todos os grupos</h3>
+            <p class="copa-classificacao-todos-hint tela-menu-sub">
+              Cada rodada só é disputada nos outros grupos depois que você termina o seu jogo da rodada; os placares aparecem em “Resultados da rodada”.
+            </p>
+            <div id="copa-tabelas-todos-grupos" class="copa-tabelas-todos-grupos" aria-label="Tabelas de todos os grupos"></div>
+          </div>
+          <div id="copa-chave-wrap" class="copa-chave-wrap" hidden>
+            <h3 class="copa-subtitulo">Chave do mata-mata (FIFA)</h3>
+            <p class="copa-chave-hint tela-menu-sub">
+              Oitavas na ordem 1.º×2.º entre grupos vizinhos; nas quartas, cruzamento 1×3, 2×4, 5×7 e 6×8. Os jogos sem a sua seleção são simulados ao abrir a fase; o destaque de vencedor só aparece depois que você joga o seu jogo desta fase.
+            </p>
+            <div id="copa-chave" class="copa-chave" aria-label="Chaveamento completo"></div>
+          </div>
+          <div id="copa-artilheiros-wrap" class="copa-artilheiros-wrap" hidden>
+            <h3 id="copa-ancora-artilheiros" class="copa-subtitulo">Artilheiros — top 10</h3>
+            <p class="copa-artilheiros-hint tela-menu-sub">
+              Lista com os dez maiores artilheiros. Gols de partidas simuladas são atribuídos a jogadores de linha (peso: atacantes e meias). Pênaltis da disputa final não entram.
+            </p>
+            <div id="copa-artilheiros-lista" class="copa-artilheiros-lista"></div>
+          </div>
+          <p id="copa-hub-msg" class="copa-hub-msg" hidden></p>
+          <div id="copa-resultados-rodada-wrap" class="copa-resultados-rodada-wrap" hidden>
+            <h3 id="copa-resultados-rodada-titulo" class="copa-subtitulo">Resultados da rodada</h3>
+            <div id="copa-resultados-rodada-lista" class="copa-resultados-rodada-lista"></div>
+          </div>
+          <div id="copa-salvar-wrap" class="copa-salvar-wrap">
+            <h3 class="copa-subtitulo">Salvar progresso</h3>
+            <p class="copa-salvar-hint tela-menu-sub">
+              Grava o campeonato para continuar depois. Os dados ficam só neste aparelho / navegador.
+            </p>
+            <div class="copa-salvar-controls">
+              <label class="copa-salvar-label" for="copa-salvar-nome">Nome</label>
+              <input
+                type="text"
+                id="copa-salvar-nome"
+                class="copa-salvar-input"
+                maxlength="48"
+                placeholder="Ex.: Brasil — fase de grupos"
+                autocomplete="off"
+              />
+              <label class="copa-salvar-label" for="copa-salvar-sobrescrever">Atualizar save</label>
+              <select id="copa-salvar-sobrescrever" class="copa-salvar-select" aria-label="Substituir save existente">
+                <option value="">Salvar como novo</option>
+              </select>
+              <button type="button" id="btn-copa-salvar" class="btn sec">Salvar</button>
+            </div>
+            <p id="copa-salvar-feedback" class="copa-salvar-feedback" hidden role="status"></p>
+            <h4 class="copa-salvar-subtitulo">Campeonatos salvos</h4>
+            <div id="copa-hub-saves-lista" class="copa-saves-lista" role="list" aria-label="Lista de saves"></div>
+          </div>
+          <div class="tela-menu-acoes">
+            <button type="button" id="btn-copa-proximo-jogo" class="btn pri" hidden>Próximo jogo</button>
+            <button type="button" id="btn-copa-ver-tabela" class="btn sec" hidden>Ver classificação</button>
+            <button type="button" id="btn-copa-ver-artilheiros" class="btn sec" hidden>Artilheiros</button>
+            <button type="button" id="btn-copa-voltar-inicio-hub" class="btn sec" hidden>Voltar ao menu</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="copa-penaltis-overlay" class="overlay overlay-copa-penaltis" hidden role="dialog" aria-modal="true">
+      <div class="copa-penaltis-modal">
+        <h2 id="copa-penaltis-titulo" class="copa-penaltis-titulo">Disputa de pênaltis</h2>
+        <p id="copa-penaltis-texto" class="copa-penaltis-texto"></p>
+        <div id="copa-penaltis-escolha" class="copa-penaltis-escolha">
+          <p class="copa-penaltis-hint">Clique nos jogadores na ordem das cobranças.</p>
+          <ul id="copa-penaltis-lista" class="copa-penaltis-lista"></ul>
+          <p id="copa-penaltis-ordem" class="copa-penaltis-ordem"></p>
+          <button type="button" id="copa-penaltis-confirmar" class="btn pri" disabled>Confirmar cobradores</button>
+        </div>
+        <div id="copa-penaltis-placar" class="copa-penaltis-placar" hidden></div>
       </div>
     </div>
 
@@ -74,24 +204,10 @@
 
       <main class="layout">
         <aside class="painel painel-esq">
-          <div class="painel-esq-head">
-            <h2 class="painel-time-cabeca">
-              <img id="bandeira-jogador-painel" class="painel-bandeira" alt="" width="40" height="30" decoding="async" />
-              <span id="nome-selecao-jogador-painel">—</span>
-            </h2>
-            <div class="subs-tutorial" role="note">
-              <p class="subs-tutorial-titulo">Montar escalação</p>
-              <p class="subs-tutorial-passos">
-                Clique em um <strong>titular</strong> e depois em um <strong>reserva</strong> (ou o contrário) para
-                trocar.
-              </p>
-              <p class="subs-tutorial-meta">
-                <span class="subs-tutorial-rotulo">Antes do apito:</span> trocas ilimitadas.
-                <span class="subs-tutorial-rotulo">Na partida:</span> com o lance fechado ou em <strong>Pausar</strong>,
-                até 5 substituições. No banco, no máximo 2 goleiros.
-              </p>
-            </div>
-          </div>
+          <h2 class="painel-time-cabeca">
+            <img id="bandeira-jogador-painel" class="painel-bandeira" alt="" width="40" height="30" decoding="async" />
+            <span id="nome-selecao-jogador-painel">—</span>
+          </h2>
           <div class="painel-esq-listas">
             <section class="bloco-elenco" aria-labelledby="tit-titulares">
               <h3 id="tit-titulares">Titulares</h3>
@@ -174,6 +290,19 @@
             intervalo vira <strong>Começar 2º tempo</strong>. Entre lances o relógio corre devagar.
           </div>
 
+          <div class="subs-tutorial" role="note">
+            <p class="subs-tutorial-titulo">Montar escalação</p>
+            <p class="subs-tutorial-passos">
+              Clique em um <strong>titular</strong> e depois em um <strong>reserva</strong> (ou o contrário) para
+              trocar.
+            </p>
+            <p class="subs-tutorial-meta">
+              <span class="subs-tutorial-rotulo">Antes do apito:</span> trocas ilimitadas.
+              <span class="subs-tutorial-rotulo">Na partida:</span> com o lance fechado ou em <strong>Pausar</strong>,
+              até 5 substituições. No banco, no máximo 2 goleiros.
+            </p>
+          </div>
+
           <div id="log" class="log" role="log" aria-live="polite"></div>
         </section>
 
@@ -182,21 +311,46 @@
             <img id="bandeira-cpu-painel" class="painel-bandeira" alt="" width="40" height="30" decoding="async" />
             <span id="nome-selecao-cpu-painel">—</span>
           </h2>
-          <p class="hint-sub hint-cpu">
-            O adversário também troca até 5 jogadores; as mudanças aparecem no placar de substituições e no log.
-          </p>
-          <h3>Titulares</h3>
-          <ul id="time-cpu-tit" class="lista-jogadores"></ul>
-          <h3>Reservas</h3>
-          <ul id="time-cpu-res" class="lista-jogadores reservas"></ul>
+          <div class="painel-dir-listas">
+            <h3>Titulares</h3>
+            <ul id="time-cpu-tit" class="lista-jogadores"></ul>
+            <h3>Reservas</h3>
+            <ul id="time-cpu-res" class="lista-jogadores reservas"></ul>
+          </div>
         </aside>
       </main>
+
+      <div
+        id="copa-penaltis-hud"
+        class="copa-penaltis-hud"
+        hidden
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <p id="copa-penaltis-hud-placar" class="copa-penaltis-hud-placar"></p>
+        <p id="copa-penaltis-hud-acao" class="copa-penaltis-hud-acao"></p>
+      </div>
 
       <div id="gol-overlay" class="overlay overlay-gol" hidden>
         <div class="cartao-gol">
           <p id="gol-titulo" class="gol-titulo">GOL!</p>
           <p id="gol-sub" class="gol-sub"></p>
           <button type="button" id="btn-gol-ok" class="btn pri">OK</button>
+        </div>
+      </div>
+
+      <div
+        id="fim-jogo-overlay"
+        class="overlay overlay-gol overlay-fim-jogo"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fim-jogo-titulo"
+      >
+        <div class="cartao-gol">
+          <p id="fim-jogo-titulo" class="gol-titulo">Fim de jogo!</p>
+          <p id="fim-jogo-placar" class="gol-sub"></p>
+          <button type="button" id="btn-fim-jogo-ok" class="btn pri">OK</button>
         </div>
       </div>
 

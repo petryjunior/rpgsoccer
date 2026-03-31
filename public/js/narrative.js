@@ -4,7 +4,7 @@ import { ZONE_LABEL, ZONES } from "./constants.js";
 
 /**
  * Contexto do lance: sempre alinha “quem tem a bola” com a ação descrita.
- * `jogador` / `adversario` vêm de escolherDuelistas (seu zag/meia/ata × rival).
+ * `jogador` / `adversario` vêm de escolherDuelistas (meio: meia×meia; área: defesa sempre zagueiro, ataque 60% ata / 30% mei / 10% zag).
  * @param {object} p
  * @param {string} p.zona
  * @param {object} p.jogador
@@ -142,6 +142,20 @@ export function textoPenaltiMarcadoPorFalta(j, fmtNome = (x) => x.nome) {
 /** Quem sofreu a falta fica lesionado e precisa sair de campo. @param {FmtNome} [fmtNome] */
 export function textoLesaoPorFalta(j, fmtNome = (x) => x.nome) {
   return `${fmtNome(j)} sente o choque da entrada e não pode continuar — lesão; precisa ser substituído.`;
+}
+
+/**
+ * Pós-jogo (Copa): previsão de retorno. `nomeJaEscapado` = nome já sanitizado para HTML.
+ * @param {number} partidasFora quantos jogos não pode ser titular (0 = ok no próximo)
+ */
+export function textoPronosticoLesaoCopa(partidasFora, nomeJaEscapado) {
+  if (partidasFora <= 0) {
+    return `${nomeJaEscapado} — após exames, fica liberado para o próximo jogo (só precisou sair desta partida).`;
+  }
+  if (partidasFora === 1) {
+    return `${nomeJaEscapado} — ficará pelo menos um jogo de fora; só poderá ficar no banco até cumprir o prazo.`;
+  }
+  return `${nomeJaEscapado} — ficará pelo menos ${partidasFora} jogos de fora; só no banco até cumprir o prazo.`;
 }
 
 /**

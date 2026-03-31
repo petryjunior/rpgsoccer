@@ -19,9 +19,29 @@ function j(nome, posicao, ataque, defesa) {
  * @typedef {{ id: string, nome: string, sigla: string, iso: string, titulares: JogadorDef[], reservas: JogadorDef[] }} SelecaoDef
  */
 
-/** Bandeira (PNG). `iso` em minúsculas, ex.: br, ar, gb. */
-export function urlBandeira(iso, largura = 120) {
-  return `https://flagcdn.com/w${largura}/${iso}.png`;
+/** Larguras que o flagcdn.com realmente serve (outros valores → 404). */
+const FLAGCDN_LARGURAS = [20, 40, 80, 160, 320, 640, 1280, 2560];
+
+function larguraBandeiraFlagcdn(largura) {
+  const n = Number(largura);
+  if (!Number.isFinite(n) || n < 10) return 80;
+  let best = FLAGCDN_LARGURAS[0];
+  let bestD = Math.abs(n - best);
+  for (const w of FLAGCDN_LARGURAS) {
+    const d = Math.abs(n - w);
+    if (d < bestD || (d === bestD && w < best)) {
+      best = w;
+      bestD = d;
+    }
+  }
+  return best;
+}
+
+/** Bandeira (PNG). `iso` em minúsculas, ex.: br, ar, gb. `largura` é ajustada ao conjunto suportado pelo CDN. */
+export function urlBandeira(iso, largura = 80) {
+  const w = larguraBandeiraFlagcdn(largura);
+  const code = String(iso ?? "xx").toLowerCase();
+  return `https://flagcdn.com/w${w}/${code}.png`;
 }
 
 /** @type {SelecaoDef[]} */

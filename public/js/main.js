@@ -7,6 +7,7 @@ import {
   textoExpulsao,
   textoFaltaMarcada,
   textoLesaoPorFalta,
+  textoPronosticoLesaoCopa,
   textoPenaltiMarcadoPorFalta,
   textoResultadoPrimario,
   textoTransicaoGoleiro,
@@ -17,6 +18,7 @@ import {
   metricasDuelo,
   proximaZonaEPosse,
   proximoIntervaloMinutos,
+  sortearAcrescimosProrrogacao,
   sortearAcrescimosTempo,
   sortearAtacanteTitular,
   sortearGoleiro,
@@ -24,19 +26,92 @@ import {
   tipoFinalizacaoGoleiro,
 } from "./match.js";
 import { parametrosLetra } from "./qte.js";
-import { SELECOES, elencoDaSelecao, urlBandeira } from "./national-teams.js";
+import { SELECOES, elencoDaSelecao, selecaoPorId, urlBandeira } from "./national-teams.js";
+import {
+  adversariosNasRodadas,
+  agregarClassificacao,
+  aplicarResultadoNaLista,
+  criarRng,
+  embaralhar,
+  forcaMediaSelecao,
+  montarFinal,
+  montarOitavas,
+  montarQuartasFifa,
+  montarSemiFifa,
+  ordenarGrupoFifa,
+  partidasDoGrupo,
+  ROTULO_FINAL_FIFA,
+  ROTULOS_OITAVAS_FIFA,
+  ROTULOS_QUARTAS_FIFA,
+  ROTULOS_SEMI_FIFA,
+  simularPlacar,
+  simularRodadaGruposExcetoJogoHumano,
+  sortearGrupos,
+} from "./world-cup.js";
+import {
+  carregarEstadoDoSave,
+  gravarNovoSaveCopa,
+  listarSavesCopaOrdenados,
+  obterSaveCopaPorId,
+  removerSaveCopa,
+  serializarCopaEstadoParaJson,
+  substituirSaveCopa,
+} from "./copa-storage.js";
 import { ordenarPorPosicao } from "./squadSort.js";
 import { validarElenco } from "./squad.js";
 
 const els = {
   jogoRoot: document.getElementById("jogo-root"),
   telaInicio: document.getElementById("tela-inicio"),
+  telaCarregarCopa: document.getElementById("tela-carregar-copa"),
+  carregarCopaLista: document.getElementById("carregar-copa-lista"),
+  carregarCopaVazio: document.getElementById("carregar-copa-vazio"),
+  btnCarregarCopaVoltar: document.getElementById("btn-carregar-copa-voltar"),
   telaAmistoso: document.getElementById("tela-amistoso"),
   btnMenuAmistoso: document.getElementById("btn-menu-amistoso"),
   amistosoCardsJogador: document.getElementById("amistoso-cards-jogador"),
   amistosoCardsCpu: document.getElementById("amistoso-cards-cpu"),
   btnConfirmarAmistoso: document.getElementById("btn-confirmar-amistoso"),
   btnVoltarMenu: document.getElementById("btn-voltar-menu"),
+  telaCopa: document.getElementById("tela-copa"),
+  copaPassoSelecao: document.getElementById("copa-passo-selecao"),
+  copaPassoGrupos: document.getElementById("copa-passo-grupos"),
+  copaCardsJogador: document.getElementById("copa-cards-jogador"),
+  btnCopaSortearGrupos: document.getElementById("btn-copa-sortear-grupos"),
+  copaGruposIntro: document.getElementById("copa-grupos-intro"),
+  copaGruposGrid: document.getElementById("copa-grupos-grid"),
+  copaClassificacaoWrap: document.getElementById("copa-classificacao-wrap"),
+  copaClassificacaoTodosWrap: document.getElementById("copa-classificacao-todos-wrap"),
+  copaTabelasTodosGrupos: document.getElementById("copa-tabelas-todos-grupos"),
+  copaTabelaGrupo: document.getElementById("copa-tabela-grupo"),
+  copaHubMsg: document.getElementById("copa-hub-msg"),
+  copaResultadosRodadaWrap: document.getElementById("copa-resultados-rodada-wrap"),
+  copaResultadosRodadaTitulo: document.getElementById("copa-resultados-rodada-titulo"),
+  copaResultadosRodadaLista: document.getElementById("copa-resultados-rodada-lista"),
+  copaChaveWrap: document.getElementById("copa-chave-wrap"),
+  copaChave: document.getElementById("copa-chave"),
+  copaSalvarNome: document.getElementById("copa-salvar-nome"),
+  copaSalvarSobrescrever: document.getElementById("copa-salvar-sobrescrever"),
+  btnCopaSalvar: document.getElementById("btn-copa-salvar"),
+  copaSalvarFeedback: document.getElementById("copa-salvar-feedback"),
+  copaHubSavesLista: document.getElementById("copa-hub-saves-lista"),
+  btnCopaProximoJogo: document.getElementById("btn-copa-proximo-jogo"),
+  btnCopaVerTabela: document.getElementById("btn-copa-ver-tabela"),
+  btnCopaVerArtilheiros: document.getElementById("btn-copa-ver-artilheiros"),
+  btnCopaVoltarInicioHub: document.getElementById("btn-copa-voltar-inicio-hub"),
+  copaArtilheirosWrap: document.getElementById("copa-artilheiros-wrap"),
+  copaArtilheirosLista: document.getElementById("copa-artilheiros-lista"),
+  copaPenaltisOverlay: document.getElementById("copa-penaltis-overlay"),
+  copaPenaltisTitulo: document.getElementById("copa-penaltis-titulo"),
+  copaPenaltisTexto: document.getElementById("copa-penaltis-texto"),
+  copaPenaltisEscolha: document.getElementById("copa-penaltis-escolha"),
+  copaPenaltisLista: document.getElementById("copa-penaltis-lista"),
+  copaPenaltisOrdem: document.getElementById("copa-penaltis-ordem"),
+  copaPenaltisConfirmar: document.getElementById("copa-penaltis-confirmar"),
+  copaPenaltisPlacar: document.getElementById("copa-penaltis-placar"),
+  copaPenaltisHud: document.getElementById("copa-penaltis-hud"),
+  copaPenaltisHudPlacar: document.getElementById("copa-penaltis-hud-placar"),
+  copaPenaltisHudAcao: document.getElementById("copa-penaltis-hud-acao"),
   amistosoErro: document.getElementById("amistoso-erro"),
   bandeiraJogadorPainel: document.getElementById("bandeira-jogador-painel"),
   nomeSelecaoJogadorPainel: document.getElementById("nome-selecao-jogador-painel"),
@@ -79,6 +154,10 @@ const els = {
   golTitulo: document.getElementById("gol-titulo"),
   golSub: document.getElementById("gol-sub"),
   btnGolOk: document.getElementById("btn-gol-ok"),
+  fimJogoOverlay: document.getElementById("fim-jogo-overlay"),
+  fimJogoTitulo: document.getElementById("fim-jogo-titulo"),
+  fimJogoPlacar: document.getElementById("fim-jogo-placar"),
+  btnFimJogoOk: document.getElementById("btn-fim-jogo-ok"),
   intervaloBanner: document.getElementById("intervalo-banner"),
   dueloRpgStrip: document.getElementById("duelo-rpg-strip"),
   btnPausa: document.getElementById("btn-pausa"),
@@ -87,7 +166,7 @@ const els = {
   btnContinuarPausa: document.getElementById("btn-continuar-pausa"),
 };
 
-const CANSACO_DUELO = 3;
+const CANSACO_DUELO = 4;
 const ATTR_MIN = 1;
 const ATTR_MAX = 99;
 const BONUS_STREAK_DUELO = 10;
@@ -96,6 +175,8 @@ const CPU_PROB_FALTA = 0.3;
 const FATOR_DEBUFF_EXPULSAO = 0.93;
 /** Chance de o jogador faltado (quem sofre a falta) se lesionar. */
 const PROB_LESAO_APOS_FALTA = 0.1;
+/** Menos que isto em campo (titulares não expulsos) = jogo encerrado por W.O. 3×0. */
+const MIN_JOGADORES_EM_CAMPO = 7;
 
 /** @type {Map<string, { ataque: number, defesa: number }>} */
 const statsBasePartida = new Map();
@@ -112,7 +193,11 @@ const QTE_FEEDBACK_FALHA_MS = 1150;
 const QTE_FEEDBACK_ACERTO_MS = 280;
 /** Intervalo entre 3→2→1: um único valor sorteado por lance (mesmo tempo nos 3 passos). */
 const QTE_COUNTDOWN_MS_MIN = 260;
-const QTE_COUNTDOWN_MS_MAX = 2600;
+const QTE_COUNTDOWN_MS_MAX = 1800;
+/** Pausa entre cada minuto exibido no relógio (entre lances). Menor = partida “corre” mais rápido. */
+const RELOGIO_MS_POR_MINUTO = 400;
+/** Quantos jogadores a tabela de artilheiros do hub da Copa exibe. */
+const COPA_ARTILHEIROS_HUB_MAX = 10;
 
 function sortearIntervaloContagemQte() {
   const a = QTE_COUNTDOWN_MS_MIN;
@@ -120,9 +205,16 @@ function sortearIntervaloContagemQte() {
   return a + Math.floor(Math.random() * (b - a + 1));
 }
 
-/** Ex.: 800 ms → "0,8" para texto do QTE. */
-function fmtSegundosAproximados(ms) {
-  return (ms / 1000).toFixed(1).replace(".", ",");
+/** ms → segundos para texto do QTE (3 casas decimais, vírgula decimal pt-BR). */
+function fmtSegundosExatos(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n)) return "0,000";
+  const s = n / 1000;
+  return s.toLocaleString("pt-BR", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+    useGrouping: false,
+  });
 }
 
 /**
@@ -172,6 +264,7 @@ function restaurarElencoParaNovaPartida() {
     }
     delete j.expulso;
     delete j.lesionado;
+    delete j.copaLesaoPartidasFora;
   }
   faltasPorJogador.clear();
   timeJogador._debuffExpulsaoAplicado = false;
@@ -194,6 +287,148 @@ function timeDoElenco(j) {
   return timeCpu;
 }
 
+/** Titular na Copa: lesão ou suspensão ativa no seu time. */
+function jogadorHumanoBloqueadoTitularCopa(nome) {
+  if (tipoModoJogo !== "copa" || !copaEstado || !metaSelecaoJogador) return false;
+  const k = chaveArtilheiroCopa(metaSelecaoJogador.id, nome);
+  const les = copaEstado.lesoesHumano?.[k]?.partidasFora ?? 0;
+  const sus = copaEstado.jogosSuspensao?.[k] ?? 0;
+  return les > 0 || sus > 0;
+}
+
+/**
+ * @param {object} j
+ * @param {"amarelo" | "vermelho"} tipo
+ */
+function registrarDisciplinaCopaHumanoAposCartao(j, tipo) {
+  if (tipoModoJogo !== "copa" || !copaEstado || !metaSelecaoJogador) return;
+  if (timeDoElenco(j) !== timeJogador) return;
+  const k = chaveArtilheiroCopa(metaSelecaoJogador.id, j.nome);
+  if (!copaEstado.amarelosAcumulado) copaEstado.amarelosAcumulado = {};
+  if (!copaEstado.jogosSuspensao) copaEstado.jogosSuspensao = {};
+  if (!copaEstado.suspensaoRelatorioFim) copaEstado.suspensaoRelatorioFim = [];
+  if (tipo === "vermelho") {
+    copaEstado.amarelosAcumulado[k] = 0;
+    copaEstado.jogosSuspensao[k] = 1;
+    copaEstado.suspensaoRelatorioFim.push({ nome: j.nome, motivo: "vermelho" });
+    return;
+  }
+  const ac = (copaEstado.amarelosAcumulado[k] ?? 0) + 1;
+  copaEstado.amarelosAcumulado[k] = ac;
+  if (ac >= 2) {
+    copaEstado.amarelosAcumulado[k] = 0;
+    copaEstado.jogosSuspensao[k] = 1;
+    copaEstado.suspensaoRelatorioFim.push({ nome: j.nome, motivo: "dois amarelos" });
+  }
+}
+
+function aplicarRestricoesCopaNoElencoHumano() {
+  if (tipoModoJogo !== "copa" || !copaEstado || !metaSelecaoJogador) return;
+  let mudou = true;
+  let guarda = 0;
+  while (mudou && guarda < 80) {
+    guarda++;
+    mudou = false;
+    for (let i = 0; i < timeJogador.titulares.length; i++) {
+      const t = timeJogador.titulares[i];
+      if (!jogadorHumanoBloqueadoTitularCopa(t.nome)) continue;
+      for (let r = 0; r < timeJogador.reservas.length; r++) {
+        const res = timeJogador.reservas[r];
+        if (jogadorHumanoBloqueadoTitularCopa(res.nome)) continue;
+        [timeJogador.titulares[i], timeJogador.reservas[r]] = [
+          timeJogador.reservas[r],
+          timeJogador.titulares[i],
+        ];
+        const v = validarElenco(timeJogador.titulares, timeJogador.reservas);
+        if (!v.ok) {
+          [timeJogador.titulares[i], timeJogador.reservas[r]] = [
+            timeJogador.reservas[r],
+            timeJogador.titulares[i],
+          ];
+          continue;
+        }
+        appendLog(
+          `<strong>Copa.</strong> ${escapeHtml(res.nome)} assume a titular no lugar de ${escapeHtml(t.nome)} (lesão ou suspensão).`,
+        );
+        mudou = true;
+        break;
+      }
+    }
+  }
+}
+
+function sortearPartidasForaLesaoCopa(rng) {
+  const t = rng();
+  if (t < 0.42) return 0;
+  if (t < 0.78) return 1;
+  return 2;
+}
+
+function consumirLesaoESuspensaoCopaAposPartida() {
+  if (!copaEstado?._snapCopaInicioPartida) return;
+  const snap = copaEstado._snapCopaInicioPartida;
+  if (!copaEstado.jogosSuspensao) copaEstado.jogosSuspensao = {};
+  if (!copaEstado.lesoesHumano) copaEstado.lesoesHumano = {};
+  for (const k of Object.keys(snap.jogosSuspensao ?? {})) {
+    if ((copaEstado.jogosSuspensao[k] ?? 0) > 0) {
+      copaEstado.jogosSuspensao[k]--;
+      if (copaEstado.jogosSuspensao[k] <= 0) delete copaEstado.jogosSuspensao[k];
+    }
+  }
+  for (const k of Object.keys(snap.lesoesHumano ?? {})) {
+    const cur = copaEstado.lesoesHumano[k];
+    if (cur && cur.partidasFora > 0) {
+      cur.partidasFora--;
+      if (cur.partidasFora <= 0) delete copaEstado.lesoesHumano[k];
+    }
+  }
+  delete copaEstado._snapCopaInicioPartida;
+}
+
+function processarLesoesFinaisCopaHumano() {
+  if (!copaEstado || !metaSelecaoJogador || tipoModoJogo !== "copa") return;
+  if (!copaEstado.lesoesHumano) copaEstado.lesoesHumano = {};
+  const sid = metaSelecaoJogador.id;
+  const vistos = new Set();
+  for (const j of [...timeJogador.titulares, ...timeJogador.reservas]) {
+    if (!j.lesionado) continue;
+    const k = chaveArtilheiroCopa(sid, j.nome);
+    if (vistos.has(k)) continue;
+    vistos.add(k);
+    const n =
+      j.copaLesaoPartidasFora !== undefined
+        ? j.copaLesaoPartidasFora
+        : sortearPartidasForaLesaoCopa(copaEstado.rng);
+    delete j.copaLesaoPartidasFora;
+    if (n > 0) {
+      copaEstado.lesoesHumano[k] = { partidasFora: n };
+    }
+    const nm = escapeHtml(j.nome);
+    appendLog(
+      `<strong>Copa — lesão.</strong> ${textoPronosticoLesaoCopa(n, nm)}`,
+    );
+  }
+}
+
+function logSuspensaoRelatorioFimCopa() {
+  if (!copaEstado?.suspensaoRelatorioFim?.length) return;
+  for (const x of copaEstado.suspensaoRelatorioFim) {
+    const m =
+      x.motivo === "vermelho" ? "cartão vermelho" : "segundo cartão amarelo (acumulado)";
+    appendLog(
+      `<strong>Copa — disciplina.</strong> ${escapeHtml(x.nome)} cumprirá suspensão no próximo jogo (${m}).`,
+    );
+  }
+  copaEstado.suspensaoRelatorioFim = [];
+}
+
+/** Após o apito final (tempo regulamentar, prorrogação ou pênaltis). */
+function aplicarEfeitosPosJogoCopaLesaoDisciplina() {
+  consumirLesaoESuspensaoCopaAposPartida();
+  processarLesoesFinaisCopaHumano();
+  logSuspensaoRelatorioFimCopa();
+}
+
 /**
  * Registra falta, cartões e expulsão; devolve linhas HTML para o resultado.
  * @param {object} j
@@ -205,10 +440,12 @@ function aplicarFaltaNoJogador(j) {
   const lines = [textoFaltaMarcada(j, fmt)];
   if (n === 2 && !j.expulso) {
     lines.push(textoCartaoAmarelo(j, fmt));
+    registrarDisciplinaCopaHumanoAposCartao(j, "amarelo");
   }
   if (n >= 3) {
     j.expulso = true;
     lines.push(textoExpulsao(j, fmt));
+    registrarDisciplinaCopaHumanoAposCartao(j, "vermelho");
     aplicarDebuffPrimeiraExpulsao(timeDoElenco(j));
     if (timeDoElenco(j) === timeJogador) aguardandoPausaPorExpulsaoHumana = true;
   }
@@ -224,6 +461,9 @@ function tentarLesaoJogadorFaltado(vitima) {
   if (!vitima || vitima.lesionado || vitima.expulso) return [];
   if (Math.random() >= PROB_LESAO_APOS_FALTA) return [];
   vitima.lesionado = true;
+  if (tipoModoJogo === "copa" && copaEstado) {
+    vitima.copaLesaoPartidasFora = sortearPartidasForaLesaoCopa(copaEstado.rng);
+  }
   return [textoLesaoPorFalta(vitima, spanNomeJogador)];
 }
 
@@ -257,9 +497,11 @@ function substituirLesionadosTitularCpu() {
     for (let k = 0; k < 120; k++) {
       const ri = Math.floor(Math.random() * timeCpu.reservas.length);
       const res = timeCpu.reservas[ri];
+      if (jogadorJaSubstituidoNaoPodeVoltar(res.id)) continue;
       [timeCpu.titulares[ti], timeCpu.reservas[ri]] = [timeCpu.reservas[ri], timeCpu.titulares[ti]];
       const v = validarElenco(timeCpu.titulares, timeCpu.reservas);
       if (v.ok) {
+        jogadoresSubstituidosForaIds.add(tit.id);
         appendLog(
           `Lesão no adversário: ${res.nome} entra no lugar de ${tit.nome}.`,
         );
@@ -279,6 +521,50 @@ function substituirLesionadosTitularCpu() {
     renderEscalacoes(null);
     atualizarSubsHud();
   }
+}
+
+/** Titulares que ainda estão em campo (não expulsos). Lesionados contam enquanto não são substituídos. */
+function contarTitularesEmCampo(/** @type {{ titulares: object[] }} */ time) {
+  return time.titulares.filter((/** @type {{ expulso?: boolean }} */ j) => !j.expulso).length;
+}
+
+/**
+ * Regra FIFA: mínimo 7 em campo; com 6 ou menos o jogo acaba em W.O. 3×0 para o adversário.
+ * @returns {boolean} true se encerrou a partida (W.O. ou empate anômalo).
+ */
+function tentarEncerrarPartidaPorMinimoJogadoresEmCampo() {
+  const nHum = contarTitularesEmCampo(timeJogador);
+  const nCpu = contarTitularesEmCampo(timeCpu);
+  if (nHum >= MIN_JOGADORES_EM_CAMPO && nCpu >= MIN_JOGADORES_EM_CAMPO) return false;
+
+  if (nHum < MIN_JOGADORES_EM_CAMPO && nCpu < MIN_JOGADORES_EM_CAMPO) {
+    appendLog(
+      "<strong>Jogo encerrado.</strong> Os dois times ficaram com menos de 7 jogadores em campo. Resultado: 0 × 0.",
+    );
+    golsJogador = 0;
+    golsCpu = 0;
+    atualizarPlacar();
+    encerrarPartida();
+    return true;
+  }
+  if (nHum < MIN_JOGADORES_EM_CAMPO) {
+    appendLog(
+      "<strong>Jogo encerrado (W.O.).</strong> Seu time ficou com menos de 7 jogadores em campo. Vitória do adversário por 3 × 0.",
+    );
+    golsJogador = 0;
+    golsCpu = 3;
+    atualizarPlacar();
+    encerrarPartida();
+    return true;
+  }
+  appendLog(
+    "<strong>Jogo encerrado (W.O.).</strong> O adversário ficou com menos de 7 jogadores em campo. Vitória sua por 3 × 0.",
+  );
+  golsJogador = 3;
+  golsCpu = 0;
+  atualizarPlacar();
+  encerrarPartida();
+  return true;
 }
 
 function snapshotStatsInicioPartida() {
@@ -382,6 +668,28 @@ let partidaAtiva = false;
 let fluxoForaDePartida = "pre_jogo";
 let substituicoesUsadas = 0;
 let substituicoesCpuUsadas = 0;
+/** IDs de quem já saiu de campo por substituição nesta partida (não pode voltar). */
+const jogadoresSubstituidosForaIds = new Set();
+
+function jogadorJaSubstituidoNaoPodeVoltar(id) {
+  return jogadoresSubstituidosForaIds.has(id);
+}
+
+/** Copa: após o apito final, o jogador fica na tela do jogo até clicar Continuar. */
+let copaTransicaoHubPendente = /** @type {null | (() => void)} */ (null);
+
+function agendarTransicaoCopaAposContinuar(fn) {
+  copaTransicaoHubPendente = fn;
+  atualizarBtnCentroRodada();
+}
+
+function executarTransicaoCopaAposContinuar() {
+  if (!copaTransicaoHubPendente) return;
+  const fn = copaTransicaoHubPendente;
+  copaTransicaoHubPendente = null;
+  fn();
+  atualizarBtnCentroRodada();
+}
 /** Após o 1º tempo, só avança o relógio para o 2º quando o jogador confirmar */
 let segundoTempoAutorizado = false;
 /** Acréscimos sorteados por partida: 1º tempo até 45+ap1; 2º até 90+ap2 */
@@ -398,6 +706,74 @@ let selecaoSub = null;
 
 let golsJogador = 0;
 let golsCpu = 0;
+/**
+ * Após decisão por pênaltis na Copa: gols da disputa (para o texto de fim de jogo). null se não houve pênaltis nesta partida.
+ * @type {{ jogador: number, cpu: number } | null}
+ */
+let placarPenaltisPosDecisao = null;
+/** Gols marcados na partida atual por id de jogador (escalação). */
+const golsPorJogadorNaPartida = new Map();
+
+function registrarGolMarcadoNaPartida(/** @type {{ id: string }} | null | undefined */ j) {
+  if (!j?.id) return;
+  golsPorJogadorNaPartida.set(j.id, (golsPorJogadorNaPartida.get(j.id) ?? 0) + 1);
+}
+
+/** @type {"amistoso" | "copa"} */
+let tipoModoJogo = "amistoso";
+
+/**
+ * @type {null | {
+ *   rng: () => number,
+ *   seed: number,
+ *   grupos: Record<string, string[]>,
+ *   partidasPorGrupo: Record<string, import('./world-cup.js').ResultadoPartida[]>,
+ *   playerTeamId: string,
+ *   grupoPlayer: string,
+ *   adversariosGrupo: string[],
+ *   idxAdversarioGrupo: number,
+ *   faseCopa: string,
+ *   ordemGrupos: Record<string, string[]>,
+ *   jogosEliminatorios: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[],
+ *   idxJogoEliminatorio: number,
+ *   campeaoId: string | null,
+ *   artilheiros: Record<string, { selecaoId: string, nome: string, gols: number }>,
+ *   lesoesHumano?: Record<string, { partidasFora: number }>,
+ *   jogosSuspensao?: Record<string, number>,
+ *   amarelosAcumulado?: Record<string, number>,
+ *   suspensaoRelatorioFim?: { nome: string, motivo: "vermelho" | "dois amarelos" }[],
+ *   _snapCopaInicioPartida?: { jogosSuspensao: Record<string, number>, lesoesHumano: Record<string, { partidasFora: number }> },
+ *   ultimaRodadaResultados?: { numero: number, partidas: { L: string, homeId: string, awayId: string, gh: number, ga: number }[] },
+ *   eliminatoria?: null | {
+ *     oitavas: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[],
+ *     quartas: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[] | null,
+ *     semi: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[] | null,
+ *     final: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[] | null,
+ *   },
+ * }}
+ */
+let copaEstado = null;
+
+/** Partida de mata-mata (permite prorrogação se empatar). */
+let copaPartidaKnockout = false;
+let copaProrrogaAtiva = false;
+/** 1 = 1.º tempo de prorrogação, 2 = 2.º (minutos absolutos após o fim do 2.º tempo + acréscimos). */
+let copaEtExtra = 0;
+let acrescimosET1 = 0;
+let acrescimosET2 = 0;
+let copaAguardandoEt2 = false;
+let copaEt2Liberado = false;
+/** @type {(() => void) | null} */
+let resolveInicioProrrogacao = null;
+/** @type {(() => void) | null} */
+let resolveInicioEt2 = null;
+let aguardandoInicioProrrogacao = false;
+let aguardandoInicioEt2 = false;
+let copaCardsMontados = false;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let copaSalvarFeedbackTimer = null;
+/** @type {string | null} */
+let idSelecaoCopaEscolhida = null;
 
 /** @type {ReturnType<typeof setTimeout> | null} */
 let qteTimerLate = null;
@@ -527,8 +903,31 @@ function pintarDueloRpgGoleiro(atacante, goleiro, chuteJogador, penalti = false)
   }
 }
 
+/**
+ * Minuto exibido no relógio. Segundo tempo: após 90′ mostra acréscimos como 90+1, …
+ * Prorrogação: 1.º suplementar começa em 90′ (não no minuto interno após 90+acrésc.); 2.º em 105′.
+ * @param {number} m minuto interno da simulação (contínuo; 2.º tempo recomeça em 45).
+ */
 function formatMinuto(m) {
-  return `${Math.floor(m)}′`;
+  const x = Number(m);
+  if (!Number.isFinite(x)) return "—";
+  const mi = Math.floor(x);
+  const fimReg = minutoFimSegundoTempoRegulamentar();
+  const fimEt1 = minutoFimPrimeiroTempoProrrogacao();
+
+  if (copaProrrogaAtiva && copaEtExtra === 2 && copaEt2Liberado && mi <= fimEt1) {
+    return "105′";
+  }
+  if (copaProrrogaAtiva && copaEtExtra === 2 && mi > fimEt1) {
+    return `${105 + (mi - fimEt1 - 1)}′`;
+  }
+  if (copaProrrogaAtiva && copaEtExtra === 1 && mi > fimReg) {
+    return `${90 + (mi - fimReg - 1)}′`;
+  }
+  if (segundoTempoAutorizado && mi > 90 && mi <= fimReg) {
+    return `90+${mi - 90}′`;
+  }
+  return `${mi}′`;
 }
 
 function atualizarPlacar() {
@@ -559,7 +958,15 @@ function aplicarCabecalhosPainelSelecoes() {
   if (nc) nc.textContent = metaSelecaoCpu.nome;
 }
 
-function labelEtapa(/** @type {number} */ _minuto) {
+function labelEtapa(/** @type {number} */ minuto) {
+  if (copaProrrogaAtiva) {
+    const fimReg = minutoFimSegundoTempoRegulamentar();
+    if (copaEtExtra === 2 && copaEt2Liberado) return "Prorrogação — 2.º tempo";
+    if (copaEtExtra === 1) {
+      if (minuto <= fimReg) return "2º tempo";
+      return "Prorrogação — 1.º tempo";
+    }
+  }
   if (!segundoTempoAutorizado) return "1º tempo";
   return "2º tempo";
 }
@@ -568,13 +975,68 @@ function minutoFimPrimeiroTempo() {
   return 45 + acrescimosPrimeiroTempo;
 }
 
-function minutoFimJogo() {
+/** Último minuto do 2.º tempo (inclui acréscimos). A prorrogação começa no minuto seguinte. */
+function minutoFimSegundoTempoRegulamentar() {
   return 90 + acrescimosSegundoTempo;
+}
+
+/** Fim do 1.º tempo de prorrogação (15 min + acréscimos da prorrogação 1). */
+function minutoFimPrimeiroTempoProrrogacao() {
+  return minutoFimSegundoTempoRegulamentar() + 15 + acrescimosET1;
+}
+
+/** Fim do 2.º tempo de prorrogação. */
+function minutoFimSegundoTempoProrrogacao() {
+  return minutoFimPrimeiroTempoProrrogacao() + 15 + acrescimosET2;
+}
+
+function minutoFimJogo() {
+  if (copaProrrogaAtiva) {
+    if (copaEtExtra === 1) return minutoFimPrimeiroTempoProrrogacao();
+    if (copaEtExtra === 2) return minutoFimSegundoTempoProrrogacao();
+  }
+  return minutoFimSegundoTempoRegulamentar();
 }
 
 function sigla(pos) {
   const m = { goleiro: "GOL", zagueiro: "ZAG", meia: "MEI", atacante: "ATA" };
   return m[pos] || pos;
+}
+
+/** Tooltip do ✚: quantos jogos da Copa ainda ficará indisponível como titular (`partidasFora` do estado ou previsão ao lesionar). */
+function tituloTooltipLesaoCopaPartidas(n) {
+  const k = Number(n);
+  if (!Number.isFinite(k) || k <= 0) {
+    return "Fora de ação só nesta partida; no próximo jogo da Copa pode voltar a ser titular.";
+  }
+  if (k === 1) return "Fora de ação por mais 1 jogo na Copa (não pode ser titular).";
+  return `Fora de ação por mais ${k} jogos na Copa (não pode ser titular).`;
+}
+
+/**
+ * Copa: lesão (partidas fora) ou suspensão — ao lado dos atributos, antes e durante a partida.
+ * @param {object} j
+ * @param {boolean} listaDoTimeHumano
+ */
+function htmlIndicadoresCopaPreJogo(j, listaDoTimeHumano) {
+  if (tipoModoJogo !== "copa" || !copaEstado || !metaSelecaoJogador || !listaDoTimeHumano) return "";
+  const k = chaveArtilheiroCopa(metaSelecaoJogador.id, j.nome);
+  const les = copaEstado.lesoesHumano?.[k]?.partidasFora ?? 0;
+  const sus = copaEstado.jogosSuspensao?.[k] ?? 0;
+  if (les <= 0 && sus <= 0) return "";
+  const bits = [];
+  if (sus > 0 && !(partidaAtiva && j.expulso)) {
+    bits.push(
+      `<span class="lineup-disc" title="Suspenso — não pode ser titular nesta partida" aria-label="Suspenso"><span class="lineup-cartao lineup-cartao--vermelho"></span></span>`,
+    );
+  }
+  if (les > 0 && !(partidaAtiva && j.lesionado)) {
+    const tip = tituloTooltipLesaoCopaPartidas(les);
+    bits.push(
+      `<span class="lineup-disc lineup-lesao-wrap" title="${tip}" aria-label="${tip}"><span class="lineup-lesao">✚</span></span>`,
+    );
+  }
+  return bits.join("");
 }
 
 /**
@@ -585,8 +1047,12 @@ function htmlIndicadoresDisciplina(j) {
   if (!partidaAtiva) return "";
   const bits = [];
   if (j.lesionado) {
+    const tip =
+      tipoModoJogo === "copa" && copaEstado && j.copaLesaoPartidasFora !== undefined
+        ? tituloTooltipLesaoCopaPartidas(j.copaLesaoPartidasFora)
+        : "Lesionado — deve sair.";
     bits.push(
-      `<span class="lineup-disc lineup-lesao-wrap" title="Lesionado — deve sair" aria-label="Lesionado"><span class="lineup-lesao">✚</span></span>`,
+      `<span class="lineup-disc lineup-lesao-wrap" title="${tip}" aria-label="${tip}"><span class="lineup-lesao">✚</span></span>`,
     );
   }
   if (j.expulso) {
@@ -605,9 +1071,22 @@ function htmlIndicadoresDisciplina(j) {
 }
 
 /**
- * @param {boolean} listaDoTimeHumano — true = painel esquerdo (seu time)
+ * Bolas ao lado dos atributos: uma por gol nesta partida.
+ * @param {object} j
  */
-function renderLista(ul, jogadores, destaqueId, listaDoTimeHumano) {
+function htmlBolasGolsNaPartida(j) {
+  if (!partidaAtiva) return "";
+  const n = golsPorJogadorNaPartida.get(j.id) ?? 0;
+  if (n <= 0) return "";
+  const bolas = "⚽".repeat(n);
+  return `<span class="lineup-gols-wrap" title="${n} gol${n > 1 ? "s" : ""} nesta partida" aria-label="${n} gol${n > 1 ? "s" : ""} na partida">${bolas}</span>`;
+}
+
+/**
+ * @param {boolean} listaDoTimeHumano — true = painel esquerdo (seu time)
+ * @param {boolean} [ehListaReservas] banco: destaca quem já foi substituído e não pode voltar
+ */
+function renderLista(ul, jogadores, destaqueId, listaDoTimeHumano, ehListaReservas = false) {
   ul.innerHTML = "";
   const ord = ordenarPorPosicao(jogadores);
   const clsNome = listaDoTimeHumano ? "nm-time-jogador" : "nm-time-cpu";
@@ -617,20 +1096,27 @@ function renderLista(ul, jogadores, destaqueId, listaDoTimeHumano) {
     if (j.id === destaqueId) li.classList.add("em-lance");
     if (j.expulso) li.classList.add("jogador-expulso");
     if (j.lesionado) li.classList.add("jogador-lesionado");
+    if (ehListaReservas && partidaAtiva && jogadorJaSubstituidoNaoPodeVoltar(j.id)) {
+      li.classList.add("jogador-fora-partida");
+      li.title = "Substituído — não pode voltar a entrar nesta partida.";
+    }
     const stA = htmlStatVersusPartida(j, "ataque");
     const stD = htmlStatVersusPartida(j, "defesa");
     const disc = htmlIndicadoresDisciplina(j);
-    li.innerHTML = `<span class="sigla">${sigla(j.posicao)}</span> <span class="nome ${clsNome}">${escapeHtml(j.nome)}</span><span class="stats">${disc} ${stA}/${stD}</span>`;
+    const bolas = htmlBolasGolsNaPartida(j);
+    const copaPre = htmlIndicadoresCopaPreJogo(j, listaDoTimeHumano);
+    const statsPrefix = [disc, bolas, copaPre].filter(Boolean).join(" ");
+    li.innerHTML = `<span class="sigla">${sigla(j.posicao)}</span> <span class="nome ${clsNome}">${escapeHtml(j.nome)}</span><span class="stats">${statsPrefix ? `${statsPrefix} ` : ""}${stA}/${stD}</span>`;
     ul.appendChild(li);
   }
 }
 
 function renderEscalacoes(destaque) {
   if (!metaSelecaoJogador || !metaSelecaoCpu) return;
-  renderLista(els.timeJogadorTit, timeJogador.titulares, destaque?.jogador, true);
-  renderLista(els.timeJogadorRes, timeJogador.reservas, null, true);
-  renderLista(els.timeCpuTit, timeCpu.titulares, destaque?.adversario, false);
-  renderLista(els.timeCpuRes, timeCpu.reservas, null, false);
+  renderLista(els.timeJogadorTit, timeJogador.titulares, destaque?.jogador, true, false);
+  renderLista(els.timeJogadorRes, timeJogador.reservas, null, true, true);
+  renderLista(els.timeCpuTit, timeCpu.titulares, destaque?.adversario, false, false);
+  renderLista(els.timeCpuRes, timeCpu.reservas, null, false, true);
   atualizarSubsHud();
 }
 
@@ -645,10 +1131,30 @@ function atualizarSubsHud() {
 function atualizarBtnCentroRodada() {
   const el = els.btnCentroRodada;
   const vol = els.btnVoltarMenuJogo;
+  if (partidaAtiva && aguardandoInicioProrrogacao && resolveInicioProrrogacao) {
+    el.hidden = false;
+    el.disabled = false;
+    el.textContent = "Iniciar prorrogação";
+    el.classList.add("pri");
+    if (vol) vol.hidden = true;
+    return;
+  }
+  if (partidaAtiva && aguardandoInicioEt2 && resolveInicioEt2) {
+    el.hidden = false;
+    el.disabled = false;
+    el.textContent = "Começar 2.º tempo da prorrogação";
+    el.classList.add("pri");
+    if (vol) vol.hidden = true;
+    return;
+  }
   if (!partidaAtiva) {
     el.hidden = false;
     el.disabled = false;
-    el.textContent = fluxoForaDePartida === "pos_fim" ? "Nova partida" : "Iniciar partida";
+    if (tipoModoJogo === "copa" && copaTransicaoHubPendente) {
+      el.textContent = "Continuar";
+    } else {
+      el.textContent = fluxoForaDePartida === "pos_fim" ? "Nova partida" : "Iniciar partida";
+    }
     el.classList.remove("sec");
     el.classList.add("pri");
     if (vol) {
@@ -797,7 +1303,7 @@ function iniciarQteLetra(params, onFim, opts) {
   const pularContagem =
     opts != null && opts.total > 1 && opts.indice > 1;
   const intervaloContagemMs = pularContagem ? 0 : sortearIntervaloContagemQte();
-  const seg = (tempoLimiteMs / 1000).toFixed(1);
+  const seg = fmtSegundosExatos(tempoLimiteMs);
   const textoInstrucao =
     opts != null && opts.total > 1
       ? `Letra ${opts.indice} de ${opts.total} — ${seg} s para acertar.`
@@ -1023,12 +1529,14 @@ function pintarEstatisticasPausa() {
 
 function sincronizarUiPausa() {
   els.pausePanel.hidden = !jogoPausado;
+  const fimJogoAberto = els.fimJogoOverlay && !els.fimJogoOverlay.hidden;
   const podePausar =
     partidaAtiva &&
     els.dueloOverlay.hidden &&
     !jogoPausado &&
     !aguardandoSegundoTempo &&
-    els.golOverlay.hidden;
+    els.golOverlay.hidden &&
+    !fimJogoAberto;
   els.btnPausa.hidden = !podePausar;
 }
 
@@ -1061,9 +1569,11 @@ function tentarSubstituicaoCpu() {
     const ri = Math.floor(Math.random() * 11);
     const tit = timeCpu.titulares[ti];
     const res = timeCpu.reservas[ri];
+    if (jogadorJaSubstituidoNaoPodeVoltar(res.id)) continue;
     [timeCpu.titulares[ti], timeCpu.reservas[ri]] = [timeCpu.reservas[ri], timeCpu.titulares[ti]];
     const v = validarElenco(timeCpu.titulares, timeCpu.reservas);
     if (v.ok) {
+      jogadoresSubstituidosForaIds.add(tit.id);
       substituicoesCpuUsadas++;
       appendLog(`Substituição do adversário: ${res.nome} entra no lugar de ${tit.nome}.`);
       atualizarSubsHud();
@@ -1103,7 +1613,7 @@ async function animarTempoJogo(de, ate) {
   const alvo =
     segundoTempoAutorizado ? Math.min(alvoBruto, teto2) : alvoBruto;
   const fim1 = minutoFimPrimeiroTempo();
-  const msPorMinuto = 1200;
+  const fimEt1 = minutoFimPrimeiroTempoProrrogacao();
 
   while (m < alvo) {
     if (m === fim1 && alvo > fim1 && !segundoTempoAutorizado) {
@@ -1116,13 +1626,72 @@ async function animarTempoJogo(de, ate) {
       atualizarBtnCentroRodada();
       m = 45;
     }
+    if (
+      copaProrrogaAtiva &&
+      copaEtExtra === 1 &&
+      m === fimEt1 &&
+      alvo > fimEt1 &&
+      !copaEt2Liberado
+    ) {
+      tempoAnimando = false;
+      await aguardarInicioEt2();
+      copaEtExtra = 2;
+      copaEt2Liberado = true;
+      aguardandoInicioEt2 = false;
+      tempoAnimando = true;
+      atualizarBtnCentroRodada();
+      m = minutoFimPrimeiroTempoProrrogacao();
+      els.relogio.textContent = formatMinuto(m);
+      els.etapaTempo.textContent = labelEtapa(m);
+      continue;
+    }
     m++;
     els.relogio.textContent = formatMinuto(m);
     els.etapaTempo.textContent = labelEtapa(m);
-    await sleepRespeitandoPausa(msPorMinuto);
+    await sleepRespeitandoPausa(RELOGIO_MS_POR_MINUTO);
   }
 
   tempoAnimando = false;
+}
+
+function aguardarInicioProrrogacao() {
+  aguardandoInicioProrrogacao = true;
+  sincronizarUiPausa();
+  if (els.intervaloBanner) {
+    els.intervaloBanner.hidden = false;
+    els.intervaloBanner.innerHTML =
+      "<strong>Empate no tempo regulamentar.</strong> Prorrogação (2 × 15 min) e, se preciso, pênaltis. Use o botão central: <strong>Iniciar prorrogação</strong>.";
+  }
+  appendLog(
+    "<strong>Empate.</strong> Na Copa, o mata-mata segue com prorrogação e, se necessário, disputa de pênaltis.",
+  );
+  return new Promise((resolve) => {
+    resolveInicioProrrogacao = resolve;
+    atualizarBtnCentroRodada();
+  });
+}
+
+function aguardarInicioEt2() {
+  aguardandoInicioEt2 = true;
+  sincronizarUiPausa();
+  if (els.intervaloBanner) {
+    els.intervaloBanner.hidden = false;
+    els.intervaloBanner.innerHTML =
+      "<strong>Fim da 1.ª prorrogação.</strong> Use o botão central: <strong>Começar 2.º tempo da prorrogação</strong>.";
+  }
+  appendLog("Intervalo antes da 2.ª prorrogação.");
+  return new Promise((resolve) => {
+    resolveInicioEt2 = resolve;
+    atualizarBtnCentroRodada();
+  });
+}
+
+function iniciarProrrogacaoAposClique() {
+  copaProrrogaAtiva = true;
+  copaEtExtra = 1;
+  copaEt2Liberado = false;
+  acrescimosET1 = sortearAcrescimosProrrogacao();
+  esconderUiIntervalo();
 }
 
 function limparSelecaoSub() {
@@ -1172,6 +1741,16 @@ function ligarCliquesSubstituicao() {
 
       const tit = timeJogador.titulares[ti];
       const res = timeJogador.reservas[ri];
+      if (tipoModoJogo === "copa" && jogadorHumanoBloqueadoTitularCopa(res.nome)) {
+        limparSelecaoSub();
+        alert("Esse jogador está suspenso ou em recuperação de lesão — não pode ser titular nesta partida.");
+        return;
+      }
+      if (partidaAtiva && jogadorJaSubstituidoNaoPodeVoltar(res.id)) {
+        limparSelecaoSub();
+        alert("Quem já foi substituído não pode voltar a entrar na mesma partida.");
+        return;
+      }
       const trocaPorLesao = partidaAtiva && tit.lesionado;
       if (partidaAtiva && substituicoesUsadas >= 5 && !trocaPorLesao) {
         limparSelecaoSub();
@@ -1190,6 +1769,7 @@ function ligarCliquesSubstituicao() {
       }
 
       if (partidaAtiva) {
+        jogadoresSubstituidosForaIds.add(tit.id);
         if (!trocaPorLesao) substituicoesUsadas++;
         appendLog(
           trocaPorLesao
@@ -1211,10 +1791,1410 @@ function ligarCliquesSubstituicao() {
   });
 }
 
+function esconderJogoMostrarCopa() {
+  if (els.jogoRoot) {
+    els.jogoRoot.setAttribute("hidden", "");
+    els.jogoRoot.style.display = "none";
+  }
+  if (els.telaCopa) {
+    els.telaCopa.style.removeProperty("display");
+    els.telaCopa.removeAttribute("hidden");
+  }
+}
+
+function htmlTabelaClassificacaoGrupoCopa(L, compact) {
+  if (!copaEstado) return "";
+  const ids = copaEstado.grupos[L];
+  const partidas = copaEstado.partidasPorGrupo[L].filter((x) => x.gh >= 0);
+  const ordem = ordenarGrupoFifa(ids, partidas, copaEstado.rng);
+  const agg = agregarClassificacao(ids, partidas);
+  const th = compact
+    ? "<th>#</th><th>Seleção</th><th>PJ</th><th>PTS</th>"
+    : "<th>#</th><th>Seleção</th><th>PJ</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th><th>Pts</th>";
+  let html = `<table><thead><tr>${th}</tr></thead><tbody>`;
+  ordem.forEach((id, i) => {
+    const s = SELECOES.find((x) => x.id === id);
+    const r = agg[id];
+    const cls = id === copaEstado.playerTeamId ? ' class="destaque-jogador"' : "";
+    if (compact) {
+      html += `<tr${cls}><td>${i + 1}</td><td>${escapeHtml(s?.nome ?? id)}</td><td>${r.pj}</td><td>${r.pts}</td></tr>`;
+    } else {
+      html += `<tr${cls}><td>${i + 1}</td><td>${escapeHtml(s?.nome ?? id)}</td><td>${r.pj}</td><td>${r.vit}</td><td>${r.emp}</td><td>${r.der}</td><td>${r.gf}</td><td>${r.gc}</td><td>${r.sg}</td><td>${r.pts}</td></tr>`;
+    }
+  });
+  html += "</tbody></table>";
+  return html;
+}
+
+function pintarTodasClassificacoesGruposCopa() {
+  if (!copaEstado || !els.copaTabelasTodosGrupos) return;
+  els.copaTabelasTodosGrupos.replaceChildren();
+  const ordL = Object.keys(copaEstado.grupos).sort();
+  for (const L of ordL) {
+    const box = document.createElement("div");
+    box.className = "copa-mini-tabela-grupo";
+    if (L === copaEstado.grupoPlayer) box.classList.add("copa-mini-tabela-grupo--player");
+    const h = document.createElement("h4");
+    h.textContent = `Grupo ${L}`;
+    const inner = document.createElement("div");
+    inner.innerHTML = htmlTabelaClassificacaoGrupoCopa(L, true);
+    box.append(h, inner);
+    els.copaTabelasTodosGrupos.appendChild(box);
+  }
+}
+
+function pintarTabelaGrupoCopa() {
+  if (!copaEstado || !els.copaTabelaGrupo) return;
+  els.copaTabelaGrupo.innerHTML = htmlTabelaClassificacaoGrupoCopa(copaEstado.grupoPlayer, false);
+  pintarTodasClassificacoesGruposCopa();
+}
+
+function chaveArtilheiroCopa(selecaoId, nome) {
+  return `${selecaoId}::${nome}`;
+}
+
+function registrarGolArtilheiroCopa(selecaoId, nome) {
+  if (!copaEstado || !nome || !selecaoId) return;
+  if (!copaEstado.artilheiros) copaEstado.artilheiros = {};
+  const k = chaveArtilheiroCopa(selecaoId, nome);
+  if (!copaEstado.artilheiros[k]) {
+    copaEstado.artilheiros[k] = { selecaoId, nome, gols: 0 };
+  }
+  copaEstado.artilheiros[k].gols++;
+}
+
+/**
+ * Escolhe um jogador do pool com probabilidade proporcional ao ataque × fator aleatório.
+ * @param {object[]} pool
+ * @param {() => number} rng
+ */
+function pickWeightedByAtaque(pool, rng) {
+  if (!pool || pool.length === 0) return null;
+  const pesos = pool.map((p) => {
+    const base = Math.max(1, p.ataque);
+    return base * (0.72 + 0.56 * rng());
+  });
+  const sum = pesos.reduce((a, b) => a + b, 0);
+  let r = rng() * sum;
+  for (let i = 0; i < pool.length; i++) {
+    r -= pesos[i];
+    if (r <= 0) return pool[i].nome;
+  }
+  return pool[pool.length - 1].nome;
+}
+
+/**
+ * Autor simulado (Copa): setor 60% ataque / 30% meio / 10% defesa (zagueiros);
+ * titular 80% / reserva 20% quando os dois existem no setor; peso crescente com atributo ataque.
+ * @param {string} selecaoId
+ * @param {() => number} rng
+ */
+function sortearNomeAutorGolSimulado(selecaoId, rng) {
+  const s = selecaoPorId(selecaoId);
+  if (!s) return null;
+  const titOut = s.titulares.filter((p) => p.posicao !== POSITIONS.GOLEIRO);
+  const resOut = s.reservas.filter((p) => p.posicao !== POSITIONS.GOLEIRO);
+  if (titOut.length === 0 && resOut.length === 0) return null;
+
+  const u = rng();
+  const setor =
+    u < 0.6 ? POSITIONS.ATACANTE : u < 0.9 ? POSITIONS.MEIA : POSITIONS.ZAGUEIRO;
+
+  let poolTit = titOut.filter((p) => p.posicao === setor);
+  let poolRes = resOut.filter((p) => p.posicao === setor);
+
+  if (poolTit.length === 0 && poolRes.length === 0) {
+    poolTit = titOut;
+    poolRes = resOut;
+  }
+
+  let pool;
+  if (poolTit.length === 0) pool = poolRes;
+  else if (poolRes.length === 0) pool = poolTit;
+  else pool = rng() < 0.8 ? poolTit : poolRes;
+
+  return pickWeightedByAtaque(pool, rng);
+}
+
+function registrarGolsPartidaSimuladaCopa(homeId, awayId, gh, ga, rng) {
+  for (let i = 0; i < gh; i++) {
+    const n = sortearNomeAutorGolSimulado(homeId, rng);
+    if (n) registrarGolArtilheiroCopa(homeId, n);
+  }
+  for (let i = 0; i < ga; i++) {
+    const n = sortearNomeAutorGolSimulado(awayId, rng);
+    if (n) registrarGolArtilheiroCopa(awayId, n);
+  }
+}
+
+function pintarArtilheirosCopa() {
+  if (!copaEstado || !els.copaArtilheirosLista) return;
+  if (!copaEstado.artilheiros) copaEstado.artilheiros = {};
+  const linhas = Object.values(copaEstado.artilheiros).sort((a, b) =>
+    b.gols !== a.gols ? b.gols - a.gols : a.nome.localeCompare(b.nome, "pt-BR"),
+  );
+  if (linhas.length === 0) {
+    els.copaArtilheirosLista.innerHTML =
+      "<p class=\"tela-menu-sub\">Ainda não há gols registrados nesta Copa.</p>";
+    return;
+  }
+  const pid = copaEstado.playerTeamId;
+  const top = linhas.slice(0, COPA_ARTILHEIROS_HUB_MAX);
+  let html =
+    "<table><thead><tr><th></th><th>Jogador</th><th>Seleção</th><th>Gols</th></tr></thead><tbody>";
+  top.forEach((row, idx) => {
+    const sel = SELECOES.find((x) => x.id === row.selecaoId);
+    const cls = row.selecaoId === pid ? ' class="destaque-jogador"' : "";
+    html += `<tr${cls}><td class="artilheiro-pos">${idx + 1}</td><td>${escapeHtml(row.nome)}</td><td>${escapeHtml(sel?.nome ?? row.selecaoId)}</td><td class="artilheiro-gols">${row.gols}</td></tr>`;
+  });
+  html += "</tbody></table>";
+  els.copaArtilheirosLista.innerHTML = html;
+}
+
+/** Lista de artilheiros visível no hub (fase de grupos ou mata-mata). */
+function mostrarSecaoArtilheirosCopaNoHub() {
+  if (!els.copaArtilheirosWrap || !els.btnCopaVerArtilheiros) return;
+  els.copaArtilheirosWrap.hidden = false;
+  pintarArtilheirosCopa();
+  els.btnCopaVerArtilheiros.hidden = false;
+}
+
+function esconderSecaoArtilheirosCopaNoHub() {
+  if (els.copaArtilheirosWrap) els.copaArtilheirosWrap.hidden = true;
+  if (els.btnCopaVerArtilheiros) els.btnCopaVerArtilheiros.hidden = true;
+}
+
+/**
+ * @returns {{ L: string, homeId: string, awayId: string, gh: number, ga: number }[]}
+ */
+function simularRodadaGruposCopa(/** @type {1 | 2 | 3} */ numeroRodada) {
+  if (!copaEstado) return [];
+  /** @type {{ L: string, homeId: string, awayId: string, gh: number, ga: number }[]} */
+  const registradas = [];
+  simularRodadaGruposExcetoJogoHumano(
+    copaEstado.grupos,
+    copaEstado.partidasPorGrupo,
+    copaEstado.grupoPlayer,
+    copaEstado.playerTeamId,
+    numeroRodada,
+    forcaSelecaoId,
+    copaEstado.rng,
+    (L, homeId, awayId, gh, ga) => {
+      registradas.push({ L, homeId, awayId, gh, ga });
+      registrarGolsPartidaSimuladaCopa(homeId, awayId, gh, ga, copaEstado.rng);
+    },
+  );
+  return registradas;
+}
+
+function ordinalRodadaGruposPt(n) {
+  if (n === 1) return "1.ª";
+  if (n === 2) return "2.ª";
+  if (n === 3) return "3.ª";
+  return `${n}.ª`;
+}
+
+function siglaSelecaoIdCopa(id) {
+  return SELECOES.find((x) => x.id === id)?.sigla ?? id;
+}
+
+function formatarDataSaveCopa(iso) {
+  try {
+    return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return String(iso);
+  }
+}
+
+function nomeFaseCopaCurta(f) {
+  const m = {
+    grupos: "Grupos",
+    oitavas: "Oitavas",
+    quartas: "Quartas",
+    semi: "Semis",
+    final: "Final",
+    eliminado: "Eliminado",
+    campeao: "Campeão",
+  };
+  return m[/** @type {keyof typeof m} */ (f)] ?? f;
+}
+
+/** @param {Record<string, string[]>} grupos */
+function preencherGradeGruposCopa(grupos) {
+  if (!els.copaGruposGrid) return;
+  els.copaGruposGrid.replaceChildren();
+  const ordL = Object.keys(grupos).sort();
+  for (const L of ordL) {
+    const box = document.createElement("div");
+    box.className = "copa-mini-grupo";
+    const h = document.createElement("h4");
+    h.textContent = `Grupo ${L}`;
+    const ul = document.createElement("ul");
+    for (const id of grupos[L]) {
+      const s = SELECOES.find((x) => x.id === id);
+      const li = document.createElement("li");
+      const im = document.createElement("img");
+      im.src = urlBandeira(s?.iso ?? "xx", 40);
+      im.alt = "";
+      li.append(im, document.createTextNode(s?.nome ?? id));
+      ul.appendChild(li);
+    }
+    box.append(h, ul);
+    els.copaGruposGrid.appendChild(box);
+  }
+}
+
+function sincronizarCardSelecaoCopaComEstado() {
+  if (!els.copaCardsJogador || !idSelecaoCopaEscolhida) return;
+  els.copaCardsJogador.querySelectorAll(".card-selecao").forEach((b) => {
+    b.classList.toggle("card-selecao--ativa", b.dataset.selecaoId === idSelecaoCopaEscolhida);
+  });
+}
+
+function atualizarSelectSobrescreverCopa() {
+  const sel = els.copaSalvarSobrescrever;
+  if (!sel) return;
+  const cur = sel.value;
+  sel.replaceChildren();
+  const o0 = document.createElement("option");
+  o0.value = "";
+  o0.textContent = "Salvar como novo";
+  sel.appendChild(o0);
+  for (const s of listarSavesCopaOrdenados()) {
+    const o = document.createElement("option");
+    o.value = s.id;
+    o.textContent = `${s.name} — ${formatarDataSaveCopa(s.savedAt)}`;
+    sel.appendChild(o);
+  }
+  if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
+  else sel.value = "";
+}
+
+function pintarListaSavesCopaHub() {
+  if (!els.copaHubSavesLista) return;
+  atualizarSelectSobrescreverCopa();
+  els.copaHubSavesLista.replaceChildren();
+  for (const s of listarSavesCopaOrdenados()) {
+    els.copaHubSavesLista.appendChild(criarLinhaSaveCopa(s, "hub"));
+  }
+}
+
+function pintarListaCarregarCopa() {
+  if (!els.carregarCopaLista || !els.carregarCopaVazio) return;
+  const saves = listarSavesCopaOrdenados();
+  els.carregarCopaLista.replaceChildren();
+  els.carregarCopaVazio.hidden = saves.length > 0;
+  for (const s of saves) {
+    els.carregarCopaLista.appendChild(criarLinhaSaveCopa(s, "carregar"));
+  }
+}
+
+/**
+ * @param {{ id: string, name: string, savedAt: string, payload: { plain?: { playerTeamId?: string, faseCopa?: string } } }} entry
+ * @param {"hub" | "carregar"} modo
+ */
+function criarLinhaSaveCopa(entry, modo) {
+  const row = document.createElement("div");
+  row.className = "copa-save-row";
+  row.setAttribute("role", "listitem");
+  const meta = document.createElement("div");
+  meta.className = "copa-save-row-meta";
+  const vn = document.createElement("span");
+  vn.className = "copa-save-row-nome";
+  vn.textContent = entry.name || "(sem nome)";
+  const vd = document.createElement("span");
+  vd.className = "copa-save-row-data";
+  const sel = SELECOES.find((x) => x.id === entry.payload?.plain?.playerTeamId);
+  const fase = entry.payload?.plain?.faseCopa ?? "?";
+  vd.textContent = `${formatarDataSaveCopa(entry.savedAt)} · ${sel?.nome ?? "?"} · ${nomeFaseCopaCurta(fase)}`;
+  meta.append(vn, vd);
+  const ac = document.createElement("div");
+  ac.className = "copa-save-row-acoes";
+  const bL = document.createElement("button");
+  bL.type = "button";
+  bL.className = modo === "carregar" ? "btn pri" : "btn sec";
+  bL.textContent = "Carregar";
+  bL.addEventListener("click", () => aplicarCarregarSavePorId(entry.id));
+  const bX = document.createElement("button");
+  bX.type = "button";
+  bX.className = "btn sec";
+  bX.textContent = "Excluir";
+  bX.addEventListener("click", () => {
+    if (confirm(`Excluir o save "${entry.name}"?`)) {
+      removerSaveCopa(entry.id);
+      pintarListaSavesCopaHub();
+      pintarListaCarregarCopa();
+    }
+  });
+  ac.append(bL, bX);
+  row.append(meta, ac);
+  return row;
+}
+
+function mostrarFeedbackSalvarCopa(msg) {
+  if (!els.copaSalvarFeedback) return;
+  if (copaSalvarFeedbackTimer) clearTimeout(copaSalvarFeedbackTimer);
+  els.copaSalvarFeedback.hidden = false;
+  els.copaSalvarFeedback.textContent = msg;
+  copaSalvarFeedbackTimer = setTimeout(() => {
+    if (els.copaSalvarFeedback) els.copaSalvarFeedback.hidden = true;
+    copaSalvarFeedbackTimer = null;
+  }, 3500);
+}
+
+function salvarProgressoCopaDaUi() {
+  if (!copaEstado) {
+    alert("Não há campeonato em andamento.");
+    return;
+  }
+  const nome = (els.copaSalvarNome?.value ?? "").trim();
+  if (!nome) {
+    alert("Digite um nome para o save.");
+    els.copaSalvarNome?.focus();
+    return;
+  }
+  let block;
+  try {
+    block = serializarCopaEstadoParaJson(copaEstado);
+  } catch (e) {
+    console.error(e);
+    alert("Erro ao preparar o save.");
+    return;
+  }
+  const sobId = els.copaSalvarSobrescrever?.value ?? "";
+  if (sobId) {
+    substituirSaveCopa(sobId, nome, block);
+    mostrarFeedbackSalvarCopa("Progresso atualizado.");
+  } else {
+    gravarNovoSaveCopa(nome, block);
+    mostrarFeedbackSalvarCopa("Progresso salvo.");
+  }
+  if (els.copaSalvarNome) els.copaSalvarNome.value = "";
+  pintarListaSavesCopaHub();
+  pintarListaCarregarCopa();
+}
+
+/** @param {string} id */
+function aplicarCarregarSavePorId(id) {
+  if (copaEstado && !confirm("Substituir o campeonato atual pelo save selecionado?")) return;
+  const entry = obterSaveCopaPorId(id);
+  if (!entry) {
+    alert("Save não encontrado.");
+    return;
+  }
+  try {
+    copaEstado = /** @type {typeof copaEstado} */ (carregarEstadoDoSave(entry));
+  } catch (e) {
+    console.error(e);
+    alert("Não foi possível carregar este save.");
+    return;
+  }
+  restaurarUiCopaCarregada();
+}
+
+function abrirTelaCarregarCopa() {
+  if (els.telaInicio) {
+    els.telaInicio.setAttribute("hidden", "");
+    els.telaInicio.style.display = "none";
+  }
+  if (els.telaAmistoso) {
+    els.telaAmistoso.setAttribute("hidden", "");
+    els.telaAmistoso.style.display = "none";
+  }
+  if (els.telaCopa) {
+    els.telaCopa.setAttribute("hidden", "");
+    els.telaCopa.style.display = "none";
+  }
+  if (els.jogoRoot) {
+    els.jogoRoot.setAttribute("hidden", "");
+    els.jogoRoot.style.display = "none";
+  }
+  if (els.telaCarregarCopa) {
+    els.telaCarregarCopa.removeAttribute("hidden");
+    els.telaCarregarCopa.style.removeProperty("display");
+  }
+  pintarListaCarregarCopa();
+  window.scrollTo(0, 0);
+}
+
+function fecharTelaCarregarCopa() {
+  if (els.telaCarregarCopa) {
+    els.telaCarregarCopa.setAttribute("hidden", "");
+    els.telaCarregarCopa.style.display = "none";
+  }
+  if (els.telaInicio) {
+    els.telaInicio.removeAttribute("hidden");
+    els.telaInicio.style.removeProperty("display");
+  }
+  window.scrollTo(0, 0);
+}
+
+function restaurarUiCopaCarregada() {
+  if (!copaEstado) return;
+  if (els.jogoRoot) {
+    els.jogoRoot.setAttribute("hidden", "");
+    els.jogoRoot.style.display = "none";
+  }
+  if (els.telaInicio) {
+    els.telaInicio.setAttribute("hidden", "");
+    els.telaInicio.style.display = "none";
+  }
+  if (els.telaAmistoso) {
+    els.telaAmistoso.setAttribute("hidden", "");
+    els.telaAmistoso.style.display = "none";
+  }
+  if (els.telaCarregarCopa) {
+    els.telaCarregarCopa.setAttribute("hidden", "");
+    els.telaCarregarCopa.style.display = "none";
+  }
+  if (els.telaCopa) {
+    els.telaCopa.removeAttribute("hidden");
+    els.telaCopa.style.removeProperty("display");
+  }
+  tipoModoJogo = "copa";
+  idSelecaoCopaEscolhida = copaEstado.playerTeamId;
+  copaPartidaKnockout = false;
+  resetFlagsProrrogacaoCopa();
+  if (!copaCardsMontados) {
+    montarCardsCopaSelecao();
+    copaCardsMontados = true;
+  }
+  sincronizarCardSelecaoCopaComEstado();
+  if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = true;
+  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
+  preencherGradeGruposCopa(copaEstado.grupos);
+  if (els.copaGruposGrid) els.copaGruposGrid.hidden = false;
+  if (els.copaGruposIntro) {
+    const sn = SELECOES.find((x) => x.id === copaEstado.playerTeamId)?.nome ?? "";
+    els.copaGruposIntro.textContent = `Você comanda ${sn}, no grupo ${copaEstado.grupoPlayer}. Há 8 grupos (A–H) com 4 seleções.`;
+    els.copaGruposIntro.hidden = false;
+  }
+  const f = copaEstado.faseCopa;
+  if (f === "grupos") {
+    mostrarTelaCopaHubAposJogoGrupo();
+  } else if (f === "oitavas" || f === "quartas" || f === "semi" || f === "final") {
+    mostrarTelaCopaHubMataMata();
+  } else if (f === "eliminado") {
+    if (!copaEstado.eliminatoria?.oitavas) mostrarTelaCopaNaoClassificou();
+    else mostrarTelaCopaEliminado();
+  } else if (f === "campeao") {
+    mostrarTelaCopaCampeao();
+  } else {
+    mostrarTelaCopaHubAposJogoGrupo();
+  }
+  window.scrollTo(0, 0);
+}
+
+function ocultarChaveamentoCopa() {
+  if (els.copaChaveWrap) els.copaChaveWrap.hidden = true;
+  if (els.copaChave) els.copaChave.replaceChildren();
+}
+
+const FASE_CHAVE_ORDER = /** @type {const} */ (["oitavas", "quartas", "semi", "final"]);
+
+/**
+ * Enquanto o seu jogo da fase atual ainda não tem resultado, não destacamos vencedor
+ * nos outros jogos já simulados (CPU×CPU), para o chaveamento não parecer “decidido ao acaso”.
+ */
+function enfatizarResultadosColunaChave(faseCol, jogosCol) {
+  if (!copaEstado || !jogosCol?.length) return true;
+  const cur = copaEstado.faseCopa;
+  if (cur === "campeao" || cur === "eliminado") return true;
+  const iCol = FASE_CHAVE_ORDER.indexOf(faseCol);
+  const iCur = FASE_CHAVE_ORDER.indexOf(cur);
+  if (iCol < 0 || iCur < 0) return true;
+  if (iCol < iCur) return true;
+  if (iCol > iCur) return false;
+  const pid = copaEstado.playerTeamId;
+  const humanoPendente = jogosCol.some(
+    (j) => j && !j.winnerId && (j.homeId === pid || j.awayId === pid),
+  );
+  return !humanoPendente;
+}
+
+/**
+ * @param {string | null | undefined} id
+ * @param {string | null | undefined} winnerId
+ * @param {string} playerTeamId
+ * @param {boolean} enfatizarResultado
+ */
+function criarCelulaTimeChave(id, winnerId, playerTeamId, enfatizarResultado) {
+  const wrap = document.createElement("div");
+  wrap.className = "copa-chave-time";
+  if (id && playerTeamId && id === playerTeamId) wrap.classList.add("copa-chave-seu-time");
+  if (!id) {
+    wrap.classList.add("copa-chave-tbd", "copa-chave-tbd-celula");
+    wrap.textContent = "—";
+    wrap.title = "A definir";
+    wrap.setAttribute("aria-label", "A definir");
+    return wrap;
+  }
+  const s = SELECOES.find((x) => x.id === id);
+  const nome = s?.nome ?? id;
+  wrap.classList.add("copa-chave-time--bandeira");
+  wrap.title = nome;
+  wrap.setAttribute("aria-label", nome);
+  const img = document.createElement("img");
+  img.className = "copa-chave-bandeira-img";
+  img.src = urlBandeira(s?.iso ?? "xx", 80);
+  img.alt = nome;
+  if (enfatizarResultado && winnerId != null && winnerId !== "") {
+    if (id === winnerId) wrap.classList.add("copa-chave-vencedor");
+    else wrap.classList.add("copa-chave-eliminado");
+  }
+  wrap.appendChild(img);
+  return wrap;
+}
+
+/**
+ * @param {{ homeId: string, awayId: string, winnerId: string | null }} jogo
+ * @param {string} [legenda]
+ * @param {string} playerTeamId
+ * @param {boolean} enfatizarResultado
+ */
+function textoPlacarCardChaveCopa(/** @type {{ gh?: number, ga?: number, penGh?: number, penGa?: number }} */ jogo) {
+  if (!Number.isFinite(jogo.gh) || !Number.isFinite(jogo.ga)) return "";
+  let t = `${jogo.gh} × ${jogo.ga}`;
+  if (Number.isFinite(jogo.penGh) && Number.isFinite(jogo.penGa)) {
+    t += ` (${jogo.penGh} × ${jogo.penGa} pen.)`;
+  }
+  return t;
+}
+
+function criarCardJogoChave(jogo, legenda, playerTeamId, enfatizarResultado) {
+  const card = document.createElement("div");
+  card.className = "copa-chave-jogo";
+  if (legenda) {
+    const cap = document.createElement("div");
+    cap.className = "copa-chave-jogo-legenda";
+    cap.textContent = legenda;
+    card.appendChild(cap);
+  }
+  const mid = document.createElement("div");
+  mid.className = "copa-chave-jogo-meio";
+  const vs = document.createElement("span");
+  vs.className = "copa-chave-vs";
+  vs.textContent = "×";
+  mid.append(
+    criarCelulaTimeChave(jogo.homeId, jogo.winnerId, playerTeamId, enfatizarResultado),
+    vs,
+    criarCelulaTimeChave(jogo.awayId, jogo.winnerId, playerTeamId, enfatizarResultado),
+  );
+  card.appendChild(mid);
+  const pl = textoPlacarCardChaveCopa(jogo);
+  if (pl) {
+    const plEl = document.createElement("div");
+    plEl.className = "copa-chave-jogo-placar";
+    plEl.textContent = pl;
+    card.appendChild(plEl);
+  }
+  return card;
+}
+
+/**
+ * @param {string} titulo
+ * @param {HTMLElement[]} cards
+ */
+function criarColunaRodadaChave(titulo, cards) {
+  const col = document.createElement("div");
+  col.className = "copa-chave-round";
+  const h = document.createElement("h4");
+  h.className = "copa-chave-round-titulo";
+  h.textContent = titulo;
+  col.appendChild(h);
+  for (const c of cards) col.appendChild(c);
+  return col;
+}
+
+function pintarChaveamentoCopa() {
+  if (!els.copaChave || !els.copaChaveWrap || !copaEstado?.eliminatoria?.oitavas?.length) {
+    ocultarChaveamentoCopa();
+    return;
+  }
+  const pid = copaEstado.playerTeamId;
+  const e = copaEstado.eliminatoria;
+  const oit = e.oitavas;
+  els.copaChave.replaceChildren();
+
+  const empOit = enfatizarResultadosColunaChave("oitavas", oit);
+  const mkOit = (/** @type {number} */ idx) =>
+    criarCardJogoChave(oit[idx], ROTULOS_OITAVAS_FIFA[idx], pid, empOit);
+
+  const bracket = document.createElement("div");
+  bracket.className = "copa-chave-bracket";
+  bracket.setAttribute("aria-label", "Chaveamento em duas metades até a final");
+
+  const ladoEsq = document.createElement("div");
+  ladoEsq.className = "copa-chave-lado copa-chave-lado--esq";
+  const ladoDir = document.createElement("div");
+  ladoDir.className = "copa-chave-lado copa-chave-lado--dir";
+  const centro = document.createElement("div");
+  centro.className = "copa-chave-centro";
+
+  ladoEsq.appendChild(
+    criarColunaRodadaChave("Oitavas", [mkOit(0), mkOit(1), mkOit(2), mkOit(3)]),
+  );
+  ladoDir.appendChild(
+    criarColunaRodadaChave("Oitavas", [mkOit(4), mkOit(5), mkOit(6), mkOit(7)]),
+  );
+
+  if (e.quartas?.length === 4) {
+    const empQ = enfatizarResultadosColunaChave("quartas", e.quartas);
+    const q = e.quartas;
+    const colQuaE = criarColunaRodadaChave("Quartas", [
+      criarCardJogoChave(q[0], ROTULOS_QUARTAS_FIFA[0], pid, empQ),
+      criarCardJogoChave(q[1], ROTULOS_QUARTAS_FIFA[1], pid, empQ),
+    ]);
+    const colQuaD = criarColunaRodadaChave("Quartas", [
+      criarCardJogoChave(q[2], ROTULOS_QUARTAS_FIFA[2], pid, empQ),
+      criarCardJogoChave(q[3], ROTULOS_QUARTAS_FIFA[3], pid, empQ),
+    ]);
+    ladoEsq.appendChild(colQuaE);
+    ladoDir.insertBefore(colQuaD, ladoDir.firstChild);
+  }
+
+  if (e.semi?.length === 2) {
+    const empS = enfatizarResultadosColunaChave("semi", e.semi);
+    const s = e.semi;
+    const colSemiE = criarColunaRodadaChave("Semifinal", [
+      criarCardJogoChave(s[0], ROTULOS_SEMI_FIFA[0], pid, empS),
+    ]);
+    const colSemiD = criarColunaRodadaChave("Semifinal", [
+      criarCardJogoChave(s[1], ROTULOS_SEMI_FIFA[1], pid, empS),
+    ]);
+    ladoEsq.appendChild(colSemiE);
+    ladoDir.insertBefore(colSemiD, ladoDir.firstChild);
+  }
+
+  const hFin = document.createElement("h4");
+  hFin.className = "copa-chave-round-titulo copa-chave-centro-titulo";
+  hFin.textContent = "Final";
+  centro.appendChild(hFin);
+  if (e.final?.length === 1) {
+    const empF = enfatizarResultadosColunaChave("final", e.final);
+    centro.appendChild(
+      criarCardJogoChave(e.final[0], ROTULO_FINAL_FIFA, pid, empF),
+    );
+  } else {
+    const p = document.createElement("p");
+    p.className = "copa-chave-centro-placeholder";
+    p.textContent = "—";
+    centro.appendChild(p);
+  }
+
+  bracket.append(ladoEsq, centro, ladoDir);
+  els.copaChave.appendChild(bracket);
+  els.copaChaveWrap.hidden = false;
+}
+
+function pintarResultadosRodadaCopa() {
+  if (!els.copaResultadosRodadaWrap || !els.copaResultadosRodadaLista || !els.copaResultadosRodadaTitulo)
+    return;
+  const u = copaEstado?.ultimaRodadaResultados;
+  if (!u?.partidas?.length) {
+    els.copaResultadosRodadaWrap.hidden = true;
+    els.copaResultadosRodadaLista.replaceChildren();
+    return;
+  }
+  els.copaResultadosRodadaWrap.hidden = false;
+  els.copaResultadosRodadaTitulo.textContent = `Resultados da ${ordinalRodadaGruposPt(u.numero)} rodada (fase de grupos)`;
+  const ord = [...u.partidas].sort(
+    (a, b) => a.L.localeCompare(b.L) || a.homeId.localeCompare(b.homeId),
+  );
+  els.copaResultadosRodadaLista.replaceChildren();
+  for (const row of ord) {
+    const div = document.createElement("div");
+    div.className = "copa-res-rodada-linha";
+    const sh = siglaSelecaoIdCopa(row.homeId);
+    const sa = siglaSelecaoIdCopa(row.awayId);
+    div.textContent = `Grupo ${row.L}: ${sh} ${row.gh} × ${row.ga} ${sa}`;
+    els.copaResultadosRodadaLista.appendChild(div);
+  }
+}
+
+function finalizarGruposCopa() {
+  if (!copaEstado) return;
+  const ordem = {};
+  for (const L of Object.keys(copaEstado.grupos)) {
+    const ids = copaEstado.grupos[L];
+    const partidas = copaEstado.partidasPorGrupo[L].filter((x) => x.gh >= 0);
+    ordem[L] = ordenarGrupoFifa(ids, partidas, copaEstado.rng);
+  }
+  copaEstado.ordemGrupos = ordem;
+  const oit = montarOitavas(ordem);
+  copaEstado.eliminatoria = { oitavas: oit, quartas: null, semi: null, final: null };
+  copaEstado.jogosEliminatorios = oit;
+  copaEstado.faseCopa = "oitavas";
+  simularJogosCpuSemHumanoNaRodada();
+  copaEstado.idxJogoEliminatorio = copaEstado.jogosEliminatorios.findIndex(
+    (j) =>
+      j.homeId === copaEstado.playerTeamId ||
+      j.awayId === copaEstado.playerTeamId,
+  );
+  copaEstado.amarelosAcumulado = {};
+}
+
+function mostrarTelaCopaHubAposJogoGrupo() {
+  esconderJogoMostrarCopa();
+  if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = true;
+  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
+  if (els.copaGruposGrid) els.copaGruposGrid.hidden = false;
+  if (els.copaGruposIntro) els.copaGruposIntro.hidden = false;
+  if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = false;
+  if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = false;
+  pintarTabelaGrupoCopa();
+  pintarResultadosRodadaCopa();
+  if (els.copaHubMsg) {
+    els.copaHubMsg.hidden = false;
+    if (copaEstado && copaEstado.idxAdversarioGrupo >= 3) {
+      els.copaHubMsg.textContent =
+        "Fase de grupos concluída para você. Os dois primeiros de cada grupo seguem para as oitavas de final.";
+    } else {
+      const rest = 3 - (copaEstado?.idxAdversarioGrupo ?? 0);
+      els.copaHubMsg.textContent =
+        rest > 0
+          ? `Faltam ${rest} jogo(s) na fase de grupos. Cada rodada só fecha nos outros grupos depois do seu jogo; os placares da rodada aparecem acima.`
+          : "";
+    }
+  }
+  if (els.btnCopaProximoJogo) {
+    const prontoOitavas = copaEstado && copaEstado.idxAdversarioGrupo >= 3;
+    els.btnCopaProximoJogo.hidden = false;
+    if (prontoOitavas) {
+      els.btnCopaProximoJogo.textContent = "Ir às oitavas de final";
+    } else if (copaEstado && copaEstado.idxAdversarioGrupo < 3) {
+      const n = copaEstado.idxAdversarioGrupo + 1;
+      els.btnCopaProximoJogo.textContent = `${n}.º jogo do grupo`;
+    } else {
+      els.btnCopaProximoJogo.textContent = "Próximo jogo";
+    }
+  }
+  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = false;
+  mostrarSecaoArtilheirosCopaNoHub();
+  if (els.btnCopaVoltarInicioHub) els.btnCopaVoltarInicioHub.hidden = false;
+  ocultarChaveamentoCopa();
+  pintarListaSavesCopaHub();
+}
+
+function mostrarTelaCopaHubMataMata() {
+  esconderJogoMostrarCopa();
+  if (copaEstado) copaEstado.ultimaRodadaResultados = undefined;
+  pintarResultadosRodadaCopa();
+  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
+  if (els.copaGruposGrid) els.copaGruposGrid.hidden = true;
+  if (els.copaGruposIntro) els.copaGruposIntro.hidden = true;
+  if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = true;
+  if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = true;
+  if (els.copaHubMsg) {
+    els.copaHubMsg.hidden = false;
+    const f = copaEstado?.faseCopa ?? "";
+    const nomes = {
+      oitavas: "Oitavas de final",
+      quartas: "Quartas de final",
+      semi: "Semifinal",
+      final: "Final",
+    };
+    els.copaHubMsg.textContent = `Fase: ${nomes[f] ?? f}. Pronto para o próximo jogo.`;
+  }
+  if (els.btnCopaProximoJogo) {
+    els.btnCopaProximoJogo.hidden = false;
+    els.btnCopaProximoJogo.textContent = "Entrar em campo";
+  }
+  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = true;
+  mostrarSecaoArtilheirosCopaNoHub();
+  if (els.btnCopaVoltarInicioHub) els.btnCopaVoltarInicioHub.hidden = false;
+  pintarChaveamentoCopa();
+  pintarListaSavesCopaHub();
+}
+
+function mostrarTelaCopaEliminado() {
+  esconderJogoMostrarCopa();
+  if (copaEstado) copaEstado.ultimaRodadaResultados = undefined;
+  pintarResultadosRodadaCopa();
+  if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = true;
+  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
+  if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = true;
+  if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = true;
+  if (els.copaGruposGrid) els.copaGruposGrid.hidden = true;
+  if (els.copaGruposIntro) els.copaGruposIntro.hidden = true;
+  mostrarSecaoArtilheirosCopaNoHub();
+  if (els.copaHubMsg) {
+    els.copaHubMsg.hidden = false;
+    const nomeCamp =
+      copaEstado?.campeaoId != null
+        ? SELECOES.find((x) => x.id === copaEstado.campeaoId)?.nome ?? "—"
+        : "—";
+    els.copaHubMsg.textContent =
+      `Sua seleção foi eliminada. Campeão mundial: ${nomeCamp}. A chave abaixo mostra os resultados até a final. Volte ao menu para uma nova Copa ou um amistoso.`;
+  }
+  if (els.btnCopaProximoJogo) els.btnCopaProximoJogo.hidden = true;
+  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = true;
+  if (els.btnCopaVoltarInicioHub) els.btnCopaVoltarInicioHub.hidden = false;
+  pintarChaveamentoCopa();
+  pintarListaSavesCopaHub();
+}
+
+function mostrarTelaCopaCampeao() {
+  esconderJogoMostrarCopa();
+  if (copaEstado) copaEstado.ultimaRodadaResultados = undefined;
+  pintarResultadosRodadaCopa();
+  if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = true;
+  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
+  if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = true;
+  if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = true;
+  if (els.copaGruposGrid) els.copaGruposGrid.hidden = true;
+  if (els.copaGruposIntro) els.copaGruposIntro.hidden = true;
+  mostrarSecaoArtilheirosCopaNoHub();
+  const nome =
+    SELECOES.find((x) => x.id === copaEstado?.campeaoId)?.nome ?? "Campeão";
+  if (els.copaHubMsg) {
+    els.copaHubMsg.hidden = false;
+    els.copaHubMsg.textContent = `🏆 ${nome} — campeão mundial! Parabéns.`;
+  }
+  if (els.btnCopaProximoJogo) els.btnCopaProximoJogo.hidden = true;
+  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = true;
+  if (els.btnCopaVoltarInicioHub) els.btnCopaVoltarInicioHub.hidden = false;
+  pintarChaveamentoCopa();
+  pintarListaSavesCopaHub();
+}
+
+function mostrarTelaCopaNaoClassificou() {
+  esconderJogoMostrarCopa();
+  if (copaEstado) copaEstado.ultimaRodadaResultados = undefined;
+  pintarResultadosRodadaCopa();
+  if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = true;
+  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
+  if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = false;
+  if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = false;
+  pintarTabelaGrupoCopa();
+  if (els.copaHubMsg) {
+    els.copaHubMsg.hidden = false;
+    els.copaHubMsg.textContent =
+      "Sua seleção não ficou entre as duas primeiras do grupo. Volte ao menu para tentar outra Copa.";
+  }
+  if (els.btnCopaProximoJogo) els.btnCopaProximoJogo.hidden = true;
+  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = false;
+  mostrarSecaoArtilheirosCopaNoHub();
+  if (els.btnCopaVoltarInicioHub) els.btnCopaVoltarInicioHub.hidden = false;
+  ocultarChaveamentoCopa();
+  pintarListaSavesCopaHub();
+}
+
+function tentarAvancarDosGruposCopa() {
+  if (!copaEstado || copaEstado.faseCopa !== "grupos") return;
+  const L = copaEstado.grupoPlayer;
+  const ids = copaEstado.grupos[L];
+  const partidas = copaEstado.partidasPorGrupo[L].filter((x) => x.gh >= 0);
+  const ordem = ordenarGrupoFifa(ids, partidas, copaEstado.rng);
+  const pos = ordem.indexOf(copaEstado.playerTeamId);
+  if (pos < 0 || pos > 1) {
+    copaEstado.faseCopa = "eliminado";
+    mostrarTelaCopaNaoClassificou();
+    return;
+  }
+  finalizarGruposCopa();
+  mostrarTelaCopaHubMataMata();
+}
+
+function handleCopaProximoJogo() {
+  if (!copaEstado) return;
+  if (copaEstado.faseCopa === "grupos") {
+    if (copaEstado.idxAdversarioGrupo < 3) {
+      const adv = copaEstado.adversariosGrupo[copaEstado.idxAdversarioGrupo];
+      if (adv) entrarNoJogoCopaVersus(adv);
+      return;
+    }
+    tentarAvancarDosGruposCopa();
+    return;
+  }
+  if (
+    copaEstado.faseCopa === "oitavas" ||
+    copaEstado.faseCopa === "quartas" ||
+    copaEstado.faseCopa === "semi" ||
+    copaEstado.faseCopa === "final"
+  ) {
+    const jogo = copaEstado.jogosEliminatorios[copaEstado.idxJogoEliminatorio];
+    if (!jogo || jogo.winnerId) return;
+    const cpuId =
+      jogo.homeId === copaEstado.playerTeamId ? jogo.awayId : jogo.homeId;
+    entrarNoJogoCopaVersus(cpuId);
+  }
+}
+
+function voltarMenuPrincipalDaCopa() {
+  copaTransicaoHubPendente = null;
+  copaEstado = null;
+  tipoModoJogo = "amistoso";
+  idSelecaoCopaEscolhida = null;
+  copaPartidaKnockout = false;
+  resetFlagsProrrogacaoCopa();
+  if (els.telaCopa) {
+    els.telaCopa.setAttribute("hidden", "");
+    els.telaCopa.style.display = "none";
+  }
+  if (els.jogoRoot) {
+    els.jogoRoot.setAttribute("hidden", "");
+    els.jogoRoot.style.display = "none";
+  }
+  if (els.telaInicio) {
+    els.telaInicio.removeAttribute("hidden");
+    els.telaInicio.style.removeProperty("display");
+  }
+  if (els.copaPenaltisOverlay) els.copaPenaltisOverlay.hidden = true;
+  esconderHudDisputaPenaltis();
+  resetCopaUi();
+}
+
+function resetCopaUi() {
+  idSelecaoCopaEscolhida = null;
+  els.copaCardsJogador?.querySelectorAll(".card-selecao").forEach((b) => {
+    b.classList.remove("card-selecao--ativa");
+  });
+  if (els.btnCopaSortearGrupos) {
+    els.btnCopaSortearGrupos.disabled = true;
+    els.btnCopaSortearGrupos.setAttribute("disabled", "");
+  }
+  if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = false;
+  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = true;
+  if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = true;
+  if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = true;
+  if (els.copaHubMsg) {
+    els.copaHubMsg.hidden = true;
+    els.copaHubMsg.textContent = "";
+  }
+  if (els.btnCopaProximoJogo) els.btnCopaProximoJogo.hidden = true;
+  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = true;
+  if (els.btnCopaVerArtilheiros) els.btnCopaVerArtilheiros.hidden = true;
+  esconderSecaoArtilheirosCopaNoHub();
+  if (els.btnCopaVoltarInicioHub) els.btnCopaVoltarInicioHub.hidden = true;
+  if (els.copaResultadosRodadaWrap) {
+    els.copaResultadosRodadaWrap.hidden = true;
+    els.copaResultadosRodadaLista?.replaceChildren();
+  }
+  ocultarChaveamentoCopa();
+  if (els.copaSalvarFeedback) els.copaSalvarFeedback.hidden = true;
+  if (els.copaSalvarNome) els.copaSalvarNome.value = "";
+  if (els.copaHubSavesLista) els.copaHubSavesLista.replaceChildren();
+  if (els.copaSalvarSobrescrever) {
+    els.copaSalvarSobrescrever.replaceChildren();
+    const o0 = document.createElement("option");
+    o0.value = "";
+    o0.textContent = "Salvar como novo";
+    els.copaSalvarSobrescrever.appendChild(o0);
+  }
+}
+
+function montarCardsCopaSelecao() {
+  if (!els.copaCardsJogador) return;
+  els.copaCardsJogador.replaceChildren();
+  for (const s of SELECOES) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "card-selecao";
+    btn.dataset.selecaoId = s.id;
+    const img = document.createElement("img");
+    img.src = urlBandeira(s.iso, 160);
+    img.alt = `Bandeira de ${s.nome}`;
+    img.width = 88;
+    img.height = 66;
+    img.loading = "lazy";
+    const span = document.createElement("span");
+    span.className = "card-selecao-nome";
+    span.textContent = s.nome;
+    btn.append(img, span);
+    btn.addEventListener("click", () => {
+      idSelecaoCopaEscolhida = s.id;
+      els.copaCardsJogador?.querySelectorAll(".card-selecao").forEach((b) => {
+        b.classList.toggle("card-selecao--ativa", b.dataset.selecaoId === s.id);
+      });
+      if (els.btnCopaSortearGrupos) {
+        els.btnCopaSortearGrupos.disabled = false;
+        els.btnCopaSortearGrupos.removeAttribute("disabled");
+      }
+    });
+    els.copaCardsJogador.appendChild(btn);
+  }
+}
+
+function iniciarCopaComSorteio() {
+  if (!idSelecaoCopaEscolhida) return;
+  const seed = Date.now() % 2147483647;
+  const rng = criarRng(seed);
+  const ids = SELECOES.map((s) => s.id);
+  const grupos = sortearGrupos(ids, rng);
+  /** @type {Record<string, import('./world-cup.js').ResultadoPartida[]>} */
+  const partidasPorGrupo = {};
+  for (const L of Object.keys(grupos)) {
+    partidasPorGrupo[L] = partidasDoGrupo(grupos[L]);
+  }
+  let grupoPlayer = "A";
+  for (const L of Object.keys(grupos)) {
+    if (grupos[L].includes(idSelecaoCopaEscolhida)) {
+      grupoPlayer = L;
+      break;
+    }
+  }
+  const quatro = grupos[grupoPlayer];
+  const adversariosGrupo = adversariosNasRodadas(quatro, idSelecaoCopaEscolhida);
+  copaEstado = {
+    rng,
+    seed,
+    grupos,
+    partidasPorGrupo,
+    playerTeamId: idSelecaoCopaEscolhida,
+    grupoPlayer,
+    adversariosGrupo,
+    idxAdversarioGrupo: 0,
+    faseCopa: "grupos",
+    ordemGrupos: {},
+    jogosEliminatorios: [],
+    idxJogoEliminatorio: 0,
+    campeaoId: null,
+    artilheiros: {},
+    lesoesHumano: {},
+    jogosSuspensao: {},
+    amarelosAcumulado: {},
+    eliminatoria: null,
+  };
+  if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = true;
+  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
+  if (els.copaGruposIntro) {
+    const sn = SELECOES.find((x) => x.id === idSelecaoCopaEscolhida)?.nome ?? "";
+    els.copaGruposIntro.textContent = `Você comanda ${sn}, no grupo ${grupoPlayer}. Há 8 grupos (A–H) com 4 seleções.`;
+  }
+  if (els.copaGruposGrid) {
+    preencherGradeGruposCopa(grupos);
+    els.copaGruposGrid.hidden = false;
+  }
+  if (els.copaGruposIntro) els.copaGruposIntro.hidden = false;
+  if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = false;
+  if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = false;
+  pintarTabelaGrupoCopa();
+  pintarResultadosRodadaCopa();
+  if (els.copaHubMsg) {
+    els.copaHubMsg.hidden = false;
+    els.copaHubMsg.textContent =
+      "Nenhuma partida da 1.ª rodada foi jogada ainda nos outros grupos. Dispute o seu 1.º jogo; em seguida os demais jogos da rodada serão simulados e listados em “Resultados da rodada”.";
+  }
+  if (els.btnCopaProximoJogo) {
+    els.btnCopaProximoJogo.hidden = false;
+    els.btnCopaProximoJogo.textContent = "1.º jogo do grupo";
+  }
+  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = false;
+  mostrarSecaoArtilheirosCopaNoHub();
+  if (els.btnCopaVoltarInicioHub) els.btnCopaVoltarInicioHub.hidden = false;
+  ocultarChaveamentoCopa();
+  pintarListaSavesCopaHub();
+}
+
+function entrarNoJogoCopaVersus(cpuId) {
+  if (!copaEstado) return;
+  try {
+    tipoModoJogo = "copa";
+    timeJogador = elencoDaSelecao(copaEstado.playerTeamId);
+    timeCpu = elencoDaSelecao(cpuId);
+    metaSelecaoJogador =
+      SELECOES.find((x) => x.id === copaEstado.playerTeamId) ?? null;
+    metaSelecaoCpu = SELECOES.find((x) => x.id === cpuId) ?? null;
+    copaPartidaKnockout = copaEstado.faseCopa !== "grupos";
+    aplicarRestricoesCopaNoElencoHumano();
+    snapshotElencoLimpo();
+    aplicarCabecalhosPainelSelecoes();
+    if (els.telaCopa) {
+      els.telaCopa.setAttribute("hidden", "");
+      els.telaCopa.style.display = "none";
+    }
+    if (els.jogoRoot) {
+      els.jogoRoot.removeAttribute("hidden");
+      els.jogoRoot.style.removeProperty("display");
+    }
+    golsJogador = 0;
+    golsCpu = 0;
+    placarPenaltisPosDecisao = null;
+    golsPorJogadorNaPartida.clear();
+    partidaAtiva = false;
+    jogoPausado = false;
+    fluxoForaDePartida = "pre_jogo";
+    resetFlagsProrrogacaoCopa();
+    precisaResolverLesaoHumano = false;
+    aguardandoPausaPorExpulsaoHumana = false;
+    substituicoesUsadas = 0;
+    substituicoesCpuUsadas = 0;
+    segundoTempoAutorizado = false;
+    aguardandoSegundoTempo = false;
+    resolveSegundoTempo = null;
+    esconderUiIntervalo();
+    renderEscalacoes(null);
+    atualizarPlacar();
+    atualizarSubsHud();
+    if (els.relogio) els.relogio.textContent = "0′";
+    if (els.etapaTempo) els.etapaTempo.textContent = "—";
+    if (els.log) els.log.innerHTML = "";
+    setZonaVisual(null);
+    atualizarBtnCentroRodada();
+    sincronizarUiPausa();
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao iniciar partida da Copa.");
+  }
+}
+
+function esconderHudDisputaPenaltis() {
+  if (els.copaPenaltisHud) els.copaPenaltisHud.hidden = true;
+}
+
+/**
+ * @returns {Promise<boolean>} true se o jogador humano vence a disputa
+ */
+function executarDisputaPenaltis() {
+  return new Promise((resolve, reject) => {
+    if (!els.copaPenaltisOverlay || !copaEstado) {
+      placarPenaltisPosDecisao = null;
+      esconderHudDisputaPenaltis();
+      reject(new Error("UI pênaltis"));
+      return;
+    }
+    const goleiroCpu = sortearGoleiro(timeCpu.titulares);
+    const goleiroHum = sortearGoleiro(timeJogador.titulares);
+    if (!goleiroCpu || !goleiroHum) {
+      placarPenaltisPosDecisao = null;
+      esconderHudDisputaPenaltis();
+      reject(new Error("Goleiros"));
+      return;
+    }
+
+    const candidatosHum = timeJogador.titulares.filter(
+      (j) => j.posicao !== POSITIONS.GOLEIRO && !j.expulso,
+    );
+    const candidatosCpu = timeCpu.titulares.filter(
+      (j) => j.posicao !== POSITIONS.GOLEIRO && !j.expulso,
+    );
+
+    /** @type {string[]} */
+    let ordemHum = [];
+    const ordemCpuArr = embaralhar([...candidatosCpu], copaEstado.rng).slice(
+      0,
+      Math.min(5, candidatosCpu.length),
+    );
+    if (ordemCpuArr.length < 5 || candidatosHum.length < 5) {
+      placarPenaltisPosDecisao = null;
+      esconderHudDisputaPenaltis();
+      reject(new Error("Elenco insuficiente para pênaltis"));
+      return;
+    }
+
+    placarPenaltisPosDecisao = null;
+    els.copaPenaltisOverlay.hidden = false;
+    els.copaPenaltisTitulo.textContent = "Disputa de pênaltis";
+    els.copaPenaltisTexto.textContent =
+      "Escolha os 5 cobradores na ordem (só jogadores em campo). Na cobrança: uma letra para marcar. Na defesa: três letras seguidas para defender.";
+    els.copaPenaltisEscolha.hidden = false;
+    els.copaPenaltisPlacar.hidden = true;
+    els.copaPenaltisLista.replaceChildren();
+    els.copaPenaltisOrdem.textContent = "";
+    els.copaPenaltisConfirmar.disabled = true;
+
+    for (const j of candidatosHum) {
+      const li = document.createElement("li");
+      const bt = document.createElement("button");
+      bt.type = "button";
+      bt.textContent = `${j.nome} (${sigla(j.posicao)})`;
+      bt.addEventListener("click", () => {
+        if (ordemHum.length >= 5) return;
+        if (ordemHum.includes(j.id)) return;
+        ordemHum.push(j.id);
+        bt.disabled = true;
+        bt.classList.add("ja-escolhido");
+        els.copaPenaltisOrdem.textContent = `Ordem: ${ordemHum.length}/5`;
+        if (ordemHum.length === 5) {
+          els.copaPenaltisConfirmar.disabled = false;
+          els.copaPenaltisConfirmar.removeAttribute("disabled");
+        }
+      });
+      li.appendChild(bt);
+      els.copaPenaltisLista.appendChild(li);
+    }
+
+    const jogadorPorId = (id) =>
+      [...timeJogador.titulares, ...timeJogador.reservas].find((x) => x.id === id);
+
+    function escolherUmJogador(restantes) {
+      return new Promise((resSel) => {
+        esconderHudDisputaPenaltis();
+        if (els.copaPenaltisOverlay) els.copaPenaltisOverlay.hidden = false;
+        els.copaPenaltisLista.replaceChildren();
+        if (!restantes.length) {
+          if (els.copaPenaltisOverlay) els.copaPenaltisOverlay.hidden = true;
+          resSel(null);
+          return;
+        }
+        for (const j of restantes) {
+          const li = document.createElement("li");
+          const bt = document.createElement("button");
+          bt.type = "button";
+          bt.textContent = `${j.nome} (${sigla(j.posicao)})`;
+          bt.addEventListener("click", () => {
+            els.copaPenaltisEscolha.hidden = true;
+            if (els.copaPenaltisOverlay) els.copaPenaltisOverlay.hidden = true;
+            resSel(j);
+          });
+          li.appendChild(bt);
+          els.copaPenaltisLista.appendChild(li);
+        }
+      });
+    }
+
+    els.copaPenaltisConfirmar.onclick = async () => {
+      els.copaPenaltisConfirmar.onclick = null;
+      els.copaPenaltisEscolha.hidden = true;
+      if (els.copaPenaltisOverlay) els.copaPenaltisOverlay.hidden = true;
+      let h = 0;
+      let c = 0;
+      let rondaMorteSubita = 0;
+      const usadosHum = new Set(ordemHum);
+      const usadosCpu = new Set(ordemCpuArr.map((x) => x.id));
+
+      const pintarHudPlacarPen = () => {
+        if (!els.copaPenaltisHudPlacar) return;
+        els.copaPenaltisHud.hidden = false;
+        els.copaPenaltisHudPlacar.textContent = `Pênaltis parciais: você ${h} × ${c} adversário`;
+      };
+
+      const pintarHudAcaoPen = (txt) => {
+        if (els.copaPenaltisHudAcao) els.copaPenaltisHudAcao.textContent = txt;
+      };
+
+      const qteChuteHumano = (atacante, textoAcao) =>
+        new Promise((res) => {
+          pintarHudPlacarPen();
+          pintarHudAcaoPen(textoAcao);
+          const { ratio } = metricasDuelo(atacante, goleiroCpu, true);
+          const p = parametrosLetra(ratio);
+          els.dueloOverlay.hidden = false;
+          mostrarFaseModal("qte");
+          iniciarQteLetra(p, (o) => {
+            els.dueloOverlay.hidden = true;
+            mostrarFaseModal("reset");
+            res(o.acertou);
+          });
+        });
+
+      const qteDefesaHumano = (atacanteCpu, textoAcao) =>
+        new Promise((res) => {
+          pintarHudPlacarPen();
+          pintarHudAcaoPen(textoAcao);
+          const { ratio } = metricasDuelo(goleiroHum, atacanteCpu, false);
+          const seq = Array.from({ length: 3 }, () => parametrosLetra(ratio));
+          els.dueloOverlay.hidden = false;
+          mostrarFaseModal("qte");
+          iniciarQteLetraSequencia(seq, (o) => {
+            els.dueloOverlay.hidden = true;
+            mostrarFaseModal("reset");
+            res(o.acertou);
+          });
+        });
+
+      const atualizarPlacarPen = () => {
+        els.copaPenaltisPlacar.hidden = false;
+        els.copaPenaltisPlacar.textContent = `Pênaltis: você ${h} × ${c} adversário`;
+        pintarHudPlacarPen();
+      };
+
+      const registrarFimDisputaPenaltis = () => {
+        esconderHudDisputaPenaltis();
+        placarPenaltisPosDecisao = { jogador: h, cpu: c };
+        resolve(h > c);
+      };
+
+      try {
+        pintarHudPlacarPen();
+        pintarHudAcaoPen(
+          "Cada rodada: você cobra o pênalti (1 letra) e em seguida defende a cobrança do adversário (3 letras). O placar abaixo atualiza após cada lance.",
+        );
+
+        for (let i = 0; i < 5; i++) {
+          const atHum = jogadorPorId(ordemHum[i]);
+          const atCpu = ordemCpuArr[i];
+          const r = `Rodada ${i + 1} de 5`;
+          const nomeH = atHum?.nome ?? "—";
+          const nomeC = atCpu?.nome ?? "—";
+          if ((await qteChuteHumano(
+            atHum,
+            `${r} — sua cobrança. ${nomeH} bate o pênalti: acerte 1 letra (A–Z) para converter.`,
+          )) === true)
+            h++;
+          atualizarPlacarPen();
+          if ((await qteDefesaHumano(
+            atCpu,
+            `${r} — sua defesa. O adversário cobra (${nomeC}): acerte 3 letras seguidas para evitar o gol.`,
+          )) !== true)
+            c++;
+          atualizarPlacarPen();
+          const faltaHum = 5 - 1 - i;
+          const faltaCpu = 5 - 1 - i;
+          if (h > c + faltaCpu || c > h + faltaHum) {
+            registrarFimDisputaPenaltis();
+            return;
+          }
+        }
+
+        if (h !== c) {
+          registrarFimDisputaPenaltis();
+          return;
+        }
+
+        while (true) {
+          rondaMorteSubita++;
+          els.copaPenaltisTexto.textContent =
+            "Empate nas 5 cobranças. Escolha o próximo cobrador; o adversário também cobra uma.";
+          els.copaPenaltisEscolha.hidden = false;
+          const restH = candidatosHum.filter((j) => !usadosHum.has(j.id));
+          const esc = await escolherUmJogador(restH);
+          if (!esc) {
+            registrarFimDisputaPenaltis();
+            return;
+          }
+          usadosHum.add(esc.id);
+          const cpuExtra = candidatosCpu.find((x) => !usadosCpu.has(x.id));
+          if (!cpuExtra) {
+            registrarFimDisputaPenaltis();
+            return;
+          }
+          usadosCpu.add(cpuExtra.id);
+          const rm = `Morte súbita — ${rondaMorteSubita}.ª rodada`;
+          const ne = esc.nome ?? "—";
+          const nce = cpuExtra.nome ?? "—";
+          if ((await qteChuteHumano(
+            esc,
+            `${rm} — sua cobrança. ${ne} bate o pênalti: 1 letra para converter.`,
+          )) === true)
+            h++;
+          atualizarPlacarPen();
+          if ((await qteDefesaHumano(
+            cpuExtra,
+            `${rm} — sua defesa. O adversário cobra (${nce}): 3 letras seguidas para defender.`,
+          )) !== true)
+            c++;
+          atualizarPlacarPen();
+          if (h !== c) {
+            registrarFimDisputaPenaltis();
+            return;
+          }
+        }
+      } catch (e) {
+        esconderHudDisputaPenaltis();
+        placarPenaltisPosDecisao = null;
+        reject(e);
+      }
+    };
+  });
+}
+
 function entrarNoJogoComSelecoes() {
   if (!idSelecaoJogadorEscolhida || !idSelecaoCpuEscolhida) return;
   if (idSelecaoJogadorEscolhida === idSelecaoCpuEscolhida) return;
   try {
+    tipoModoJogo = "amistoso";
     timeJogador = elencoDaSelecao(idSelecaoJogadorEscolhida);
     timeCpu = elencoDaSelecao(idSelecaoCpuEscolhida);
     snapshotElencoLimpo();
@@ -1231,6 +3211,8 @@ function entrarNoJogoComSelecoes() {
     }
     golsJogador = 0;
     golsCpu = 0;
+    placarPenaltisPosDecisao = null;
+    golsPorJogadorNaPartida.clear();
     partidaAtiva = false;
     jogoPausado = false;
     fluxoForaDePartida = "pre_jogo";
@@ -1267,7 +3249,24 @@ window.__rpgsoccerAoAbrirAmistoso = function rpgsoccerAoAbrirAmistoso() {
     amistosoCardsMontados = true;
   }
   resetAmistosoUi();
+  window.scrollTo(0, 0);
 };
+
+window.__rpgsoccerAoAbrirCopa = function rpgsoccerAoAbrirCopa() {
+  tipoModoJogo = "amistoso";
+  copaEstado = null;
+  copaPartidaKnockout = false;
+  resetFlagsProrrogacaoCopa();
+  if (!els.copaCardsJogador) return;
+  if (!copaCardsMontados) {
+    montarCardsCopaSelecao();
+    copaCardsMontados = true;
+  }
+  resetCopaUi();
+  window.scrollTo(0, 0);
+};
+
+window.__rpgsoccerAbrirTelaCarregarCopa = abrirTelaCarregarCopa;
 
 (function sincronizarAmistosoSeJaVisivel() {
   const ami = document.getElementById("tela-amistoso");
@@ -1276,7 +3275,69 @@ window.__rpgsoccerAoAbrirAmistoso = function rpgsoccerAoAbrirAmistoso() {
   }
 })();
 
+(function sincronizarCopaSeJaVisivel() {
+  const copa = document.getElementById("tela-copa");
+  if (copa && !copa.hasAttribute("hidden") && !copaCardsMontados) {
+    window.__rpgsoccerAoAbrirCopa();
+  }
+})();
+
+els.btnCopaSortearGrupos?.addEventListener("click", () => {
+  iniciarCopaComSorteio();
+});
+
+els.btnCopaProximoJogo?.addEventListener("click", () => {
+  handleCopaProximoJogo();
+});
+
+els.btnCopaVerTabela?.addEventListener("click", () => {
+  if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = false;
+  if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = false;
+  document.getElementById("copa-ancora-classificacao")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+});
+
+els.btnCopaVerArtilheiros?.addEventListener("click", () => {
+  if (els.copaArtilheirosWrap) els.copaArtilheirosWrap.hidden = false;
+  pintarArtilheirosCopa();
+  document.getElementById("copa-ancora-artilheiros")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+});
+
+els.btnCopaVoltarInicioHub?.addEventListener("click", () => {
+  voltarMenuPrincipalDaCopa();
+});
+
+els.btnCarregarCopaVoltar?.addEventListener("click", () => {
+  fecharTelaCarregarCopa();
+});
+
+els.btnCopaSalvar?.addEventListener("click", () => {
+  salvarProgressoCopaDaUi();
+});
+
 els.btnCentroRodada?.addEventListener("click", () => {
+  if (resolveInicioProrrogacao) {
+    const r = resolveInicioProrrogacao;
+    resolveInicioProrrogacao = null;
+    aguardandoInicioProrrogacao = false;
+    esconderUiIntervalo();
+    r();
+    return;
+  }
+  if (resolveInicioEt2) {
+    acrescimosET2 = sortearAcrescimosProrrogacao();
+    const r = resolveInicioEt2;
+    resolveInicioEt2 = null;
+    aguardandoInicioEt2 = false;
+    esconderUiIntervalo();
+    r();
+    return;
+  }
   if (resolveSegundoTempo) {
     const r = resolveSegundoTempo;
     resolveSegundoTempo = null;
@@ -1289,6 +3350,10 @@ els.btnCentroRodada?.addEventListener("click", () => {
     return;
   }
   if (!partidaAtiva) {
+    if (tipoModoJogo === "copa" && copaTransicaoHubPendente) {
+      executarTransicaoCopaAposContinuar();
+      return;
+    }
     if (fluxoForaDePartida === "pos_fim") {
       fluxoForaDePartida = "nova_prep";
       atualizarBtnCentroRodada();
@@ -1305,6 +3370,16 @@ els.btnCentroRodada?.addEventListener("click", () => {
 function voltarAoMenuPrincipalDoJogo() {
   if (partidaAtiva) return;
   limparSelecaoSub();
+  esconderPopupFimDeJogo();
+  copaTransicaoHubPendente = null;
+  if (tipoModoJogo === "copa") {
+    copaEstado = null;
+    tipoModoJogo = "amistoso";
+    copaPartidaKnockout = false;
+    resetFlagsProrrogacaoCopa();
+    if (els.copaPenaltisOverlay) els.copaPenaltisOverlay.hidden = true;
+    esconderHudDisputaPenaltis();
+  }
   if (els.telaAmistoso) {
     els.telaAmistoso.setAttribute("hidden", "");
     els.telaAmistoso.style.display = "none";
@@ -1343,7 +3418,8 @@ function alternarPausaPorTecla() {
     !partidaAtiva ||
     !els.dueloOverlay.hidden ||
     aguardandoSegundoTempo ||
-    !els.golOverlay.hidden
+    !els.golOverlay.hidden ||
+    (els.fimJogoOverlay && !els.fimJogoOverlay.hidden)
   ) {
     return;
   }
@@ -1372,7 +3448,8 @@ window.addEventListener("keydown", (e) => {
   if (!partidaAtiva) return;
   const dueloAberto = els.dueloOverlay && !els.dueloOverlay.hidden;
   const golAberto = els.golOverlay && !els.golOverlay.hidden;
-  if (!jogoPausado && (dueloAberto || aguardandoSegundoTempo || golAberto)) {
+  const fimJogoAberto = els.fimJogoOverlay && !els.fimJogoOverlay.hidden;
+  if (!jogoPausado && (dueloAberto || aguardandoSegundoTempo || golAberto || fimJogoAberto)) {
     return;
   }
   e.preventDefault();
@@ -1419,7 +3496,7 @@ function abrirModalLance(lance) {
   mostrarFaseModal("campo_pre_qte");
   const metCampo = metricasDuelo(ctx.jogador, ctx.adversario, ctx.jogadorComBola);
   const letraParamsCampo = parametrosLetra(metCampo.ratio);
-  els.qteDica.textContent = `Você tem ~${fmtSegundosAproximados(letraParamsCampo.tempoLimiteMs)} s para pressionar a tecla certa.`;
+  els.qteDica.textContent = `Você tem ${fmtSegundosExatos(letraParamsCampo.tempoLimiteMs)} s para pressionar a tecla certa.`;
 
   ctx.iniciarQteCampo = () => {
     mostrarFaseModal("qte_campo");
@@ -1456,9 +3533,6 @@ function abrirModalLance(lance) {
       );
 
       let tipo = tipoFinalizacaoGoleiro(ctx.zona, acertou);
-      if (tipo === "cpu_chuta" && !teclaErrada) {
-        tipo = null;
-      }
 
       if (!acertou && teclaErrada) {
         ctx.linhasResultado.push(...aplicarFaltaNoJogador(ctx.jogador));
@@ -1597,9 +3671,13 @@ function iniciarQteGoleiro() {
       } else {
         ctx.linhasResultado.push(textoDueloGoleiro({ ...pBase, venceu: true }, fmt));
         golsJogador++;
+        registrarGolMarcadoNaPartida(ctx.forwardChute);
         teveGol = true;
         ctx.golParaJogador = true;
         estadoGlobal.posseJogador = false;
+        if (tipoModoJogo === "copa" && copaEstado && metaSelecaoJogador) {
+          registrarGolArtilheiroCopa(metaSelecaoJogador.id, ctx.forwardChute.nome);
+        }
       }
     } else if (chuteJogador && !acertou) {
       ctx.linhasResultado.push(textoDueloGoleiro({ ...pBase, venceu: false }, fmt));
@@ -1617,9 +3695,13 @@ function iniciarQteGoleiro() {
       } else {
         ctx.linhasResultado.push(textoDueloGoleiro({ ...pBase, venceu: false }, fmt));
         golsCpu++;
+        registrarGolMarcadoNaPartida(ctx.forwardChute);
         teveGol = true;
         ctx.golParaJogador = false;
         estadoGlobal.posseJogador = true;
+        if (tipoModoJogo === "copa" && copaEstado && metaSelecaoCpu) {
+          registrarGolArtilheiroCopa(metaSelecaoCpu.id, ctx.forwardChute.nome);
+        }
       }
     }
 
@@ -1627,14 +3709,24 @@ function iniciarQteGoleiro() {
     mostrarResultadoFinal(teveGol, ctx.golParaJogador);
   }
 
-  const nLetras = chuteJogador ? (penalti ? 2 : 3) : penalti ? 4 : 2;
+  const nLetras = penalti
+    ? chuteJogador
+      ? 1
+      : 3
+    : chuteJogador
+      ? 3
+      : 2;
   const seq = Array.from({ length: nLetras }, () => parametrosLetra(met.ratio));
   const msPorLetra = seq.reduce((a, pr) => a + pr.tempoLimiteMs, 0) / nLetras;
   /** @type {Record<number, string>} */
-  const porExtenso = { 2: "duas", 3: "três", 4: "quatro" };
+  const porExtenso = { 1: "uma", 2: "duas", 3: "três", 4: "quatro" };
   const alvo = porExtenso[nLetras];
   const prefix = penalti ? "Pênalti — " : "";
-  els.qteDica.textContent = `${prefix}Acerte ${alvo} letras seguidas (~${fmtSegundosAproximados(msPorLetra)} s por letra).`;
+  const tempoHint = fmtSegundosExatos(msPorLetra);
+  els.qteDica.textContent =
+    nLetras === 1
+      ? `${prefix}Acerte ${alvo} letra (${tempoHint} s).`
+      : `${prefix}Acerte ${alvo} letras seguidas (${tempoHint} s por letra).`;
   iniciarQteLetraSequencia(seq, aoFimGoleiro);
 }
 
@@ -1691,6 +3783,8 @@ els.btnFecharLance?.addEventListener("click", async () => {
   renderEscalacoes(null);
   substituirLesionadosTitularCpu();
 
+  if (tentarEncerrarPartidaPorMinimoJogadoresEmCampo()) return;
+
   if (teveGol) {
     mostrarPopupGol(golParaJogador);
     return;
@@ -1704,6 +3798,30 @@ els.btnFecharLance?.addEventListener("click", async () => {
   await continuarRodadaAposLance();
 });
 
+function textoPlacarFinalPartida() {
+  const j = metaSelecaoJogador?.sigla ?? "";
+  const c = metaSelecaoCpu?.sigla ?? "";
+  let t = j && c ? `${j} ${golsJogador} × ${golsCpu} ${c}` : `${golsJogador} × ${golsCpu}`;
+  if (placarPenaltisPosDecisao) {
+    const { jogador: ph, cpu: pc } = placarPenaltisPosDecisao;
+    t += ` (${ph} × ${pc})`;
+  }
+  return t;
+}
+
+function mostrarPopupFimDeJogo() {
+  if (!els.fimJogoOverlay) return;
+  if (els.fimJogoTitulo) els.fimJogoTitulo.textContent = "Fim de jogo!";
+  if (els.fimJogoPlacar) els.fimJogoPlacar.textContent = textoPlacarFinalPartida();
+  els.fimJogoOverlay.hidden = false;
+  sincronizarUiPausa();
+}
+
+function esconderPopupFimDeJogo() {
+  if (els.fimJogoOverlay) els.fimJogoOverlay.hidden = true;
+  sincronizarUiPausa();
+}
+
 function mostrarPopupGol(golAFavor) {
   els.golOverlay.hidden = false;
   sincronizarUiPausa();
@@ -1716,10 +3834,15 @@ function mostrarPopupGol(golAFavor) {
   }
 }
 
+els.btnFimJogoOk?.addEventListener("click", () => {
+  esconderPopupFimDeJogo();
+});
+
 els.btnGolOk?.addEventListener("click", async () => {
   els.golOverlay.hidden = true;
   sincronizarUiPausa();
   substituirLesionadosTitularCpu();
+  if (tentarEncerrarPartidaPorMinimoJogadoresEmCampo()) return;
   if (temTitularLesionadoHumano()) {
     bloquearPorLesaoHumanoAposLance();
     return;
@@ -1749,6 +3872,67 @@ async function continuarRodadaAposLance() {
     estadoGlobal.minuto = fim;
     els.relogio.textContent = formatMinuto(fim);
     els.etapaTempo.textContent = "Fim";
+    const fimReg = minutoFimSegundoTempoRegulamentar();
+    const empate = golsJogador === golsCpu;
+    if (
+      tipoModoJogo === "copa" &&
+      copaPartidaKnockout &&
+      !copaProrrogaAtiva &&
+      fim === fimReg &&
+      empate
+    ) {
+      tempoAnimando = false;
+      await aguardarInicioProrrogacao();
+      iniciarProrrogacaoAposClique();
+      appendLog("1.º tempo da prorrogação (15 min).");
+      const saltoP = proximoIntervaloMinutos();
+      const teto = minutoFimJogo();
+      await animarTempoJogo(fim, Math.min(fim + saltoP, teto));
+      estadoGlobal.minuto = Math.min(fim + saltoP, teto);
+      dispararLance();
+      return;
+    }
+    if (
+      tipoModoJogo === "copa" &&
+      copaPartidaKnockout &&
+      copaProrrogaAtiva &&
+      copaEtExtra === 1 &&
+      fim === minutoFimPrimeiroTempoProrrogacao() &&
+      empate
+    ) {
+      tempoAnimando = false;
+      await aguardarInicioEt2();
+      copaEtExtra = 2;
+      copaEt2Liberado = true;
+      aguardandoInicioEt2 = false;
+      esconderUiIntervalo();
+      els.relogio.textContent = formatMinuto(fim);
+      els.etapaTempo.textContent = labelEtapa(fim);
+      appendLog("2.º tempo da prorrogação (15 min).");
+      const saltoEt2 = proximoIntervaloMinutos();
+      const tetoEt2 = minutoFimJogo();
+      await animarTempoJogo(fim, Math.min(fim + saltoEt2, tetoEt2));
+      estadoGlobal.minuto = Math.min(fim + saltoEt2, tetoEt2);
+      dispararLance();
+      return;
+    }
+    if (
+      tipoModoJogo === "copa" &&
+      copaPartidaKnockout &&
+      copaProrrogaAtiva &&
+      copaEtExtra === 2 &&
+      empate
+    ) {
+      tempoAnimando = false;
+      try {
+        const humGanhou = await executarDisputaPenaltis();
+        await tratarFimPartidaCopaKnockout(humGanhou);
+      } catch (e) {
+        console.error(e);
+        encerrarPartida();
+      }
+      return;
+    }
     encerrarPartida();
     return;
   }
@@ -1789,7 +3973,304 @@ function dispararLance() {
   });
 }
 
+function resetFlagsProrrogacaoCopa() {
+  copaProrrogaAtiva = false;
+  copaEtExtra = 0;
+  copaEt2Liberado = false;
+  acrescimosET1 = 0;
+  acrescimosET2 = 0;
+  aguardandoInicioProrrogacao = false;
+  aguardandoInicioEt2 = false;
+  resolveInicioProrrogacao = null;
+  resolveInicioEt2 = null;
+}
+
+function forcaSelecaoId(id) {
+  const s = SELECOES.find((x) => x.id === id);
+  return s ? forcaMediaSelecao(s) : 50;
+}
+
+function processarFimDeJogoCopa() {
+  if (!copaEstado) return;
+  const gh = golsJogador;
+  const gc = golsCpu;
+  resetFlagsProrrogacaoCopa();
+  copaPartidaKnockout = false;
+  const j = metaSelecaoJogador?.sigla ?? "";
+  const c = metaSelecaoCpu?.sigla ?? "";
+  appendLog(`<strong>Fim de jogo.</strong> ${j} ${gh} × ${gc} ${c}`);
+
+  aplicarEfeitosPosJogoCopaLesaoDisciplina();
+
+  if (copaEstado.faseCopa === "grupos") {
+    const adv = copaEstado.adversariosGrupo[copaEstado.idxAdversarioGrupo];
+    registrarResultadoGrupoCopa(copaEstado, copaEstado.playerTeamId, adv, gh, gc);
+    copaEstado.idxAdversarioGrupo++;
+    const nr = copaEstado.idxAdversarioGrupo;
+    const partidasSim =
+      nr >= 1 && nr <= 3 ? simularRodadaGruposCopa(/** @type {1 | 2 | 3} */ (nr)) : [];
+    const listaG = copaEstado.partidasPorGrupo[copaEstado.grupoPlayer];
+    const pj = listaG.find(
+      (x) =>
+        (x.home === copaEstado.playerTeamId && x.away === adv) ||
+        (x.home === adv && x.away === copaEstado.playerTeamId),
+    );
+    const jogoHumano =
+      pj && pj.gh >= 0
+        ? {
+            L: copaEstado.grupoPlayer,
+            homeId: pj.home,
+            awayId: pj.away,
+            gh: pj.gh,
+            ga: pj.ga,
+          }
+        : null;
+    const todas = jogoHumano ? [jogoHumano, ...partidasSim] : [...partidasSim];
+    copaEstado.ultimaRodadaResultados =
+      nr >= 1 && nr <= 3 ? { numero: nr, partidas: todas } : undefined;
+    agendarTransicaoCopaAposContinuar(() => mostrarTelaCopaHubAposJogoGrupo());
+    return;
+  }
+
+  const jogo = copaEstado.jogosEliminatorios[copaEstado.idxJogoEliminatorio];
+  if (!jogo) return;
+  aplicarPlacarJogoEliminatorioAtualKnockout(null);
+  const humanVence = gh > gc;
+  const faseAntesEliminacao = copaEstado.faseCopa;
+  if (!humanVence) {
+    jogo.winnerId =
+      jogo.homeId === copaEstado.playerTeamId ? jogo.awayId : jogo.homeId;
+    copaEstado.faseCopa = "eliminado";
+    completarEliminatoriaAposEliminacaoHumana(
+      /** @type {"oitavas"|"quartas"|"semi"|"final"} */ (faseAntesEliminacao),
+    );
+    agendarTransicaoCopaAposContinuar(() => mostrarTelaCopaEliminado());
+    return;
+  }
+  jogo.winnerId = copaEstado.playerTeamId;
+  avancarEliminatoriaCopa(true);
+}
+
+function registrarResultadoGrupoCopa(est, humanId, advId, gHuman, gAdv) {
+  const lista = est.partidasPorGrupo[est.grupoPlayer];
+  const p = lista.find(
+    (x) =>
+      (x.home === humanId && x.away === advId) ||
+      (x.home === advId && x.away === humanId),
+  );
+  if (!p) return;
+  if (p.home === humanId) {
+    aplicarResultadoNaLista(lista, humanId, advId, gHuman, gAdv);
+  } else {
+    aplicarResultadoNaLista(lista, advId, humanId, gAdv, gHuman);
+  }
+}
+
+/**
+ * Grava placar do jogo eliminatório que acabou de ser disputado pelo humano (gols e, se houver, pênaltis).
+ * @param {null | { jogador: number, cpu: number }} placarPenaltis
+ */
+function aplicarPlacarJogoEliminatorioAtualKnockout(placarPenaltis) {
+  if (!copaEstado) return;
+  const f = copaEstado.faseCopa;
+  if (f !== "oitavas" && f !== "quartas" && f !== "semi" && f !== "final") return;
+  const jogo = copaEstado.jogosEliminatorios[copaEstado.idxJogoEliminatorio];
+  if (!jogo) return;
+  const pid = copaEstado.playerTeamId;
+  const emCasa = jogo.homeId === pid;
+  jogo.gh = emCasa ? golsJogador : golsCpu;
+  jogo.ga = emCasa ? golsCpu : golsJogador;
+  if (placarPenaltis) {
+    jogo.penGh = emCasa ? placarPenaltis.jogador : placarPenaltis.cpu;
+    jogo.penGa = emCasa ? placarPenaltis.cpu : placarPenaltis.jogador;
+  } else {
+    delete jogo.penGh;
+    delete jogo.penGa;
+  }
+}
+
+/**
+ * Simula todas as fases restantes da Copa (CPU×CPU) após o jogador ser eliminado e define `campeaoId`.
+ * @param {"oitavas"|"quartas"|"semi"|"final"} faseInicial
+ */
+function completarEliminatoriaAposEliminacaoHumana(faseInicial) {
+  if (!copaEstado?.eliminatoria) return;
+  let fase = faseInicial;
+  for (let passo = 0; passo < 24; passo++) {
+    simularJogosCpuSemHumanoNaRodada();
+    const lista = copaEstado.jogosEliminatorios;
+    if (!lista?.length) break;
+    if (lista.some((j) => !j.winnerId)) break;
+
+    if (fase === "final") {
+      copaEstado.campeaoId = lista[0].winnerId;
+      return;
+    }
+
+    const v = lista.map((x) => x.winnerId).filter(Boolean);
+    if (fase === "oitavas" && v.length === 8) {
+      const qua = montarQuartasFifa(/** @type {string[]} */ (v));
+      copaEstado.eliminatoria.quartas = qua;
+      copaEstado.jogosEliminatorios = qua;
+      fase = "quartas";
+      continue;
+    }
+    if (fase === "quartas" && v.length === 4) {
+      const semi = montarSemiFifa(/** @type {string[]} */ (v));
+      copaEstado.eliminatoria.semi = semi;
+      copaEstado.jogosEliminatorios = semi;
+      fase = "semi";
+      continue;
+    }
+    if (fase === "semi" && v.length === 2) {
+      const fin = montarFinal(/** @type {string} */ (v[0]), /** @type {string} */ (v[1]));
+      copaEstado.eliminatoria.final = fin;
+      copaEstado.jogosEliminatorios = fin;
+      fase = "final";
+      continue;
+    }
+    break;
+  }
+}
+
+function simularJogoCpuVsCpu(
+  /** @type {{ homeId: string, awayId: string, winnerId?: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }} */ jogo,
+) {
+  if (!copaEstado) return jogo.homeId;
+  const { homeId, awayId } = jogo;
+  const { gh, ga } = simularPlacar(forcaSelecaoId(homeId), forcaSelecaoId(awayId), copaEstado.rng);
+  const g = gh === ga ? (copaEstado.rng() < 0.5 ? { gh: gh + 1, ga } : { gh, ga: ga + 1 }) : { gh, ga };
+  jogo.gh = g.gh;
+  jogo.ga = g.ga;
+  delete jogo.penGh;
+  delete jogo.penGa;
+  registrarGolsPartidaSimuladaCopa(homeId, awayId, g.gh, g.ga, copaEstado.rng);
+  return g.gh > g.ga ? homeId : awayId;
+}
+
+/**
+ * @param {boolean} [adiarIrParaHub] se true (fim de jogo em campo), só mostra o hub após "Continuar"
+ */
+function avancarEliminatoriaCopa(adiarIrParaHub = false) {
+  if (!copaEstado) return;
+  const ir = (/** @type {() => void} */ fn) => {
+    if (adiarIrParaHub) agendarTransicaoCopaAposContinuar(fn);
+    else fn();
+  };
+  const fase = copaEstado.faseCopa;
+  const lista = copaEstado.jogosEliminatorios;
+
+  if (fase === "oitavas") {
+    const v = lista.map((x) => x.winnerId).filter(Boolean);
+    if (v.length !== 8) return;
+    const qua = montarQuartasFifa(v);
+    if (copaEstado.eliminatoria) copaEstado.eliminatoria.quartas = qua;
+    copaEstado.jogosEliminatorios = qua;
+    copaEstado.faseCopa = "quartas";
+    simularJogosCpuSemHumanoNaRodada();
+    copaEstado.idxJogoEliminatorio = copaEstado.jogosEliminatorios.findIndex(
+      (j) => j.homeId === copaEstado.playerTeamId || j.awayId === copaEstado.playerTeamId,
+    );
+    ir(() => mostrarTelaCopaHubMataMata());
+    return;
+  }
+
+  if (fase === "quartas") {
+    const v = lista.map((x) => x.winnerId).filter(Boolean);
+    if (v.length !== 4) return;
+    const semi = montarSemiFifa(v);
+    if (copaEstado.eliminatoria) copaEstado.eliminatoria.semi = semi;
+    copaEstado.jogosEliminatorios = semi;
+    copaEstado.faseCopa = "semi";
+    simularJogosCpuSemHumanoNaRodada();
+    copaEstado.idxJogoEliminatorio = copaEstado.jogosEliminatorios.findIndex(
+      (j) => j.homeId === copaEstado.playerTeamId || j.awayId === copaEstado.playerTeamId,
+    );
+    ir(() => mostrarTelaCopaHubMataMata());
+    return;
+  }
+
+  if (fase === "semi") {
+    const v = lista.map((x) => x.winnerId).filter(Boolean);
+    if (v.length !== 2) return;
+    const fin = montarFinal(v[0], v[1]);
+    if (copaEstado.eliminatoria) copaEstado.eliminatoria.final = fin;
+    copaEstado.jogosEliminatorios = fin;
+    copaEstado.faseCopa = "final";
+    copaEstado.idxJogoEliminatorio = 0;
+    ir(() => mostrarTelaCopaHubMataMata());
+    return;
+  }
+
+  if (fase === "final") {
+    copaEstado.campeaoId = copaEstado.playerTeamId;
+    copaEstado.faseCopa = "campeao";
+    ir(() => mostrarTelaCopaCampeao());
+  }
+}
+
+function simularJogosCpuSemHumanoNaRodada() {
+  if (!copaEstado) return;
+  const pid = copaEstado.playerTeamId;
+  for (const j of copaEstado.jogosEliminatorios) {
+    if (j.winnerId) continue;
+    if (j.homeId === pid || j.awayId === pid) continue;
+    j.winnerId = simularJogoCpuVsCpu(j);
+  }
+}
+
+async function tratarFimPartidaCopaKnockout(humGanhouPenaltis) {
+  if (!copaEstado) return;
+  const jogo = copaEstado.jogosEliminatorios[copaEstado.idxJogoEliminatorio];
+  partidaAtiva = false;
+  jogoPausado = false;
+  precisaResolverLesaoHumano = false;
+  aguardandoPausaPorExpulsaoHumana = false;
+  fluxoForaDePartida = "pos_fim";
+  els.pausePanel.hidden = true;
+  aguardandoSegundoTempo = false;
+  resolveSegundoTempo = null;
+  esconderUiIntervalo();
+  const fim = minutoFimJogo();
+  estadoGlobal.minuto = Math.min(estadoGlobal.minuto, fim);
+  els.relogio.textContent = formatMinuto(estadoGlobal.minuto);
+  els.etapaTempo.textContent = "Fim";
+  resetFlagsProrrogacaoCopa();
+  copaPartidaKnockout = false;
+  appendLog(
+    humGanhouPenaltis
+      ? "<strong>Pênaltis:</strong> você vence a disputa."
+      : "<strong>Pênaltis:</strong> o adversário converteu melhor.",
+  );
+  aplicarEfeitosPosJogoCopaLesaoDisciplina();
+  const penSnap = placarPenaltisPosDecisao
+    ? { jogador: placarPenaltisPosDecisao.jogador, cpu: placarPenaltisPosDecisao.cpu }
+    : null;
+  aplicarPlacarJogoEliminatorioAtualKnockout(penSnap);
+  jogo.winnerId = humGanhouPenaltis
+    ? copaEstado.playerTeamId
+    : jogo.homeId === copaEstado.playerTeamId
+      ? jogo.awayId
+      : jogo.homeId;
+  if (els.copaPenaltisOverlay) els.copaPenaltisOverlay.hidden = true;
+  esconderHudDisputaPenaltis();
+  const faseAntesEliminacao = copaEstado.faseCopa;
+  if (humGanhouPenaltis) {
+    avancarEliminatoriaCopa(true);
+  } else {
+    copaEstado.faseCopa = "eliminado";
+    completarEliminatoriaAposEliminacaoHumana(
+      /** @type {"oitavas"|"quartas"|"semi"|"final"} */ (faseAntesEliminacao),
+    );
+    agendarTransicaoCopaAposContinuar(() => mostrarTelaCopaEliminado());
+  }
+  sincronizarUiPausa();
+  atualizarBtnCentroRodada();
+  mostrarPopupFimDeJogo();
+}
+
 function encerrarPartida() {
+  placarPenaltisPosDecisao = null;
   partidaAtiva = false;
   jogoPausado = false;
   precisaResolverLesaoHumano = false;
@@ -1804,12 +4285,15 @@ function encerrarPartida() {
   els.relogio.textContent = formatMinuto(estadoGlobal.minuto);
   els.etapaTempo.textContent = "Fim";
   sincronizarUiPausa();
+  if (tipoModoJogo === "copa" && copaEstado) {
+    processarFimDeJogoCopa();
+    atualizarBtnCentroRodada();
+    mostrarPopupFimDeJogo();
+    return;
+  }
   atualizarBtnCentroRodada();
-  const j = metaSelecaoJogador?.sigla ?? "";
-  const c = metaSelecaoCpu?.sigla ?? "";
-  const placarTxt =
-    j && c ? `${j} ${golsJogador} × ${golsCpu} ${c}` : `${golsJogador} × ${golsCpu}`;
-  appendLog(`<strong>Fim de jogo.</strong> ${placarTxt}`);
+  appendLog(`<strong>Fim de jogo.</strong> ${textoPlacarFinalPartida()}`);
+  mostrarPopupFimDeJogo();
 }
 
 async function iniciarPartida() {
@@ -1825,19 +4309,34 @@ async function iniciarPartida() {
   }
   golsJogador = 0;
   golsCpu = 0;
+  placarPenaltisPosDecisao = null;
+  golsPorJogadorNaPartida.clear();
+  esconderPopupFimDeJogo();
   jogoPausado = false;
   precisaResolverLesaoHumano = false;
   aguardandoPausaPorExpulsaoHumana = false;
   els.pausePanel.hidden = true;
   substituicoesUsadas = 0;
   substituicoesCpuUsadas = 0;
+  jogadoresSubstituidosForaIds.clear();
+  copaTransicaoHubPendente = null;
   segundoTempoAutorizado = false;
   aguardandoSegundoTempo = false;
   resolveSegundoTempo = null;
   esconderUiIntervalo();
   acrescimosPrimeiroTempo = sortearAcrescimosTempo();
-  acrescimosSegundoTempo = sortearAcrescimosTempo();
+  acrescimosSegundoTempo = Math.max(1, sortearAcrescimosTempo());
+  resetFlagsProrrogacaoCopa();
   restaurarElencoParaNovaPartida();
+  if (tipoModoJogo === "copa" && copaEstado) {
+    const lh = copaEstado.lesoesHumano ?? {};
+    copaEstado._snapCopaInicioPartida = {
+      jogosSuspensao: { ...(copaEstado.jogosSuspensao ?? {}) },
+      lesoesHumano: Object.fromEntries(
+        Object.keys(lh).map((k) => [k, { partidasFora: lh[k].partidasFora }]),
+      ),
+    };
+  }
   snapshotStatsInicioPartida();
   atualizarPlacar();
   els.log.innerHTML = "";

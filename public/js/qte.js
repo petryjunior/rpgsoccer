@@ -5,7 +5,8 @@
  * Este arquivo só define quanto tempo o jogador tem para acertar **cada** letra,
  * em função do `ratio` do duelo (vantagem estatística). Outros fatores de “dificuldade”
  * ficam em `main.js`: intervalo aleatório da contagem regressiva (`QTE_COUNTDOWN_MS_MIN` /
- * `QTE_COUNTDOWN_MS_MAX`) e quantas letras seguidas no lance de goleiro (3 no chute, 2 na defesa).
+ * `QTE_COUNTDOWN_MS_MAX`) e quantas letras seguidas no lance de goleiro (pênalti: 1 no chute, 3 na defesa;
+ * lance normal: 3 no chute, 2 na defesa).
  *
  * Fórmula: `tempoLimiteMs = BASE_MS + r * FAIXA_MS`
  *
@@ -13,7 +14,7 @@
  *   Aumentar → mesmo no pior caso o jogador tem mais tempo (QTE mais fácil no limite inferior).
  *   Diminuir → piso mais cruel (mais difícil quando está em desvantagem).
  *
- * - **FAIXA_MS** (hoje 800): quanto tempo *extra* você ganha quando o duelo favorece você (`r` no teto).
+ * - **FAIXA_MS** (hoje 900): quanto tempo *extra* você ganha quando o duelo favorece você (`r` no teto).
  *   O tempo máximo possível é BASE_MS + FAIXA_MS (com `r` máximo após o clamp).
  *   Aumentar → quem está em vantagem no duelo fica com janela bem maior.
  *   Diminuir → a vantagem no duelo importa menos; todos ficam com tempos mais “apertados”.
@@ -35,6 +36,6 @@
 export function parametrosLetra(ratio) {
   const r = Math.min(0.93, Math.max(0.07, ratio));
   const letra = String.fromCharCode(65 + Math.floor(Math.random() * 26));
-  const tempoLimiteMs = 350 + r * 800;
+  const tempoLimiteMs = 300 + r * 900;
   return { letra, tempoLimiteMs, ratioUsado: r };
 }

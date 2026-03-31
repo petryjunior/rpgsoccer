@@ -298,6 +298,9 @@ export function validarElenco(titulares, reservas) {
   if (count(t, POSITIONS.GOLEIRO) < 1) {
     return { ok: false, msg: "Titulares: pelo menos 1 goleiro." };
   }
+  if (count(t, POSITIONS.GOLEIRO) > 1) {
+    return { ok: false, msg: "Titulares: só pode haver um goleiro em campo." };
+  }
   if (count(t, POSITIONS.ZAGUEIRO) < 3) {
     return { ok: false, msg: "Titulares: pelo menos 3 zagueiros." };
   }

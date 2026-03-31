@@ -6,6 +6,7 @@ name: Deploy GitHub Pages
 on:
   push:
     branches: [main, expansion]
+  workflow_dispatch:
 
 permissions:
   contents: write
