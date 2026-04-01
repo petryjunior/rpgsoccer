@@ -47,6 +47,7 @@ import {
   simularPlacar,
   simularRodadaGruposExcetoJogoHumano,
   sortearGrupos,
+  sortear32IdsCopa,
 } from "./world-cup.js";
 import {
   carregarEstadoDoSave,
@@ -673,6 +674,16 @@ let idSelecaoCpuEscolhida = null;
 let amistosoCardsMontados = false;
 
 let partidaAtiva = false;
+/** Só durante disputa de pênaltis da Copa: libera awaits internos ao voltar ao menu. */
+let disputaPenaltisInterrompidaPorMenu = false;
+/** @type {null | (() => void)} */
+let liberarEsperaQtePenaltis = null;
+/** @type {null | (() => void)} */
+let resolverPopupPenaltisPendente = null;
+/** @type {null | (() => void)} */
+let cancelarDisputaPenaltisAtual = null;
+/** @type {null | ((value: unknown) => void)} */
+let resolverEscolhaCobradorPenaltis = null;
 /**
  * Fora de partida: primeira entrada no jogo | logo após fim (Nova partida) | ajustando elenco antes de reiniciar.
  * @type {"pre_jogo" | "pos_fim" | "nova_prep"}
@@ -1153,7 +1164,7 @@ function atualizarBtnCentroRodada() {
     el.disabled = false;
     el.textContent = "Iniciar prorrogação";
     el.classList.add("pri");
-    if (vol) vol.hidden = true;
+    if (vol) vol.hidden = false;
     return;
   }
   if (partidaAtiva && aguardandoInicioEt2 && resolveInicioEt2) {
@@ -1161,7 +1172,7 @@ function atualizarBtnCentroRodada() {
     el.disabled = false;
     el.textContent = "Começar 2.º tempo da prorrogação";
     el.classList.add("pri");
-    if (vol) vol.hidden = true;
+    if (vol) vol.hidden = false;
     return;
   }
   if (!partidaAtiva) {
@@ -1181,7 +1192,7 @@ function atualizarBtnCentroRodada() {
     }
     return;
   }
-  if (vol) vol.hidden = true;
+  if (vol) vol.hidden = false;
   if (aguardandoSegundoTempo && resolveSegundoTempo) {
     el.hidden = false;
     el.disabled = false;
@@ -1645,6 +1656,10 @@ async function animarTempoJogo(de, ate) {
     if (m === fim1 && alvo > fim1 && !segundoTempoAutorizado) {
       tempoAnimando = false;
       await aguardarSegundoTempo();
+      if (!partidaAtiva) {
+        tempoAnimando = false;
+        return;
+      }
       segundoTempoAutorizado = true;
       aguardandoSegundoTempo = false;
       tempoAnimando = true;
@@ -1661,6 +1676,10 @@ async function animarTempoJogo(de, ate) {
     ) {
       tempoAnimando = false;
       await aguardarInicioEt2();
+      if (!partidaAtiva) {
+        tempoAnimando = false;
+        return;
+      }
       copaEtExtra = 2;
       copaEt2Liberado = true;
       aguardandoInicioEt2 = false;
@@ -1675,6 +1694,10 @@ async function animarTempoJogo(de, ate) {
     els.relogio.textContent = formatMinuto(m);
     els.etapaTempo.textContent = labelEtapa(m);
     await sleepRespeitandoPausa(RELOGIO_MS_POR_MINUTO);
+    if (!partidaAtiva) {
+      tempoAnimando = false;
+      return;
+    }
   }
 
   tempoAnimando = false;
@@ -2623,15 +2646,8 @@ function mostrarTelaCopaHubMataMata() {
   if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = true;
   if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = true;
   if (els.copaHubMsg) {
-    els.copaHubMsg.hidden = false;
-    const f = copaEstado?.faseCopa ?? "";
-    const nomes = {
-      oitavas: "Oitavas de final",
-      quartas: "Quartas de final",
-      semi: "Semifinal",
-      final: "Final",
-    };
-    els.copaHubMsg.textContent = `Fase: ${nomes[f] ?? f}. Pronto para o próximo jogo.`;
+    els.copaHubMsg.hidden = true;
+    els.copaHubMsg.textContent = "";
   }
   if (els.btnCopaProximoJogo) {
     els.btnCopaProximoJogo.hidden = false;
@@ -2868,8 +2884,8 @@ function iniciarCopaComSorteio() {
   if (!idSelecaoCopaEscolhida) return;
   const seed = Date.now() % 2147483647;
   const rng = criarRng(seed);
-  const ids = SELECOES.map((s) => s.id);
-  const grupos = sortearGrupos(ids, rng);
+  const ids32 = sortear32IdsCopa(SELECOES, idSelecaoCopaEscolhida, rng);
+  const grupos = sortearGrupos(ids32, rng);
   /** @type {Record<string, import('./world-cup.js').ResultadoPartida[]>} */
   const partidasPorGrupo = {};
   for (const L of Object.keys(grupos)) {
@@ -3033,6 +3049,39 @@ function executarDisputaPenaltis() {
       return;
     }
 
+    disputaPenaltisInterrompidaPorMenu = false;
+    const abortarDisputaPorMenu = () => {
+      disputaPenaltisInterrompidaPorMenu = true;
+      if (resolverPopupPenaltisPendente) {
+        const r = resolverPopupPenaltisPendente;
+        resolverPopupPenaltisPendente = null;
+        r();
+      }
+      if (liberarEsperaQtePenaltis) {
+        const lib = liberarEsperaQtePenaltis;
+        liberarEsperaQtePenaltis = null;
+        lib();
+      }
+      if (resolverEscolhaCobradorPenaltis) {
+        const r = resolverEscolhaCobradorPenaltis;
+        resolverEscolhaCobradorPenaltis = null;
+        r(null);
+      }
+      cancelarDisputaPenaltisAtual = null;
+      if (els.copaPenaltisConfirmar) els.copaPenaltisConfirmar.onclick = null;
+      esconderHudDisputaPenaltis();
+      if (els.copaPenaltisOverlay) els.copaPenaltisOverlay.hidden = true;
+      if (els.penaltisResultadoOverlay) els.penaltisResultadoOverlay.hidden = true;
+      pararQte();
+      if (cancelarInputQte) cancelarInputQte();
+      if (els.dueloOverlay) {
+        els.dueloOverlay.hidden = true;
+        mostrarFaseModal("reset");
+      }
+      reject(new Error("ABANDONO_MENU"));
+    };
+    cancelarDisputaPenaltisAtual = abortarDisputaPorMenu;
+
     placarPenaltisPosDecisao = null;
     els.copaPenaltisOverlay.hidden = false;
     els.copaPenaltisTitulo.textContent = "Disputa de pênaltis";
@@ -3070,10 +3119,15 @@ function executarDisputaPenaltis() {
 
     function escolherUmJogador(restantes) {
       return new Promise((resSel) => {
+        resolverEscolhaCobradorPenaltis = (v) => {
+          resolverEscolhaCobradorPenaltis = null;
+          resSel(v);
+        };
         esconderHudDisputaPenaltis();
         if (els.copaPenaltisOverlay) els.copaPenaltisOverlay.hidden = false;
         els.copaPenaltisLista.replaceChildren();
         if (!restantes.length) {
+          resolverEscolhaCobradorPenaltis = null;
           if (els.copaPenaltisOverlay) els.copaPenaltisOverlay.hidden = true;
           resSel(null);
           return;
@@ -3086,7 +3140,11 @@ function executarDisputaPenaltis() {
           bt.addEventListener("click", () => {
             els.copaPenaltisEscolha.hidden = true;
             if (els.copaPenaltisOverlay) els.copaPenaltisOverlay.hidden = true;
-            resSel(j);
+            if (resolverEscolhaCobradorPenaltis) {
+              const r = resolverEscolhaCobradorPenaltis;
+              resolverEscolhaCobradorPenaltis = null;
+              r(j);
+            }
           });
           li.appendChild(bt);
           els.copaPenaltisLista.appendChild(li);
@@ -3134,6 +3192,15 @@ function executarDisputaPenaltis() {
 
       const qteChuteHumano = (atacante, textoAcao) =>
         new Promise((res) => {
+          liberarEsperaQtePenaltis = () => {
+            liberarEsperaQtePenaltis = null;
+            pararQte();
+            if (cancelarInputQte) cancelarInputQte();
+            els.dueloOverlay.hidden = true;
+            mostrarFaseModal("reset");
+            hudPenaltisModoQte(false);
+            res(false);
+          };
           pintarHudPlacarPen();
           pintarHudAcaoPen(textoAcao);
           const { ratio } = metricasDuelo(atacante, goleiroCpu, true);
@@ -3142,6 +3209,7 @@ function executarDisputaPenaltis() {
           mostrarFaseModal("qte");
           hudPenaltisModoQte(true);
           iniciarQteLetra(p, (o) => {
+            liberarEsperaQtePenaltis = null;
             els.dueloOverlay.hidden = true;
             mostrarFaseModal("reset");
             hudPenaltisModoQte(false);
@@ -3151,6 +3219,15 @@ function executarDisputaPenaltis() {
 
       const qteDefesaHumano = (atacanteCpu, textoAcao) =>
         new Promise((res) => {
+          liberarEsperaQtePenaltis = () => {
+            liberarEsperaQtePenaltis = null;
+            pararQte();
+            if (cancelarInputQte) cancelarInputQte();
+            els.dueloOverlay.hidden = true;
+            mostrarFaseModal("reset");
+            hudPenaltisModoQte(false);
+            res(false);
+          };
           pintarHudPlacarPen();
           pintarHudAcaoPen(textoAcao);
           const { ratio } = metricasDuelo(goleiroHum, atacanteCpu, false);
@@ -3159,6 +3236,7 @@ function executarDisputaPenaltis() {
           mostrarFaseModal("qte");
           hudPenaltisModoQte(true);
           iniciarQteLetraSequencia(seq, (o) => {
+            liberarEsperaQtePenaltis = null;
             els.dueloOverlay.hidden = true;
             mostrarFaseModal("reset");
             hudPenaltisModoQte(false);
@@ -3194,12 +3272,19 @@ function executarDisputaPenaltis() {
             els.btnPenaltisResultadoOk.removeEventListener("click", fechar);
             els.penaltisResultadoOverlay.hidden = true;
             sincronizarUiPausa();
+            resolverPopupPenaltisPendente = null;
             resolve();
           };
+          resolverPopupPenaltisPendente = fechar;
           els.btnPenaltisResultadoOk.addEventListener("click", fechar);
         });
 
       const registrarFimDisputaPenaltis = () => {
+        cancelarDisputaPenaltisAtual = null;
+        disputaPenaltisInterrompidaPorMenu = false;
+        liberarEsperaQtePenaltis = null;
+        resolverPopupPenaltisPendente = null;
+        resolverEscolhaCobradorPenaltis = null;
         esconderHudDisputaPenaltis();
         placarPenaltisPosDecisao = { jogador: h, cpu: c };
         resolve(h > c);
@@ -3212,6 +3297,7 @@ function executarDisputaPenaltis() {
         );
 
         for (let i = 0; i < 5; i++) {
+          if (disputaPenaltisInterrompidaPorMenu) return;
           const atHum = jogadorPorId(ordemHum[i]);
           const atCpu = ordemCpuArr[i];
           const r = `Rodada ${i + 1} de 5`;
@@ -3221,6 +3307,7 @@ function executarDisputaPenaltis() {
             atHum,
             `${r} — sua cobrança. ${nomeH} bate o pênalti: acerte 1 letra (A–Z) para converter.`,
           );
+          if (disputaPenaltisInterrompidaPorMenu) return;
           if (converteuHum) h++;
           atualizarPlacarPen();
           await popupResultadoPenalti(
@@ -3230,10 +3317,12 @@ function executarDisputaPenaltis() {
               : `${nomeH} errou a cobrança. ${subLinhaPlacarPen()}`,
             converteuHum ? "gol" : "nao",
           );
+          if (disputaPenaltisInterrompidaPorMenu) return;
           const defendeu = await qteDefesaHumano(
             atCpu,
             `${r} — sua defesa. O adversário cobra (${nomeC}): acerte 3 letras seguidas para evitar o gol.`,
           );
+          if (disputaPenaltisInterrompidaPorMenu) return;
           if (!defendeu) c++;
           atualizarPlacarPen();
           await popupResultadoPenalti(
@@ -3243,6 +3332,7 @@ function executarDisputaPenaltis() {
               : `${nomeC} converteu. ${subLinhaPlacarPen()}`,
             defendeu ? "gol" : "nao",
           );
+          if (disputaPenaltisInterrompidaPorMenu) return;
           const faltaHum = 5 - 1 - i;
           const faltaCpu = 5 - 1 - i;
           if (h > c + faltaCpu || c > h + faltaHum) {
@@ -3257,12 +3347,14 @@ function executarDisputaPenaltis() {
         }
 
         while (true) {
+          if (disputaPenaltisInterrompidaPorMenu) return;
           rondaMorteSubita++;
           els.copaPenaltisTexto.textContent =
             "Empate nas 5 cobranças. Escolha o próximo cobrador; o adversário também cobra uma.";
           els.copaPenaltisEscolha.hidden = false;
           const restH = candidatosHum.filter((j) => !usadosHum.has(j.id));
           const esc = await escolherUmJogador(restH);
+          if (disputaPenaltisInterrompidaPorMenu) return;
           if (!esc) {
             registrarFimDisputaPenaltis();
             return;
@@ -3281,6 +3373,7 @@ function executarDisputaPenaltis() {
             esc,
             `${rm} — sua cobrança. ${ne} bate o pênalti: 1 letra para converter.`,
           );
+          if (disputaPenaltisInterrompidaPorMenu) return;
           if (convHumMs) h++;
           atualizarPlacarPen();
           await popupResultadoPenalti(
@@ -3290,10 +3383,12 @@ function executarDisputaPenaltis() {
               : `${ne} errou a cobrança. ${subLinhaPlacarPen()}`,
             convHumMs ? "gol" : "nao",
           );
+          if (disputaPenaltisInterrompidaPorMenu) return;
           const defMs = await qteDefesaHumano(
             cpuExtra,
             `${rm} — sua defesa. O adversário cobra (${nce}): 3 letras seguidas para defender.`,
           );
+          if (disputaPenaltisInterrompidaPorMenu) return;
           if (!defMs) c++;
           atualizarPlacarPen();
           await popupResultadoPenalti(
@@ -3303,6 +3398,7 @@ function executarDisputaPenaltis() {
               : `${nce} converteu. ${subLinhaPlacarPen()}`,
             defMs ? "gol" : "nao",
           );
+          if (disputaPenaltisInterrompidaPorMenu) return;
           if (h !== c) {
             registrarFimDisputaPenaltis();
             return;
@@ -3368,10 +3464,10 @@ function entrarNoJogoComSelecoes() {
   }
 }
 
-window.__rpgsoccerEntrarJogo = entrarNoJogoComSelecoes;
+window.__qwertyFootballEntrarJogo = entrarNoJogoComSelecoes;
 
 /** Chamado pelo script inline em index.html ao abrir a tela Amistoso (monta cartões e limpa escolha). */
-window.__rpgsoccerAoAbrirAmistoso = function rpgsoccerAoAbrirAmistoso() {
+window.__qwertyFootballAoAbrirAmistoso = function qwertyFootballAoAbrirAmistoso() {
   if (!els.amistosoCardsJogador || !els.amistosoCardsCpu) return;
   if (!amistosoCardsMontados) {
     montarCardsAmistoso();
@@ -3381,7 +3477,7 @@ window.__rpgsoccerAoAbrirAmistoso = function rpgsoccerAoAbrirAmistoso() {
   window.scrollTo(0, 0);
 };
 
-window.__rpgsoccerAoAbrirCopa = function rpgsoccerAoAbrirCopa() {
+window.__qwertyFootballAoAbrirCopa = function qwertyFootballAoAbrirCopa() {
   tipoModoJogo = "amistoso";
   copaEstado = null;
   copaPartidaKnockout = false;
@@ -3395,19 +3491,19 @@ window.__rpgsoccerAoAbrirCopa = function rpgsoccerAoAbrirCopa() {
   window.scrollTo(0, 0);
 };
 
-window.__rpgsoccerAbrirTelaCarregarCopa = abrirTelaCarregarCopa;
+window.__qwertyFootballAbrirTelaCarregarCopa = abrirTelaCarregarCopa;
 
 (function sincronizarAmistosoSeJaVisivel() {
   const ami = document.getElementById("tela-amistoso");
   if (ami && !ami.hasAttribute("hidden") && !amistosoCardsMontados) {
-    window.__rpgsoccerAoAbrirAmistoso();
+    window.__qwertyFootballAoAbrirAmistoso();
   }
 })();
 
 (function sincronizarCopaSeJaVisivel() {
   const copa = document.getElementById("tela-copa");
   if (copa && !copa.hasAttribute("hidden") && !copaCardsMontados) {
-    window.__rpgsoccerAoAbrirCopa();
+    window.__qwertyFootballAoAbrirCopa();
   }
 })();
 
@@ -3496,8 +3592,51 @@ els.btnCentroRodada?.addEventListener("click", () => {
   }
 });
 
-function voltarAoMenuPrincipalDoJogo() {
-  if (partidaAtiva) return;
+function liberarPromessasPendentesDurantePartida() {
+  if (resolveSegundoTempo) {
+    const r = resolveSegundoTempo;
+    resolveSegundoTempo = null;
+    r();
+  }
+  aguardandoSegundoTempo = false;
+  if (resolveInicioProrrogacao) {
+    const r = resolveInicioProrrogacao;
+    resolveInicioProrrogacao = null;
+    r();
+  }
+  aguardandoInicioProrrogacao = false;
+  if (resolveInicioEt2) {
+    const r = resolveInicioEt2;
+    resolveInicioEt2 = null;
+    r();
+  }
+  aguardandoInicioEt2 = false;
+}
+
+function abortarPartidaEVoltarAoMenu() {
+  partidaAtiva = false;
+  liberarPromessasPendentesDurantePartida();
+  if (cancelarDisputaPenaltisAtual) cancelarDisputaPenaltisAtual();
+  fecharModalLance();
+  if (els.golOverlay) els.golOverlay.hidden = true;
+  esconderPopupFimDeJogo();
+  if (els.penaltisResultadoOverlay) els.penaltisResultadoOverlay.hidden = true;
+  esconderHudDisputaPenaltis();
+  if (els.copaPenaltisOverlay) els.copaPenaltisOverlay.hidden = true;
+  if (els.copaPenaltisConfirmar) els.copaPenaltisConfirmar.onclick = null;
+  esconderUiIntervalo();
+  jogoPausado = false;
+  precisaResolverLesaoHumano = false;
+  aguardandoPausaPorExpulsaoHumana = false;
+  tempoAnimando = false;
+  disputaPenaltisInterrompidaPorMenu = false;
+  liberarEsperaQtePenaltis = null;
+  resolverPopupPenaltisPendente = null;
+  resolverEscolhaCobradorPenaltis = null;
+  aplicarVoltaMenuPrincipalJogo();
+}
+
+function aplicarVoltaMenuPrincipalJogo() {
   limparSelecaoSub();
   esconderPopupFimDeJogo();
   copaTransicaoHubPendente = null;
@@ -3529,7 +3668,20 @@ function voltarAoMenuPrincipalDoJogo() {
   sincronizarUiPausa();
 }
 
+function voltarAoMenuPrincipalDoJogo() {
+  if (partidaAtiva) return;
+  aplicarVoltaMenuPrincipalJogo();
+}
+
 els.btnVoltarMenuJogo?.addEventListener("click", () => {
+  if (partidaAtiva) {
+    const ok = window.confirm(
+      "Sair da partida agora? O progresso desta partida será perdido.",
+    );
+    if (!ok) return;
+    abortarPartidaEVoltarAoMenu();
+    return;
+  }
   voltarAoMenuPrincipalDoJogo();
 });
 
@@ -3809,7 +3961,8 @@ function iniciarQteGoleiro() {
       goleiro: ctx.goleiroDefesa,
     };
     const erraAposVencerGoleiro = (atacante) =>
-      Math.random() < chanceErrarFinalizacaoAposVencerGoleiro(atacante.ataque);
+      Math.random() <
+      chanceErrarFinalizacaoAposVencerGoleiro(atacante.ataque, penalti);
 
     let teveGol = false;
 
@@ -4024,6 +4177,7 @@ async function continuarRodadaAposLance() {
     if (de < fim) {
       await animarTempoJogo(de, fim);
     }
+    if (!partidaAtiva) return;
     estadoGlobal.minuto = fim;
     els.relogio.textContent = formatMinuto(fim);
     els.etapaTempo.textContent = "Fim";
@@ -4038,11 +4192,13 @@ async function continuarRodadaAposLance() {
     ) {
       tempoAnimando = false;
       await aguardarInicioProrrogacao();
+      if (!partidaAtiva) return;
       iniciarProrrogacaoAposClique();
       appendLog("1.º tempo da prorrogação (15 min).");
       const saltoP = proximoIntervaloMinutos();
       const teto = minutoFimJogo();
       await animarTempoJogo(fim, Math.min(fim + saltoP, teto));
+      if (!partidaAtiva) return;
       estadoGlobal.minuto = Math.min(fim + saltoP, teto);
       dispararLance();
       return;
@@ -4057,6 +4213,7 @@ async function continuarRodadaAposLance() {
     ) {
       tempoAnimando = false;
       await aguardarInicioEt2();
+      if (!partidaAtiva) return;
       copaEtExtra = 2;
       copaEt2Liberado = true;
       aguardandoInicioEt2 = false;
@@ -4067,6 +4224,7 @@ async function continuarRodadaAposLance() {
       const saltoEt2 = proximoIntervaloMinutos();
       const tetoEt2 = minutoFimJogo();
       await animarTempoJogo(fim, Math.min(fim + saltoEt2, tetoEt2));
+      if (!partidaAtiva) return;
       estadoGlobal.minuto = Math.min(fim + saltoEt2, tetoEt2);
       dispararLance();
       return;
@@ -4083,6 +4241,7 @@ async function continuarRodadaAposLance() {
         const humGanhou = await executarDisputaPenaltis();
         await tratarFimPartidaCopaKnockout(humGanhou);
       } catch (e) {
+        if (e && /** @type {Error} */ (e).message === "ABANDONO_MENU") return;
         console.error(e);
         encerrarPartida();
       }
@@ -4092,11 +4251,13 @@ async function continuarRodadaAposLance() {
     return;
   }
   await animarTempoJogo(de, prox);
+  if (!partidaAtiva) return;
   estadoGlobal.minuto = prox;
   dispararLance();
 }
 
 function dispararLance() {
+  if (!partidaAtiva) return;
   if (partidaAtiva && temTitularLesionadoHumano()) {
     jogoPausado = true;
     precisaResolverLesaoHumano = true;
@@ -4513,6 +4674,7 @@ async function iniciarPartida() {
 
   const primeiro = proximoIntervaloMinutos();
   await animarTempoJogo(0, primeiro);
+  if (!partidaAtiva) return;
   estadoGlobal.minuto = primeiro;
   dispararLance();
 }

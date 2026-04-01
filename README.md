@@ -1,9 +1,13 @@
-# rpgsoccer
+# QWERTY Football
 
-New project workspace. Replace this README when you define the stack and goals.
+Futebol com duelos por atributos e desafio de letra (QTE).
 
 ## Setup
 
 ```bash
 cd rpgsoccer
+npm install
+npm start
 ```
+
+Abra o endereço indicado no terminal (por exemplo `http://localhost:3000`).

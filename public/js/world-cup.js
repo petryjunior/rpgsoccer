@@ -47,6 +47,62 @@ export function criarRng(seed) {
 
 const GRUPOS_LETRAS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
+/** Soma (ataque+defesa) onde a curva de peso é ancorada; times abaixo ainda entram, mas raro. */
+const COPA_PESO_SOM_REF = 1280;
+/**
+ * Escala em “pontos de soma” por unidade de expoente. Valores maiores = sorteio mais uniforme;
+ * ~50 deixa seleções elite (Brasil, Alemanha, Espanha, etc.) com chance ~75% de vaga vs. pool atual.
+ */
+const COPA_PESO_ESCALA_EXP = 50;
+
+/**
+ * Peso para o sorteio das 32 vagas na Copa (maior = mais provável de entrar).
+ * Curva exponencial na soma ataque+defesa dos titulares: elite domina muito mais que no modelo linear.
+ * @param {{ titulares: { ataque: number, defesa: number }[] }} s
+ */
+export function pesoInscricaoCopa(s) {
+  let sum = 0;
+  for (const p of s.titulares) sum += p.ataque + p.defesa;
+  const x = (sum - COPA_PESO_SOM_REF) / COPA_PESO_ESCALA_EXP;
+  const clamped = Math.max(-8, Math.min(14, x));
+  return Math.exp(clamped);
+}
+
+/**
+ * Escolhe 32 seleções: a do jogador entra sempre; as outras 31 são sorteadas
+ * sem reposição com probabilidade proporcional a `pesoInscricaoCopa`.
+ * @param {{ id: string, titulares: { ataque: number, defesa: number }[] }[]} todasSelecoes
+ * @param {string} playerTeamId
+ * @param {() => number} rng
+ * @returns {string[]}
+ */
+export function sortear32IdsCopa(todasSelecoes, playerTeamId, rng) {
+  if (todasSelecoes.length < 32) {
+    throw new Error("Copa: são necessárias pelo menos 32 seleções no total.");
+  }
+  if (!todasSelecoes.some((s) => s.id === playerTeamId)) {
+    throw new Error("Copa: seleção do jogador não está no elenco mundial.");
+  }
+  /** @type {Set<string>} */
+  const ids = new Set([playerTeamId]);
+  while (ids.size < 32) {
+    const candidatas = todasSelecoes.filter((s) => !ids.has(s.id));
+    const pesos = candidatas.map((s) => pesoInscricaoCopa(s));
+    const total = pesos.reduce((a, b) => a + b, 0);
+    let r = rng() * total;
+    let pick = candidatas.length - 1;
+    for (let i = 0; i < candidatas.length; i++) {
+      r -= pesos[i];
+      if (r < 0) {
+        pick = i;
+        break;
+      }
+    }
+    ids.add(candidatas[pick].id);
+  }
+  return Array.from(ids);
+}
+
 /**
  * @param {string[]} ids32 exatamente 32 ids de seleção
  * @param {() => number} rng

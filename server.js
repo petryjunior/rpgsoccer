@@ -13,5 +13,5 @@ app.get("/", (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`RPG Soccer em http://localhost:${PORT}`);
+  console.log(`QWERTY Football em http://localhost:${PORT}`);
 });

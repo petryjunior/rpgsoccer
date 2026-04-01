@@ -222,21 +222,32 @@ export function criarJogadorFixo(nome, posicao, ataque, defesa) {
   };
 }
 
+/** Formações titulares válidas: 1 GOL + z+m+a = 10, z∈[3,5], m∈[2,5], a∈[1,4]. */
+const TITULAR_FORMACOES_VALIDAS = (() => {
+  /** @type {{ z: number, m: number, a: number }[]} */
+  const out = [];
+  for (let z = 3; z <= 5; z++) {
+    for (let m = 2; m <= 5; m++) {
+      const a = 10 - z - m;
+      if (a >= 1 && a <= 4) out.push({ z, m, a });
+    }
+  }
+  return out;
+})();
+
 /**
- * Monta 11 titulares: mínimo 1 GOL, 3 ZAG, 2 MEI, 1 ATA; demais sorteados entre linha de campo.
+ * Monta 11 titulares: 1 goleiro + uma formação aleatória válida (3–5 zagueiros, 2–5 meias, 1–4 atacantes).
  * @returns {ReturnType<typeof criarJogador>[]}
  */
 function montarTitulares() {
-  const titulares = [];
-  titulares.push(criarJogador(POSITIONS.GOLEIRO));
-  for (let i = 0; i < 3; i++) titulares.push(criarJogador(POSITIONS.ZAGUEIRO));
-  for (let i = 0; i < 2; i++) titulares.push(criarJogador(POSITIONS.MEIA));
-  titulares.push(criarJogador(POSITIONS.ATACANTE));
-
-  const linha = [POSITIONS.ZAGUEIRO, POSITIONS.MEIA, POSITIONS.ATACANTE];
-  while (titulares.length < 11) {
-    titulares.push(criarJogador(pick(linha)));
-  }
+  const f =
+    TITULAR_FORMACOES_VALIDAS[
+      Math.floor(Math.random() * TITULAR_FORMACOES_VALIDAS.length)
+    ];
+  const titulares = [criarJogador(POSITIONS.GOLEIRO)];
+  for (let i = 0; i < f.z; i++) titulares.push(criarJogador(POSITIONS.ZAGUEIRO));
+  for (let i = 0; i < f.m; i++) titulares.push(criarJogador(POSITIONS.MEIA));
+  for (let i = 0; i < f.a; i++) titulares.push(criarJogador(POSITIONS.ATACANTE));
   return shuffle(titulares);
 }
 
@@ -301,14 +312,26 @@ export function validarElenco(titulares, reservas) {
   if (count(t, POSITIONS.GOLEIRO) > 1) {
     return { ok: false, msg: "Titulares: só pode haver um goleiro em campo." };
   }
-  if (count(t, POSITIONS.ZAGUEIRO) < 3) {
+  const nz = count(t, POSITIONS.ZAGUEIRO);
+  const nm = count(t, POSITIONS.MEIA);
+  const na = count(t, POSITIONS.ATACANTE);
+  if (nz < 3) {
     return { ok: false, msg: "Titulares: pelo menos 3 zagueiros." };
   }
-  if (count(t, POSITIONS.MEIA) < 2) {
+  if (nz > 5) {
+    return { ok: false, msg: "Titulares: no máximo 5 zagueiros." };
+  }
+  if (nm < 2) {
     return { ok: false, msg: "Titulares: pelo menos 2 meias." };
   }
-  if (count(t, POSITIONS.ATACANTE) < 1) {
+  if (nm > 5) {
+    return { ok: false, msg: "Titulares: no máximo 5 meias." };
+  }
+  if (na < 1) {
     return { ok: false, msg: "Titulares: pelo menos 1 atacante." };
+  }
+  if (na > 4) {
+    return { ok: false, msg: "Titulares: no máximo 4 atacantes." };
   }
   for (const pos of Object.values(POSITIONS)) {
     if (count(r, pos) < 1) {

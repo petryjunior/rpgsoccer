@@ -1,8 +1,8 @@
 {
-  "name": "rpgsoccer",
+  "name": "qwerty-football",
   "version": "0.1.0",
   "private": true,
-  "description": "RPG Soccer — futebol com duelos por atributos",
+  "description": "QWERTY Football — futebol com duelos por atributos e QTE por letra",
   "type": "module",
   "scripts": {
     "start": "node server.js",

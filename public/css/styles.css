@@ -736,7 +736,7 @@ body {
 }
 
 /*
- * Fase QTE (e qte_campo com intro + QTE): encolher título, faixa RPG e painel da letra
+ * Fase QTE (e qte_campo com intro + QTE): encolher título, faixa de duelo e painel da letra
  * para caber na altura útil sem barra de rolagem no modal.
  */
 .modal-duelo:has(#fase-qte:not([hidden])) {

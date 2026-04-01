@@ -4,6 +4,7 @@
 
 import { criarRng } from "./world-cup.js";
 
+/** Mantém o prefixo legado para não invalidar saves já gravados no navegador. */
 const STORAGE_KEY = "rpgsoccer-copa-saves-v1";
 const FORMAT_VERSION = 1;
 const MAX_SAVES = 14;

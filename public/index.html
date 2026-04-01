@@ -3,22 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>RPG Soccer</title>
+    <title>QWERTY Football</title>
     <link rel="stylesheet" href="css/styles.css" />
   </head>
   <body>
     <div id="tela-inicio" class="tela-menu tela-inicio">
       <div class="tela-menu-inner">
-        <h1 class="tela-inicio-marca">RPG Soccer</h1>
-        <p class="tela-menu-sub tela-inicio-tagline">
-          Letra no tempo, duelos com desgaste e substituições.
-        </p>
+        <h1 class="tela-inicio-marca">QWERTY Football</h1>
         <nav class="tela-menu-nav" aria-label="Modos de jogo">
           <button
             type="button"
             id="btn-menu-amistoso"
             class="btn pri menu-mod-btn"
-            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');if(i){i.style.display='none';i.setAttribute('hidden','');}if(c){c.style.display='none';c.setAttribute('hidden','');}if(a){a.style.removeProperty('display');a.removeAttribute('hidden');}var fn=window.__rpgsoccerAoAbrirAmistoso;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
+            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');if(i){i.style.display='none';i.setAttribute('hidden','');}if(c){c.style.display='none';c.setAttribute('hidden','');}if(a){a.style.removeProperty('display');a.removeAttribute('hidden');}var fn=window.__qwertyFootballAoAbrirAmistoso;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
           >
             Amistoso
           </button>
@@ -26,7 +23,7 @@
             type="button"
             id="btn-menu-copa"
             class="btn pri menu-mod-btn"
-            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');if(i){i.style.display='none';i.setAttribute('hidden','');}if(a){a.style.display='none';a.setAttribute('hidden','');}if(c){c.style.removeProperty('display');c.removeAttribute('hidden');}var fn=window.__rpgsoccerAoAbrirCopa;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
+            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');if(i){i.style.display='none';i.setAttribute('hidden','');}if(a){a.style.display='none';a.setAttribute('hidden','');}if(c){c.style.removeProperty('display');c.removeAttribute('hidden');}var fn=window.__qwertyFootballAoAbrirCopa;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
           >
             Copa do Mundo
           </button>
@@ -34,7 +31,7 @@
             type="button"
             id="btn-menu-carregar-copa"
             class="btn sec menu-mod-btn"
-            onclick="(function(){var fn=window.__rpgsoccerAbrirTelaCarregarCopa;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
+            onclick="(function(){var fn=window.__qwertyFootballAbrirTelaCarregarCopa;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
           >
             Carregar Copa
           </button>
@@ -77,7 +74,7 @@
             id="btn-confirmar-amistoso"
             class="btn pri"
             disabled
-            onclick="if(this.disabled)return;var g=window.__rpgsoccerEntrarJogo;if(typeof g==='function'){try{g();}catch(e){console.error(e);alert('Erro ao entrar no jogo — veja o console.');}}"
+            onclick="if(this.disabled)return;var g=window.__qwertyFootballEntrarJogo;if(typeof g==='function'){try{g();}catch(e){console.error(e);alert('Erro ao entrar no jogo — veja o console.');}}"
           >
             Ir para o jogo
           </button>
@@ -240,11 +237,7 @@
 
     <div id="jogo-root" class="jogo-root" hidden>
       <header class="topo">
-        <h1>RPG Soccer</h1>
-        <p class="sub">
-          Letra no tempo: os atributos definem o desafio; cada duelo cansa quem entra em campo. Dois tempos, até 5
-          trocas.
-        </p>
+        <h1>QWERTY Football</h1>
       </header>
 
       <main class="layout">

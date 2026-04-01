@@ -202,9 +202,15 @@ export function proximaZonaEPosse(zona, jogadorVenceu, jogadorComBola) {
 
 /**
  * Chance do atacante errar o chute mesmo após vencer o goleiro no QTE (0–1).
- * Mais ataque ⇒ menos erro.
+ * Jogo normal: 10–45%; pênalti: 5–25%. Mais ataque ⇒ menos erro.
+ * @param {number} ataque
+ * @param {boolean} [penalti]
  */
-export function chanceErrarFinalizacaoAposVencerGoleiro(ataque) {
+export function chanceErrarFinalizacaoAposVencerGoleiro(ataque, penalti = false) {
   const a = Number(ataque);
-  return Math.min(0.28, Math.max(0.035, (86 - a) / 200));
+  const raw = (86 - a) / 200;
+  if (penalti) {
+    return Math.min(0.25, Math.max(0.05, raw));
+  }
+  return Math.min(0.45, Math.max(0.1, raw));
 }
