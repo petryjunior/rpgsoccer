@@ -106,9 +106,9 @@ export function textoTransicaoGoleiro(chuteJogador, opts) {
   const penalti = opts?.penalti === true;
   if (penalti) {
     if (chuteJogador) {
-      return "Pênalti a seu favor. A bola vai para a marca da cal; quem bate encara o goleiro de frente.";
+      return "Pênalti a favor — cobrança × goleiro.";
     }
-    return "Pênalti para o adversário. O atacante posiciona a bola; você entra no duelo como goleiro.";
+    return "Pênalti do adversário — duelo goleiro × cobrador.";
   }
   if (chuteJogador) {
     return "A zaga não conteve — sobra finalização cara a cara com o goleiro.";

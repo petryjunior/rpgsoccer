@@ -210,7 +210,8 @@ export const SELECOES = [
     id: "ing",
     nome: "Inglaterra",
     sigla: "ENG",
-    iso: "gb",
+    /** Inglaterra (St George), não o Union Jack do Reino Unido (`gb`). */
+    iso: "gb-eng",
     titulares: [
       j("James Walker", P.GOLEIRO, 27, 89),
       j("Hugh Mitchell", P.ZAGUEIRO, 51, 84),

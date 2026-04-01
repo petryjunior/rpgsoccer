@@ -112,6 +112,51 @@
           </div>
         </div>
         <div id="copa-passo-grupos" class="copa-passo" hidden>
+          <div id="copa-celebracao" class="copa-celebracao" hidden aria-live="polite">
+            <div class="copa-celebracao-bg" aria-hidden="true"></div>
+            <div class="copa-celebracao-inner">
+              <div class="copa-celebracao-trofeu" aria-hidden="true">
+                <svg class="copa-celebracao-trofeu-svg" viewBox="0 0 120 140" width="104" height="122" focusable="false">
+                  <defs>
+                    <linearGradient id="copa-taca-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#f0e4a8" />
+                      <stop offset="40%" stop-color="#d4a012" />
+                      <stop offset="100%" stop-color="#7a5c08" />
+                    </linearGradient>
+                    <linearGradient id="copa-taca-shine" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#fff" stop-opacity="0.5" />
+                      <stop offset="100%" stop-color="#d4a012" stop-opacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <ellipse cx="60" cy="132" rx="42" ry="7" fill="rgba(0,0,0,0.28)" />
+                  <path
+                    fill="url(#copa-taca-gold)"
+                    stroke="#5c4506"
+                    stroke-width="1"
+                    d="M60 12 C36 12 20 28 20 50 L20 56 L100 56 L100 50 C100 28 84 12 60 12 Z
+                       M20 56 L14 56 C6 56 2 62 2 70 C2 86 16 98 38 100 L38 104 L82 104 L82 100 C104 98 118 86 118 70 C118 62 114 56 106 56 L100 56
+                       M42 104 L42 116 L78 116 L78 104
+                       M50 116 L50 126 L70 126 L70 116"
+                  />
+                  <ellipse cx="44" cy="38" rx="14" ry="22" fill="url(#copa-taca-shine)" opacity="0.7" transform="rotate(-15 44 38)" />
+                </svg>
+              </div>
+              <p class="copa-celebracao-rotulo">Copa do Mundo</p>
+              <h3 id="copa-celebracao-nome" class="copa-celebracao-nome"></h3>
+              <img
+                id="copa-celebracao-bandeira"
+                class="copa-celebracao-bandeira"
+                alt=""
+                width="132"
+                height="99"
+                decoding="async"
+              />
+              <p class="copa-celebracao-sub">Campeão mundial</p>
+              <p class="copa-celebracao-texto">
+                Você comandou esta seleção até o topo. A taça é sua — parabéns pela campanha.
+              </p>
+            </div>
+          </div>
           <p id="copa-grupos-intro" class="tela-menu-sub"></p>
           <div id="copa-grupos-grid" class="copa-grupos-grid" aria-label="Grupos da Copa"></div>
           <div id="copa-classificacao-wrap" class="copa-classificacao-wrap" hidden>
@@ -372,7 +417,7 @@
       <div id="duelo-overlay" class="overlay overlay-duelo" hidden>
         <div class="duelo-shield-top" aria-hidden="true"></div>
         <div class="duelo-scrim" aria-hidden="true"></div>
-        <div class="modal-duelo">
+        <div id="modal-duelo" class="modal-duelo">
           <h2 id="duelo-titulo">Lance importante</h2>
           <div id="duelo-rpg-strip" class="duelo-rpg-strip" hidden></div>
 
