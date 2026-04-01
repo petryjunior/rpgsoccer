@@ -203,7 +203,7 @@ const QTE_FEEDBACK_ACERTO_MS = 280;
 const QTE_COUNTDOWN_MS_MIN = 260;
 const QTE_COUNTDOWN_MS_MAX = 1800;
 /** Pausa entre cada minuto exibido no relógio (entre lances). Menor = partida “corre” mais rápido. */
-const RELOGIO_MS_POR_MINUTO = 400;
+const RELOGIO_MS_POR_MINUTO = 1000;
 /** Quantos jogadores a tabela de artilheiros do hub da Copa exibe. */
 const COPA_ARTILHEIROS_HUB_MAX = 10;
 
