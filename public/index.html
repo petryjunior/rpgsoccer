@@ -35,7 +35,71 @@
           >
             Carregar Copa
           </button>
+          <button
+            type="button"
+            id="btn-menu-campanha"
+            class="btn pri menu-mod-btn"
+            onclick="(function(){var fn=window.__qwertyFootballAoAbrirCampanha;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
+          >
+            Campanha
+          </button>
         </nav>
+      </div>
+    </div>
+
+    <div id="tela-campanha" class="tela-menu tela-campanha" hidden>
+      <div class="tela-menu-inner tela-campanha-inner">
+        <h2 class="tela-menu-titulo">Modo Campanha</h2>
+
+        <div id="campanha-passo-inicio" class="campanha-passo">
+          <p class="tela-menu-sub">
+            Comande uma seleção por várias temporadas: amistosos FIFA, torneios continentais genéricos e eliminatórias. Convocação de 23 a partir de um elenco ampliado.
+          </p>
+          <div id="campanha-inicio-botoes" class="tela-menu-acoes">
+            <button type="button" id="btn-campanha-continuar" class="btn pri" hidden>Continuar campanha</button>
+            <button type="button" id="btn-campanha-nova" class="btn pri">Nova campanha</button>
+            <button type="button" id="btn-campanha-voltar-inicio" class="btn sec">Voltar ao menu</button>
+          </div>
+        </div>
+
+        <div id="campanha-passo-selecao" class="campanha-passo" hidden>
+          <p class="tela-menu-sub">Escolha a seleção que você vai comandar.</p>
+          <div id="campanha-cards-selecao" class="selecoes-cards" role="group" aria-label="Sua seleção na campanha"></div>
+          <div class="tela-menu-acoes">
+            <button type="button" id="btn-campanha-confirmar-selecao" class="btn pri" disabled>Começar com esta seleção</button>
+            <button type="button" id="btn-campanha-voltar-inicio-2" class="btn sec">Voltar</button>
+          </div>
+        </div>
+
+        <div id="campanha-passo-convocacao" class="campanha-passo" hidden>
+          <p class="tela-menu-sub">
+            Lista por posição. Escolha <strong>23 jogadores</strong> de forma que dê para montar <strong>11 titulares</strong> em formação válida e <strong>12 reservas</strong> com pelo menos um de cada posição no banco e no máximo dois goleiros reservas. O botão confirmar só habilita quando isso for possível. Use <strong>Seleção automática</strong> para marcar os 23 com melhor soma de atributos que respeitem essas regras — ainda precisa confirmar para avançar.
+          </p>
+          <p id="campanha-convocacao-contador" class="campanha-convocacao-contador" aria-live="polite">0 / 23</p>
+          <div id="campanha-convocacao-lista" class="campanha-convocacao-lista" role="group"></div>
+          <div class="tela-menu-acoes campanha-convocacao-acoes">
+            <button type="button" id="btn-campanha-convocacao-auto" class="btn sec">
+              Seleção automática
+            </button>
+            <button type="button" id="btn-campanha-confirmar-convocacao" class="btn pri" disabled>Confirmar convocação</button>
+            <button type="button" id="btn-campanha-voltar-hub-convoc" class="btn sec" hidden>Voltar ao hub</button>
+          </div>
+        </div>
+
+        <div id="campanha-passo-hub" class="campanha-passo" hidden>
+          <p id="campanha-hub-resumo" class="tela-menu-sub"></p>
+          <div id="campanha-hub-torneio" class="campanha-hub-torneio" hidden aria-label="Tabelas do torneio continental"></div>
+          <div id="campanha-hub-elims" class="campanha-hub-torneio campanha-hub-elims" hidden aria-label="Tabelas das eliminatórias da Copa"></div>
+          <ul id="campanha-hub-eventos" class="campanha-hub-eventos" aria-label="Calendário da temporada"></ul>
+          <div class="tela-menu-acoes">
+            <button type="button" id="btn-campanha-copa-2030" class="btn pri" hidden>
+              Disputar a Copa do Mundo 2030
+            </button>
+            <button type="button" id="btn-campanha-jogar-proximo" class="btn pri" disabled>Jogar próximo evento</button>
+            <button type="button" id="btn-campanha-refazer-convocacao" class="btn sec">Refazer convocação</button>
+            <button type="button" id="btn-campanha-hub-voltar-menu" class="btn sec">Voltar ao menu principal</button>
+          </div>
+        </div>
       </div>
     </div>
 

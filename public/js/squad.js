@@ -223,7 +223,7 @@ export function criarJogadorFixo(nome, posicao, ataque, defesa) {
 }
 
 /** Formações titulares válidas: 1 GOL + z+m+a = 10, z∈[3,5], m∈[2,5], a∈[1,4]. */
-const TITULAR_FORMACOES_VALIDAS = (() => {
+export const TITULAR_FORMACOES_VALIDAS = (() => {
   /** @type {{ z: number, m: number, a: number }[]} */
   const out = [];
   for (let z = 3; z <= 5; z++) {
@@ -297,14 +297,19 @@ export function gerarTime() {
 /**
  * @param {ReturnType<typeof criarJogador>[]} titulares
  * @param {ReturnType<typeof criarJogador>[]} reservas
+ * @param {{ numReservas?: number }} [opcoes] modo Campanha usa 12 reservas.
  */
-export function validarElenco(titulares, reservas) {
+export function validarElenco(titulares, reservas, opcoes) {
   const count = (arr, pos) => arr.filter((j) => j.posicao === pos).length;
   const t = titulares;
   const r = reservas;
+  const nRes = opcoes?.numReservas ?? 11;
 
-  if (t.length !== 11 || r.length !== 11) {
-    return { ok: false, msg: "Cada time precisa de 11 titulares e 11 reservas." };
+  if (t.length !== 11 || r.length !== nRes) {
+    return {
+      ok: false,
+      msg: `Cada time precisa de 11 titulares e ${nRes} reservas.`,
+    };
   }
   if (count(t, POSITIONS.GOLEIRO) < 1) {
     return { ok: false, msg: "Titulares: pelo menos 1 goleiro." };
@@ -342,4 +347,92 @@ export function validarElenco(titulares, reservas) {
     return { ok: false, msg: "Reservas: no máximo 2 goleiros no banco." };
   }
   return { ok: true, msg: "" };
+}
+
+/**
+ * Soma ataque+defesa para ordenar qualidade do jogador.
+ * @param {{ ataque: number, defesa: number }} j
+ */
+function somaStats(j) {
+  return j.ataque + j.defesa;
+}
+
+/**
+ * Monta 11+12 a partir dos 23 convocados (melhor goleiro titular + formação válida que caiba no elenco).
+ * @param {ReturnType<typeof criarJogadorFixo>[]} vinteETres
+ * @returns {{ titulares: typeof vinteETres, reservas: typeof vinteETres }}
+ */
+export function escalaçãoInicialDeConvocados23(vinteETres) {
+  if (vinteETres.length !== 23) {
+    throw new Error("Convocação precisa ter exatamente 23 jogadores.");
+  }
+  const by = (/** @type {import('./constants.js').Position} */ pos) =>
+    vinteETres.filter((j) => j.posicao === pos);
+  const gol = by(POSITIONS.GOLEIRO);
+  const zag = by(POSITIONS.ZAGUEIRO);
+  const mei = by(POSITIONS.MEIA);
+  const ata = by(POSITIONS.ATACANTE);
+  const ord = (/** @type {typeof vinteETres} */ arr) =>
+    [...arr].sort((a, b) => somaStats(b) - somaStats(a));
+
+  const formacoes = [...TITULAR_FORMACOES_VALIDAS].sort(
+    (a, b) => a.z - b.z || a.m - b.m || a.a - b.a,
+  );
+  for (const f of formacoes) {
+    if (gol.length < 1 || zag.length < f.z || mei.length < f.m || ata.length < f.a) continue;
+    /** @type {typeof vinteETres} */
+    const tit = [];
+    const used = new Set();
+    const pushUnique = (/** @type {typeof vinteETres[0]} */ j) => {
+      if (used.has(j.id)) return false;
+      tit.push(j);
+      used.add(j.id);
+      return true;
+    };
+    pushUnique(ord(gol)[0]);
+    let nz = 0;
+    for (const j of ord(zag)) {
+      if (nz >= f.z) break;
+      if (pushUnique(j)) nz++;
+    }
+    if (nz < f.z) continue;
+    let nm = 0;
+    for (const j of ord(mei)) {
+      if (nm >= f.m) break;
+      if (pushUnique(j)) nm++;
+    }
+    if (nm < f.m) continue;
+    let na = 0;
+    for (const j of ord(ata)) {
+      if (na >= f.a) break;
+      if (pushUnique(j)) na++;
+    }
+    if (na < f.a || tit.length !== 11) continue;
+    const res = vinteETres.filter((j) => !used.has(j.id));
+    if (res.length !== 12) continue;
+    const vBench = validarElenco(tit, res, { numReservas: 12 });
+    if (!vBench.ok) continue;
+    return { titulares: tit, reservas: res };
+  }
+  throw new Error(
+    "Estes 23 não permitem montar 11 titulares em formação válida (1 goleiro; 3–5 zagueiros; 2–5 meias; 1–4 atacantes) e 12 reservas com pelo menos um de cada posição no banco e no máximo 2 goleiros reservas.",
+  );
+}
+
+/**
+ * Verifica se os 23 permitem titulares + banco conforme as regras do jogo.
+ * @param {ReturnType<typeof criarJogadorFixo>[]} vinteETres
+ * @returns {{ ok: true } | { ok: false, msg: string }}
+ */
+export function podeMontarEscalaçãoCompleta23(vinteETres) {
+  try {
+    escalaçãoInicialDeConvocados23(vinteETres);
+    return { ok: true };
+  } catch (e) {
+    const msg =
+      typeof e === "object" && e && "message" in e && typeof e.message === "string"
+        ? e.message
+        : "Convocação não permite escalação válida.";
+    return { ok: false, msg };
+  }
 }

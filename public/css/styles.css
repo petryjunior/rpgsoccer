@@ -2270,3 +2270,172 @@ body {
   object-fit: cover;
 }
 
+/* Modo Campanha */
+.tela-campanha-inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.campanha-passo {
+  margin-top: 0.75rem;
+}
+
+.campanha-convocacao-acoes {
+  flex-wrap: wrap;
+  gap: 0.5rem 0.65rem;
+}
+
+.campanha-convocacao-contador {
+  font-weight: 700;
+  color: var(--acento);
+  margin: 0.5rem 0;
+}
+
+.campanha-convocacao-lista {
+  max-height: min(58vh, 520px);
+  overflow-y: auto;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  background: var(--painel);
+}
+
+.campanha-convocacao-secao {
+  margin-bottom: 1rem;
+}
+
+.campanha-convocacao-secao:last-child {
+  margin-bottom: 0;
+}
+
+.campanha-convocacao-secao-titulo {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--texto);
+  letter-spacing: 0.02em;
+}
+
+.campanha-convocacao-secao-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.campanha-jogador-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.campanha-jogador-linha:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.campanha-jogador-linha--marcado {
+  border-color: var(--verde-claro);
+  background: rgba(45, 157, 108, 0.12);
+}
+
+.campanha-jogador-linha input {
+  flex-shrink: 0;
+}
+
+.campanha-jogador-meta {
+  flex: 1;
+  font-size: 0.88rem;
+}
+
+.campanha-hub-torneio {
+  margin: 0.65rem 0 0.85rem;
+  padding: 0.55rem 0.65rem 0.65rem;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--painel);
+  text-align: left;
+}
+
+.campanha-torneio-regras {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* Tabela principal do grupo do jogador — mesmo visual da classificação da Copa. */
+.campanha-torneio-grupo-jogador {
+  margin: 0;
+  padding: 0.45rem 0.5rem 0.55rem;
+  border: 1px solid var(--verde-claro);
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(45, 157, 108, 0.22);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.campanha-torneio-grupo-jogador .copa-subtitulo {
+  margin: 0 0 0.45rem;
+}
+
+.campanha-torneio-outros-hint {
+  margin: 0.85rem 0 0.4rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.campanha-torneio-grid-outros {
+  margin-top: 0.35rem;
+}
+
+.campanha-hub-elims {
+  margin-top: 0.65rem;
+  border-color: rgba(100, 149, 237, 0.45);
+  box-shadow: 0 0 0 1px rgba(100, 149, 237, 0.2);
+}
+
+.campanha-hub-eventos {
+  list-style: none;
+  margin: 0.75rem 0;
+  padding: 0;
+}
+
+.campanha-hub-eventos li {
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--borda);
+  color: var(--muted);
+}
+
+.campanha-hub-eventos li.campanha-ev-feito {
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+
+.campanha-hub-eventos li.campanha-ev-atual {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+.campanha-hub-eventos li.campanha-ev-wcq {
+  border-left: 3px solid cornflowerblue;
+}
+
+.campanha-hub-eventos li.campanha-ev-torneio {
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.campanha-hub-eventos li.campanha-ev-torneio.campanha-ev-atual {
+  color: var(--texto);
+}
+
+.campanha-hub-eventos li.campanha-ev-torneio-bloco {
+  margin-top: 0.65rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--borda);
+}
+

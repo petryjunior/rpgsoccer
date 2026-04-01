@@ -122,6 +122,57 @@ export function sortearGrupos(ids32, rng) {
 }
 
 /**
+ * Estado inicial do modo Copa com 32 seleções já definidas (ex.: classificados da campanha).
+ * @param {string[]} ids32
+ * @param {string} playerTeamId
+ * @param {number} seed
+ */
+export function montarEstadoCopaCom32Ids(ids32, playerTeamId, seed) {
+  if (ids32.length !== 32) {
+    throw new Error("Copa: são necessárias 32 seleções.");
+  }
+  if (!ids32.includes(playerTeamId)) {
+    throw new Error("Copa: a sua seleção tem de estar entre as 32.");
+  }
+  const rng = criarRng(seed >>> 0);
+  const grupos = sortearGrupos(ids32, rng);
+  /** @type {Record<string, ResultadoPartida[]>} */
+  const partidasPorGrupo = {};
+  for (const L of Object.keys(grupos)) {
+    partidasPorGrupo[L] = partidasDoGrupo(grupos[L]);
+  }
+  let grupoPlayer = "A";
+  for (const L of Object.keys(grupos)) {
+    if (grupos[L].includes(playerTeamId)) {
+      grupoPlayer = L;
+      break;
+    }
+  }
+  const quatro = grupos[grupoPlayer];
+  const adversariosGrupo = adversariosNasRodadas(quatro, playerTeamId);
+  return {
+    rng,
+    seed: seed >>> 0,
+    grupos,
+    partidasPorGrupo,
+    playerTeamId,
+    grupoPlayer,
+    adversariosGrupo,
+    idxAdversarioGrupo: 0,
+    faseCopa: "grupos",
+    ordemGrupos: {},
+    jogosEliminatorios: [],
+    idxJogoEliminatorio: 0,
+    campeaoId: null,
+    artilheiros: {},
+    lesoesHumano: {},
+    jogosSuspensao: {},
+    amarelosAcumulado: {},
+    eliminatoria: null,
+  };
+}
+
+/**
  * @param {string[]} quatroIds
  * @returns {ResultadoPartida[]}
  */

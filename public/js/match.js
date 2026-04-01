@@ -153,6 +153,7 @@ export function sortearAcrescimosProrrogacao() {
 
 /**
  * Após duelo na área (defesa sempre zagueiro; ataque sorteado): vencedor com posse de ataque enfrenta o goleiro.
+ * Retorna quem vai ao duelo com o goleiro — não implica pênalti; pênalti só por falta marcada em main.js.
  * @returns {'jogador_chuta' | 'cpu_chuta' | null}
  */
 export function tipoFinalizacaoGoleiro(zona, jogadorVenceuPrimario) {
