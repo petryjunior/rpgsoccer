@@ -112,6 +112,9 @@ const els = {
   copaPenaltisHud: document.getElementById("copa-penaltis-hud"),
   copaPenaltisHudPlacar: document.getElementById("copa-penaltis-hud-placar"),
   copaPenaltisHudAcao: document.getElementById("copa-penaltis-hud-acao"),
+  copaPenaltisHudQte: document.getElementById("copa-penaltis-hud-qte"),
+  copaPenaltisHudQtePlacar: document.getElementById("copa-penaltis-hud-qte-placar"),
+  copaPenaltisHudQteAcao: document.getElementById("copa-penaltis-hud-qte-acao"),
   amistosoErro: document.getElementById("amistoso-erro"),
   bandeiraJogadorPainel: document.getElementById("bandeira-jogador-painel"),
   nomeSelecaoJogadorPainel: document.getElementById("nome-selecao-jogador-painel"),
@@ -154,6 +157,11 @@ const els = {
   golTitulo: document.getElementById("gol-titulo"),
   golSub: document.getElementById("gol-sub"),
   btnGolOk: document.getElementById("btn-gol-ok"),
+  penaltisResultadoOverlay: document.getElementById("penaltis-resultado-overlay"),
+  penaltisResultadoCartao: document.getElementById("penaltis-resultado-cartao"),
+  penaltisResultadoTitulo: document.getElementById("penaltis-resultado-titulo"),
+  penaltisResultadoSub: document.getElementById("penaltis-resultado-sub"),
+  btnPenaltisResultadoOk: document.getElementById("btn-penaltis-resultado-ok"),
   fimJogoOverlay: document.getElementById("fim-jogo-overlay"),
   fimJogoTitulo: document.getElementById("fim-jogo-titulo"),
   fimJogoPlacar: document.getElementById("fim-jogo-placar"),
@@ -1530,15 +1538,22 @@ function pintarEstatisticasPausa() {
 function sincronizarUiPausa() {
   els.pausePanel.hidden = !jogoPausado;
   const fimJogoAberto = els.fimJogoOverlay && !els.fimJogoOverlay.hidden;
+  const penaltisResAberto =
+    els.penaltisResultadoOverlay && !els.penaltisResultadoOverlay.hidden;
   const podePausar =
     partidaAtiva &&
     els.dueloOverlay.hidden &&
     !jogoPausado &&
     !aguardandoSegundoTempo &&
     els.golOverlay.hidden &&
+    !penaltisResAberto &&
     !fimJogoAberto;
   els.btnPausa.hidden = !podePausar;
 }
+
+/** Intervalo entre 1.º e 2.º tempo regulamentar (mensagens de prorrogação sobrescrevem e devem voltar a isto ao esconder). */
+const INTERVALO_BANNER_HTML_TEMPO_REGULAR =
+  "<strong>Fim do 1º tempo.</strong> Ajuste o time se quiser. O botão central passa a ser <strong>Começar 2º tempo</strong> — o relógio só volta depois do clique.";
 
 function mostrarBannerIntervalo() {
   els.intervaloBanner.hidden = false;
@@ -1547,13 +1562,14 @@ function mostrarBannerIntervalo() {
     bannerEsconderTimer = null;
   }
   bannerEsconderTimer = setTimeout(() => {
-    els.intervaloBanner.hidden = true;
     bannerEsconderTimer = null;
+    esconderUiIntervalo();
   }, 10000);
 }
 
 function esconderUiIntervalo() {
   els.intervaloBanner.hidden = true;
+  if (els.intervaloBanner) els.intervaloBanner.innerHTML = INTERVALO_BANNER_HTML_TEMPO_REGULAR;
   if (bannerEsconderTimer !== null) {
     clearTimeout(bannerEsconderTimer);
     bannerEsconderTimer = null;
@@ -1591,6 +1607,7 @@ function aguardarSegundoTempo() {
   aguardandoSegundoTempo = true;
   sincronizarUiPausa();
   tentarSubstituicaoCpu();
+  if (els.intervaloBanner) els.intervaloBanner.innerHTML = INTERVALO_BANNER_HTML_TEMPO_REGULAR;
   mostrarBannerIntervalo();
   appendLog(
     "<strong>Intervalo.</strong> O relógio está parado — faça substituições e use o botão <strong>Começar 2º tempo</strong> no centro da tela.",
@@ -2941,6 +2958,7 @@ function entrarNoJogoCopaVersus(cpuId) {
 
 function esconderHudDisputaPenaltis() {
   if (els.copaPenaltisHud) els.copaPenaltisHud.hidden = true;
+  if (els.copaPenaltisHudQte) els.copaPenaltisHudQte.hidden = true;
 }
 
 /**
@@ -3054,14 +3072,32 @@ function executarDisputaPenaltis() {
       const usadosHum = new Set(ordemHum);
       const usadosCpu = new Set(ordemCpuArr.map((x) => x.id));
 
+      const nomePenHum = () =>
+        (metaSelecaoJogador && String(metaSelecaoJogador.nome || "").trim()) ||
+        "Sua seleção";
+      const nomePenCpu = () =>
+        (metaSelecaoCpu && String(metaSelecaoCpu.nome || "").trim()) || "Adversário";
+
+      const textoPlacarParcialPen = () =>
+        `Pênaltis parciais: ${nomePenHum()} ${h} × ${c} ${nomePenCpu()}`;
+      const textoPlacarModalPen = () =>
+        `Pênaltis: ${nomePenHum()} ${h} × ${c} ${nomePenCpu()}`;
+
+      const hudPenaltisModoQte = (emQte) => {
+        if (els.copaPenaltisHud) els.copaPenaltisHud.hidden = emQte;
+        if (els.copaPenaltisHudQte) els.copaPenaltisHudQte.hidden = !emQte;
+      };
+
       const pintarHudPlacarPen = () => {
-        if (!els.copaPenaltisHudPlacar) return;
-        els.copaPenaltisHud.hidden = false;
-        els.copaPenaltisHudPlacar.textContent = `Pênaltis parciais: você ${h} × ${c} adversário`;
+        const t = textoPlacarParcialPen();
+        if (els.copaPenaltisHudPlacar) els.copaPenaltisHudPlacar.textContent = t;
+        if (els.copaPenaltisHudQtePlacar) els.copaPenaltisHudQtePlacar.textContent = t;
+        if (els.copaPenaltisHud) els.copaPenaltisHud.hidden = false;
       };
 
       const pintarHudAcaoPen = (txt) => {
         if (els.copaPenaltisHudAcao) els.copaPenaltisHudAcao.textContent = txt;
+        if (els.copaPenaltisHudQteAcao) els.copaPenaltisHudQteAcao.textContent = txt;
       };
 
       const qteChuteHumano = (atacante, textoAcao) =>
@@ -3072,9 +3108,11 @@ function executarDisputaPenaltis() {
           const p = parametrosLetra(ratio);
           els.dueloOverlay.hidden = false;
           mostrarFaseModal("qte");
+          hudPenaltisModoQte(true);
           iniciarQteLetra(p, (o) => {
             els.dueloOverlay.hidden = true;
             mostrarFaseModal("reset");
+            hudPenaltisModoQte(false);
             res(o.acertou);
           });
         });
@@ -3087,18 +3125,47 @@ function executarDisputaPenaltis() {
           const seq = Array.from({ length: 3 }, () => parametrosLetra(ratio));
           els.dueloOverlay.hidden = false;
           mostrarFaseModal("qte");
+          hudPenaltisModoQte(true);
           iniciarQteLetraSequencia(seq, (o) => {
             els.dueloOverlay.hidden = true;
             mostrarFaseModal("reset");
+            hudPenaltisModoQte(false);
             res(o.acertou);
           });
         });
 
       const atualizarPlacarPen = () => {
         els.copaPenaltisPlacar.hidden = false;
-        els.copaPenaltisPlacar.textContent = `Pênaltis: você ${h} × ${c} adversário`;
+        els.copaPenaltisPlacar.textContent = textoPlacarModalPen();
         pintarHudPlacarPen();
       };
+
+      const subLinhaPlacarPen = () =>
+        `Parcial: ${nomePenHum()} ${h} × ${c} ${nomePenCpu()}.`;
+
+      const popupResultadoPenalti = (titulo, sub, tom) =>
+        new Promise((resolve) => {
+          if (!els.penaltisResultadoOverlay || !els.btnPenaltisResultadoOk) {
+            resolve();
+            return;
+          }
+          if (els.penaltisResultadoTitulo) els.penaltisResultadoTitulo.textContent = titulo;
+          if (els.penaltisResultadoSub) els.penaltisResultadoSub.textContent = sub;
+          const cartaoEl = els.penaltisResultadoCartao;
+          if (cartaoEl) {
+            cartaoEl.classList.remove("penaltis-res-tom-gol", "penaltis-res-tom-nao");
+            cartaoEl.classList.add(tom === "gol" ? "penaltis-res-tom-gol" : "penaltis-res-tom-nao");
+          }
+          els.penaltisResultadoOverlay.hidden = false;
+          sincronizarUiPausa();
+          const fechar = () => {
+            els.btnPenaltisResultadoOk.removeEventListener("click", fechar);
+            els.penaltisResultadoOverlay.hidden = true;
+            sincronizarUiPausa();
+            resolve();
+          };
+          els.btnPenaltisResultadoOk.addEventListener("click", fechar);
+        });
 
       const registrarFimDisputaPenaltis = () => {
         esconderHudDisputaPenaltis();
@@ -3109,7 +3176,7 @@ function executarDisputaPenaltis() {
       try {
         pintarHudPlacarPen();
         pintarHudAcaoPen(
-          "Cada rodada: você cobra o pênalti (1 letra) e em seguida defende a cobrança do adversário (3 letras). O placar abaixo atualiza após cada lance.",
+          "Cada rodada: você cobra o pênalti (1 letra) e em seguida defende a cobrança do adversário (3 letras). O placar parcial atualiza após cada lance (no topo entre os lances; durante o lance, logo acima da letra).",
         );
 
         for (let i = 0; i < 5; i++) {
@@ -3118,18 +3185,32 @@ function executarDisputaPenaltis() {
           const r = `Rodada ${i + 1} de 5`;
           const nomeH = atHum?.nome ?? "—";
           const nomeC = atCpu?.nome ?? "—";
-          if ((await qteChuteHumano(
+          const converteuHum = await qteChuteHumano(
             atHum,
             `${r} — sua cobrança. ${nomeH} bate o pênalti: acerte 1 letra (A–Z) para converter.`,
-          )) === true)
-            h++;
+          );
+          if (converteuHum) h++;
           atualizarPlacarPen();
-          if ((await qteDefesaHumano(
+          await popupResultadoPenalti(
+            converteuHum ? "Gol!" : "Não foi gol",
+            converteuHum
+              ? `${nomeH} converteu. ${subLinhaPlacarPen()}`
+              : `${nomeH} errou a cobrança. ${subLinhaPlacarPen()}`,
+            converteuHum ? "gol" : "nao",
+          );
+          const defendeu = await qteDefesaHumano(
             atCpu,
             `${r} — sua defesa. O adversário cobra (${nomeC}): acerte 3 letras seguidas para evitar o gol.`,
-          )) !== true)
-            c++;
+          );
+          if (!defendeu) c++;
           atualizarPlacarPen();
+          await popupResultadoPenalti(
+            defendeu ? "Defendeu!" : "Gol do adversário",
+            defendeu
+              ? `Você impediu o gol de ${nomeC}. ${subLinhaPlacarPen()}`
+              : `${nomeC} converteu. ${subLinhaPlacarPen()}`,
+            defendeu ? "gol" : "nao",
+          );
           const faltaHum = 5 - 1 - i;
           const faltaCpu = 5 - 1 - i;
           if (h > c + faltaCpu || c > h + faltaHum) {
@@ -3164,18 +3245,32 @@ function executarDisputaPenaltis() {
           const rm = `Morte súbita — ${rondaMorteSubita}.ª rodada`;
           const ne = esc.nome ?? "—";
           const nce = cpuExtra.nome ?? "—";
-          if ((await qteChuteHumano(
+          const convHumMs = await qteChuteHumano(
             esc,
             `${rm} — sua cobrança. ${ne} bate o pênalti: 1 letra para converter.`,
-          )) === true)
-            h++;
+          );
+          if (convHumMs) h++;
           atualizarPlacarPen();
-          if ((await qteDefesaHumano(
+          await popupResultadoPenalti(
+            convHumMs ? "Gol!" : "Não foi gol",
+            convHumMs
+              ? `${ne} converteu. ${subLinhaPlacarPen()}`
+              : `${ne} errou a cobrança. ${subLinhaPlacarPen()}`,
+            convHumMs ? "gol" : "nao",
+          );
+          const defMs = await qteDefesaHumano(
             cpuExtra,
             `${rm} — sua defesa. O adversário cobra (${nce}): 3 letras seguidas para defender.`,
-          )) !== true)
-            c++;
+          );
+          if (!defMs) c++;
           atualizarPlacarPen();
+          await popupResultadoPenalti(
+            defMs ? "Defendeu!" : "Gol do adversário",
+            defMs
+              ? `Você impediu o gol de ${nce}. ${subLinhaPlacarPen()}`
+              : `${nce} converteu. ${subLinhaPlacarPen()}`,
+            defMs ? "gol" : "nao",
+          );
           if (h !== c) {
             registrarFimDisputaPenaltis();
             return;
@@ -3183,6 +3278,8 @@ function executarDisputaPenaltis() {
         }
       } catch (e) {
         esconderHudDisputaPenaltis();
+        if (els.penaltisResultadoOverlay) els.penaltisResultadoOverlay.hidden = true;
+        sincronizarUiPausa();
         placarPenaltisPosDecisao = null;
         reject(e);
       }
@@ -3414,11 +3511,13 @@ function alternarPausaPorTecla() {
     sincronizarUiPausa();
     return;
   }
+  const penaltisResAberto = els.penaltisResultadoOverlay && !els.penaltisResultadoOverlay.hidden;
   if (
     !partidaAtiva ||
     !els.dueloOverlay.hidden ||
     aguardandoSegundoTempo ||
     !els.golOverlay.hidden ||
+    penaltisResAberto ||
     (els.fimJogoOverlay && !els.fimJogoOverlay.hidden)
   ) {
     return;
@@ -3448,8 +3547,12 @@ window.addEventListener("keydown", (e) => {
   if (!partidaAtiva) return;
   const dueloAberto = els.dueloOverlay && !els.dueloOverlay.hidden;
   const golAberto = els.golOverlay && !els.golOverlay.hidden;
+  const penaltisResAberto = els.penaltisResultadoOverlay && !els.penaltisResultadoOverlay.hidden;
   const fimJogoAberto = els.fimJogoOverlay && !els.fimJogoOverlay.hidden;
-  if (!jogoPausado && (dueloAberto || aguardandoSegundoTempo || golAberto || fimJogoAberto)) {
+  if (
+    !jogoPausado &&
+    (dueloAberto || aguardandoSegundoTempo || golAberto || penaltisResAberto || fimJogoAberto)
+  ) {
     return;
   }
   e.preventDefault();

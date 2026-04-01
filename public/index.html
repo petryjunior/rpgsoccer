@@ -340,6 +340,21 @@
       </div>
 
       <div
+        id="penaltis-resultado-overlay"
+        class="overlay overlay-penaltis-resultado"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="penaltis-resultado-titulo"
+      >
+        <div id="penaltis-resultado-cartao" class="cartao-gol penaltis-resultado-cartao">
+          <p id="penaltis-resultado-titulo" class="gol-titulo"></p>
+          <p id="penaltis-resultado-sub" class="gol-sub"></p>
+          <button type="button" id="btn-penaltis-resultado-ok" class="btn pri">Continuar</button>
+        </div>
+      </div>
+
+      <div
         id="fim-jogo-overlay"
         class="overlay overlay-gol overlay-fim-jogo"
         hidden
@@ -377,6 +392,10 @@
           </div>
 
           <div id="fase-qte" class="fase-modal" hidden>
+            <div id="copa-penaltis-hud-qte" class="copa-penaltis-hud-qte" hidden aria-live="polite">
+              <p id="copa-penaltis-hud-qte-placar" class="copa-penaltis-hud-qte-placar"></p>
+              <p id="copa-penaltis-hud-qte-acao" class="copa-penaltis-hud-qte-acao"></p>
+            </div>
             <p id="qte-dica" class="qte-dica"></p>
             <div
               id="qte-reacao"
