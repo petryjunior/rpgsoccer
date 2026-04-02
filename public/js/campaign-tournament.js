@@ -4,7 +4,7 @@
  */
 
 import { dadosTorneioContinental, idsCompeticaoContinental } from "./campaign-confederation.js";
-import { elencoDaSelecao } from "./national-teams.js";
+import { elencoDaSelecao, selecaoPorId } from "./national-teams.js";
 import {
   agregarClassificacao,
   aplicarResultadoNaLista,
@@ -14,7 +14,12 @@ import {
   partidasDoGrupo,
   simularPlacar,
 } from "./world-cup.js";
-import { ANO_BASE_CAMPANHA, textoMesAno } from "./campaign-dates.js";
+import {
+  ANO_BASE_CAMPANHA,
+  MES_FIM_TORNEIO_CONTINENTAL_CAMPANHA,
+  textoMesAno,
+} from "./campaign-dates.js";
+import { ordenarEventosCalendarioCampanhaNoAno } from "./campaign-calendar-order.js";
 
 /**
  * @typedef {import('./world-cup.js').ResultadoPartida} ResultadoPartida
@@ -35,6 +40,7 @@ import { ANO_BASE_CAMPANHA, textoMesAno } from "./campaign-dates.js";
  */
 
 /**
+ * `eliminatoriasCopaMundial` / `wcqClassificadosKoIds`: só eliminatórias da Copa (sem final de “campeão” da zona).
  * @typedef {{
  *   confKey: string,
  *   nomeTorneio: string,
@@ -47,6 +53,12 @@ import { ANO_BASE_CAMPANHA, textoMesAno } from "./campaign-dates.js";
  *   fase: 'grupos' | 'mata_mata' | 'fim',
  *   rodadaGrupoHumanoAtual: number,
  *   eliminado: boolean,
+ *   campeaoContinentalId?: string | null,
+ *   eliminatoriasCopaMundial?: boolean,
+ *   wcqClassificadosKoIds?: string[] | null,
+ *   historicoMataMata?: { fase: FaseMataMataCampanha, partidas: { home: string, away: string, gh: number, ga: number }[] }[],
+ *   idaVoltaGrupos?: boolean,
+ *   idaVoltaMataMata?: boolean,
  *   ko?: {
  *     fase: FaseMataMataCampanha,
  *     jogosRodada: JogoKoCampanha[],
@@ -193,9 +205,9 @@ export function montarGruposPorFormato(playerId, idsConf, rng) {
 
 /**
  * @param {Record<string, string[]>} grupos
- * @returns {Record<string, ResultadoPartida[]>}
+ * @param {boolean} [idaVolta] eliminatórias da Copa: todos os confrontos de grupo em ida e volta
  */
-function criarPartidasPorGrupo(grupos) {
+function criarPartidasPorGrupo(grupos, idaVolta = false) {
   /** @type {Record<string, ResultadoPartida[]>} */
   const part = {};
   /** @type {Record<string, [string, string][][]>} */
@@ -203,26 +215,62 @@ function criarPartidasPorGrupo(grupos) {
   for (const L of Object.keys(grupos).sort()) {
     const ids = grupos[L];
     if (ids.length === 4) {
-      part[L] = partidasDoGrupo(ids);
+      const listaIda = partidasDoGrupo(ids);
       const idxRodada = [
         [0, 5],
         [1, 4],
         [2, 3],
       ];
-      rodadas[L] = idxRodada.map((ix) =>
+      const rodadasIda = idxRodada.map((ix) =>
         ix.map((pi) => {
-          const p = part[L][pi];
+          const p = listaIda[pi];
           return /** @type {[string, string]} */ ([p.home, p.away]);
         }),
       );
-    } else {
-      rodadas[L] = gerarRodadasRoundRobin(ids);
-      /** @type {ResultadoPartida[]} */
-      const lista = [];
-      for (const [h, a] of rodadas[L].flat()) {
-        lista.push({ home: h, away: a, gh: -1, ga: -1 });
+      if (idaVolta) {
+        const listaVolta = listaIda.map((p) => ({
+          home: p.away,
+          away: p.home,
+          gh: -1,
+          ga: -1,
+        }));
+        const rodadasVolta = idxRodada.map((ix) =>
+          ix.map((pi) => {
+            const p = listaVolta[pi];
+            return /** @type {[string, string]} */ ([p.home, p.away]);
+          }),
+        );
+        part[L] = listaIda.concat(listaVolta);
+        rodadas[L] = rodadasIda.concat(rodadasVolta);
+      } else {
+        part[L] = listaIda;
+        rodadas[L] = rodadasIda;
       }
-      part[L] = lista;
+    } else {
+      const rodRR = gerarRodadasRoundRobin(ids);
+      /** @type {ResultadoPartida[]} */
+      const listaIda = [];
+      for (const rnd of rodRR) {
+        for (const [h, a] of rnd) {
+          listaIda.push({ home: h, away: a, gh: -1, ga: -1 });
+        }
+      }
+      if (idaVolta) {
+        const listaVolta = listaIda.map((p) => ({
+          home: p.away,
+          away: p.home,
+          gh: -1,
+          ga: -1,
+        }));
+        const rodadasVolta = rodRR.map((rnd) =>
+          rnd.map(([h, a]) => /** @type {[string, string]} */ ([a, h])),
+        );
+        part[L] = listaIda.concat(listaVolta);
+        rodadas[L] = rodRR.concat(rodadasVolta);
+      } else {
+        part[L] = listaIda;
+        rodadas[L] = rodRR;
+      }
     }
   }
   return { part, rodadas };
@@ -244,7 +292,7 @@ function agendaHumanoGrupo(playerId, grupo, rodadas, lista, tipoEvento, nomeTorn
       if (h !== playerId && a !== playerId) continue;
       const adv = h === playerId ? a : h;
       const humanoCasa = h === playerId;
-      const partida = lista.find((p) => (p.home === h && p.away === a) || (p.home === a && p.away === h));
+      const partida = lista.find((p) => p.home === h && p.away === a);
       const idx = partida ? lista.indexOf(partida) : -1;
       ev.push({
         id: "",
@@ -329,8 +377,39 @@ export function criarTorneioCampanhaComPool(op) {
 
   const base = `a${anoCalendario}-${idSuffix}-`;
 
+  const idaWcq = tipoEvento === "eliminatorias_copa";
+
   if (pool.length === 2) {
     const outro = pool.find((id) => id !== selecaoPlayerId) ?? pool[0];
+    /** @type {JogoKoCampanha[]} */
+    const jogosKo =
+      idaWcq
+        ? [
+            {
+              home: selecaoPlayerId,
+              away: outro,
+              gh: -1,
+              ga: -1,
+              humanoEnvolvido: true,
+            },
+            {
+              home: outro,
+              away: selecaoPlayerId,
+              gh: -1,
+              ga: -1,
+              humanoEnvolvido: true,
+            },
+          ]
+        : [
+            {
+              home: selecaoPlayerId,
+              away: outro,
+              gh: -1,
+              ga: -1,
+              humanoEnvolvido: true,
+            },
+          ];
+    for (const j of jogosKo) j.humanoEnvolvido = jogoEnvolveHumano(j, selecaoPlayerId);
     /** @type {TorneioContinentalEstado} */
     const torneioContinental = {
       confKey,
@@ -344,25 +423,20 @@ export function criarTorneioCampanhaComPool(op) {
       fase: "mata_mata",
       rodadaGrupoHumanoAtual: 0,
       eliminado: false,
+      eliminatoriasCopaMundial: idaWcq,
+      idaVoltaGrupos: false,
+      idaVoltaMataMata: idaWcq,
       ko: {
         fase: "final",
-        jogosRodada: [
-          {
-            home: selecaoPlayerId,
-            away: outro,
-            gh: -1,
-            ga: -1,
-            humanoEnvolvido: true,
-          },
-        ],
+        jogosRodada: jogosKo,
         idxProximoJogoHumano: 0,
         vencedoresAcumulados: [],
       },
     };
     const e0 = {
-      id: `${base}fin`,
+      id: `${base}fin0`,
       tipo: tipoEvento,
-      rotulo: `${nomeTorneio} — final`,
+      rotulo: idaWcq ? `${nomeTorneio} — final (ida)` : `${nomeTorneio} — final`,
       adversarioId: outro,
       concluido: false,
       torneioNome: nomeTorneio,
@@ -375,13 +449,32 @@ export function criarTorneioCampanhaComPool(op) {
       campanhaIdxPartidaGrupo: null,
       campanhaKoSlot: true,
     };
+    if (idaWcq) {
+      const e1 = {
+        id: `${base}fin1`,
+        tipo: tipoEvento,
+        rotulo: `${nomeTorneio} — final (volta)`,
+        adversarioId: outro,
+        concluido: false,
+        torneioNome: nomeTorneio,
+        faseContinental: /** @type {const} */ ("final"),
+        campanhaHumanoCasa: false,
+        campanhaParHome: outro,
+        campanhaParAway: selecaoPlayerId,
+        campanhaGrupo: null,
+        campanhaRodadaGrupo: null,
+        campanhaIdxPartidaGrupo: null,
+        campanhaKoSlot: true,
+      };
+      return { torneioContinental, eventosTorneio: [e0, e1] };
+    }
     return { torneioContinental, eventosTorneio: [e0] };
   }
 
   const { grupos, formato } =
     gruposPredefinidos ??
     montarGruposPorFormato(selecaoPlayerId, pool, rng);
-  const { part: partidasPorGrupo, rodadas: rodadasPorGrupo } = criarPartidasPorGrupo(grupos);
+  const { part: partidasPorGrupo, rodadas: rodadasPorGrupo } = criarPartidasPorGrupo(grupos, idaWcq);
   const playerGrupo = grupoDoJogador(grupos, selecaoPlayerId);
   const listaP = partidasPorGrupo[playerGrupo];
   const rodadasP = rodadasPorGrupo[playerGrupo];
@@ -407,14 +500,26 @@ export function criarTorneioCampanhaComPool(op) {
     fase: "grupos",
     rodadaGrupoHumanoAtual: 0,
     eliminado: false,
+    eliminatoriasCopaMundial: idaWcq,
+    idaVoltaGrupos: idaWcq,
+    idaVoltaMataMata: idaWcq,
   };
 
-  const eventosTorneio = agenda.map((e, i) => ({
-    ...e,
-    id: `${base}g${i}`,
-    torneioNome: nomeTorneio,
-    rotulo: `${nomeTorneio} — Grupo ${playerGrupo} · rodada ${e.campanhaRodadaGrupo}/${rodadasP.length}`,
-  }));
+  const eventosTorneio = agenda.map((e, i) => {
+    const r = (e.campanhaRodadaGrupo ?? 1) - 1;
+    const perna =
+      idaWcq && rodadasP.length > 0
+        ? r < rodadasP.length / 2
+          ? " (ida)"
+          : " (volta)"
+        : "";
+    return {
+      ...e,
+      id: `${base}g${i}`,
+      torneioNome: nomeTorneio,
+      rotulo: `${nomeTorneio} — Grupo ${playerGrupo} · rodada ${e.campanhaRodadaGrupo}/${rodadasP.length}${perna}`,
+    };
+  });
 
   return { torneioContinental, eventosTorneio };
 }
@@ -461,12 +566,98 @@ function simularRodadaGruposExcetoPar(T, rodadaIdx0, skipHome, skipAway, rng) {
     if (!rodadas[rodadaIdx0]) continue;
     for (const [h, a] of rodadas[rodadaIdx0]) {
       if (skipHome && skipAway && h === skipHome && a === skipAway) continue;
-      const p = lista.find((x) => (x.home === h && x.away === a) || (x.home === a && x.away === h));
+      const p = lista.find((x) => x.home === h && x.away === a);
       if (p && p.gh >= 0) continue;
       const { gh, ga } = simularAteDecidir(forcaSelecaoId(h), forcaSelecaoId(a), rng);
       aplicarResultadoNaLista(lista, h, a, gh, ga);
     }
   }
+}
+
+/**
+ * Só deve avançar para mata-mata quando não há partidas de grupo pendentes em nenhum grupo.
+ * @param {TorneioContinentalEstado} T
+ */
+function todasPartidasFaseGruposDecididas(T) {
+  if (!T?.grupos) return false;
+  for (const L of Object.keys(T.grupos)) {
+    const ids = T.grupos[L];
+    if ((ids?.length ?? 0) < 2) continue;
+    const lista = T.partidasPorGrupo[L];
+    if (!Array.isArray(lista) || lista.length === 0) return false;
+    for (const p of lista) {
+      if (p.gh < 0) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Todas as partidas do grupo do jogador em que ele entra já têm placar (ele não tem jogo de grupo pendente no estado).
+ * @param {TorneioContinentalEstado} T
+ */
+function todasPartidasHumanoNoGrupoDecididas(T) {
+  const lista = T.partidasPorGrupo[T.playerGrupo];
+  if (!lista || lista.length === 0) return false;
+  const pid = T.playerId;
+  for (const p of lista) {
+    if ((p.home === pid || p.away === pid) && p.gh < 0) return false;
+  }
+  return true;
+}
+
+/**
+ * Há no calendário civil um jogo de grupos desta competição ainda por disputar (próximo passo do jogador).
+ * Evita que `repararFaseGruposTorneioCampanha` chame `simularPartidasPendentesTodosGrupos` após um amistoso
+ * e resolva em massa o resto dos grupos — incluindo o próximo WCQ — só porque o reparo abriu o hub.
+ * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
+ * @param {'torneio_continental' | 'eliminatorias_copa'} tipoEv
+ */
+function temJogoGruposCompeticaoPendenteNoCalendario(estado, tipoEv) {
+  for (const e of estado.eventos ?? []) {
+    if (e.concluido) continue;
+    if (e.tipo !== tipoEv) continue;
+    if (e.faseContinental !== "grupos") continue;
+    if (e.adversarioId) return true;
+  }
+  return false;
+}
+
+/**
+ * Corrige saves em que os grupos já estão (ou deveriam estar) fechados mas o mata-mata não arrancou
+ * — por exemplo calendário fora da ordem das rodadas: o último jogo do humano não era a “última rodada” índice.
+ * @returns {boolean} true se o estado do torneio ou eventos foi alterado
+ */
+export function repararFaseGruposTorneioCampanha(estado, rng) {
+  const anoCal =
+    estado.anoCalendario ?? ANO_BASE_CAMPANHA + ((estado.temporada ?? 1) - 1);
+  /** @type {SlotTorneioCampanha[]} */
+  const slots = ["continental", "wcq"];
+  let alterou = false;
+  for (const slot of slots) {
+    const T = slot === "wcq" ? estado.eliminatoriasCopa : estado.torneioContinental;
+    if (!T || T.eliminado || T.fase !== "grupos") continue;
+
+    if (todasPartidasFaseGruposDecididas(T)) {
+      const faseAntes = T.fase;
+      iniciarMataMataSeAplicavel(estado, anoCal, rng, slot);
+      if (faseAntes !== T.fase) alterou = true;
+      continue;
+    }
+
+    if (!todasPartidasHumanoNoGrupoDecididas(T)) continue;
+
+    const tipoEv =
+      slot === "wcq" ? /** @type {const} */ ("eliminatorias_copa") : /** @type {const} */ ("torneio_continental");
+    if (temJogoGruposCompeticaoPendenteNoCalendario(estado, tipoEv)) continue;
+
+    simularPartidasPendentesTodosGrupos(T, rng);
+    alterou = true;
+    if (todasPartidasFaseGruposDecididas(T)) {
+      iniciarMataMataSeAplicavel(estado, anoCal, rng, slot);
+    }
+  }
+  return alterou;
 }
 
 /**
@@ -583,18 +774,6 @@ function qualificadosAposGrupos(T, rng) {
 }
 
 /**
- * Onde enfileirar jogos de mata-mata: antes dos amistosos já agendados para set./nov.,
- * para não “furar” a Copa com datas FIFA posteriores na ordem do array.
- * @param {import('./campaign-calendar.js').EventoCampanha[]} eventos
- */
-function indiceInserirKoAntesAmistososFinais(eventos) {
-  const i = eventos.findIndex(
-    (e) => !e.concluido && e.tipo === "amistoso" && (e.campanhaMes ?? 0) >= 9,
-  );
-  return i < 0 ? eventos.length : i;
-}
-
-/**
  * Texto curto para o hub: quantos classificam e que fase eliminatória vem a seguir.
  * @param {TorneioContinentalEstado | null | undefined} T
  * @returns {string}
@@ -615,12 +794,60 @@ export function textoRegrasClassificacaoTorneioCampanha(T) {
     return "Classificam 2 por grupo (4 no total); semifinais e final.";
   }
   if (fmt === "TRES_GRUPOS_3") {
-    return "Classificam os três 1.ºs lugares e o melhor 2.º (4 no total); semifinais e final.";
+    return "Três grupos de 3 seleções (todos contra todos). Classificam os três 1.ºs lugares dos grupos A, B e C e o melhor 2.º colocado entre os três grupos (desempate: pontos, saldo de gols, gols marcados). Os 4 times disputam semifinais e final para o título.";
   }
   if (fmt === "QUATRO_GRUPOS_5") {
     return "Classificam 2 por grupo (8 no total); quartas, semifinais e final.";
   }
   return "";
+}
+
+/**
+ * Texto para o hub: placares de cada rodada do mata-mata já concluída.
+ * @param {TorneioContinentalEstado | null | undefined} T
+ * @returns {string[]}
+ */
+export function paragrafosHistoricoMataMataCampanha(T) {
+  const hist = T?.historicoMataMata;
+  if (!hist?.length) return [];
+  const nom = (id) => selecaoPorId(id)?.nome ?? id;
+  /** @param {string} f */
+  const tituloFase = (f) =>
+    f === "quartas"
+      ? "Quartas de final"
+      : f === "semi"
+        ? "Semifinais"
+        : f === "final"
+          ? "Final"
+          : String(f);
+  /** @type {string[]} */
+  const out = ["Mata-mata — resultados por fase:"];
+  for (const b of hist) {
+    out.push(`${tituloFase(b.fase)}:`);
+    for (const p of b.partidas) {
+      out.push(`  ${nom(p.home)} ${p.gh} × ${p.ga} ${nom(p.away)}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * @param {TorneioContinentalEstado} T
+ */
+function registrarRodadaKoConcluidaNoHistorico(T) {
+  const ko = T.ko;
+  if (!ko?.jogosRodada?.length) return;
+  const partidas = ko.jogosRodada
+    .filter((j) => j.gh >= 0 && j.ga >= 0)
+    .map((j) => ({
+      home: j.home,
+      away: j.away,
+      gh: j.gh,
+      ga: j.ga,
+    }));
+  if (!partidas.length) return;
+  if (!T.historicoMataMata) T.historicoMataMata = [];
+  T.historicoMataMata.push({ fase: ko.fase, partidas });
 }
 
 /**
@@ -665,6 +892,115 @@ function simularTodosCpuNaRodada(jogos, playerId, rng) {
 
 /**
  * @param {JogoKoCampanha[]} jogos
+ * @param {() => number} rng
+ */
+function simularRodadaKoCompleta(jogos, rng) {
+  for (const j of jogos) {
+    if (j.gh < 0) simularJogoKoCpu(j, rng);
+  }
+}
+
+/**
+ * Avança o mata-mata só com CPU até haver campeão (após o jogador perder ou não se classificar).
+ * @param {TorneioContinentalEstado} T
+ * @param {() => number} rng
+ */
+function completarMataMataAposSaidaHumana(T, rng) {
+  const pid = T.playerId;
+  for (let guard = 0; guard < 32; guard++) {
+    if (T.fase !== "mata_mata" || !T.ko) break;
+    simularTodosCpuNaRodada(T.ko.jogosRodada, pid, rng);
+    if (!todosJogosRodadaDecididos(T.ko.jogosRodada)) {
+      simularRodadaKoCompleta(T.ko.jogosRodada, rng);
+    }
+    if (!todosJogosRodadaDecididos(T.ko.jogosRodada)) break;
+    avancarParaProximaRodadaKo(T, rng);
+  }
+}
+
+/**
+ * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
+ * @param {SlotTorneioCampanha} slot
+ * @param {number} anoCalendario
+ */
+function marcarEventosCompeticaoConcluidosFantasma(estado, slot, anoCalendario) {
+  const tipo = slot === "wcq" ? "eliminatorias_copa" : "torneio_continental";
+  for (const e of estado.eventos) {
+    if (e.tipo !== tipo || e.concluido) continue;
+    if (e.campanhaAno != null && e.campanhaAno !== anoCalendario) continue;
+    e.concluido = true;
+  }
+}
+
+/**
+ * @param {string[]} times
+ * @param {FaseMataMataCampanha} primeiraFaseKo
+ * @param {string} playerId
+ * @param {boolean} idaVoltaKo eliminatórias: cada confronto em duas pernas
+ * @returns {{ jogos: JogoKoCampanha[], label: FaseMataMataCampanha } | null}
+ */
+function construirJogosPrimeiraRodadaKo(times, primeiraFaseKo, playerId, idaVoltaKo) {
+  /** @type {JogoKoCampanha[]} */
+  const jogos = [];
+  /** @type {FaseMataMataCampanha} */
+  const label = primeiraFaseKo;
+
+  if (primeiraFaseKo === "final") {
+    if (times.length < 2) return null;
+    if (idaVoltaKo) {
+      jogos.push(
+        { home: times[0], away: times[1], gh: -1, ga: -1, humanoEnvolvido: false },
+        { home: times[1], away: times[0], gh: -1, ga: -1, humanoEnvolvido: false },
+      );
+    } else {
+      jogos.push({
+        home: times[0],
+        away: times[1],
+        gh: -1,
+        ga: -1,
+        humanoEnvolvido: false,
+      });
+    }
+  } else if (primeiraFaseKo === "semi") {
+    if (times.length !== 4) return null;
+    const pares = [
+      [times[0], times[3]],
+      [times[1], times[2]],
+    ];
+    for (const [x, y] of pares) {
+      if (idaVoltaKo) {
+        jogos.push(
+          { home: x, away: y, gh: -1, ga: -1, humanoEnvolvido: false },
+          { home: y, away: x, gh: -1, ga: -1, humanoEnvolvido: false },
+        );
+      } else {
+        jogos.push({ home: x, away: y, gh: -1, ga: -1, humanoEnvolvido: false });
+      }
+    }
+  } else if (primeiraFaseKo === "quartas") {
+    if (times.length !== 8) return null;
+    for (let i = 0; i < 8; i += 2) {
+      const x = times[i];
+      const y = times[i + 1];
+      if (idaVoltaKo) {
+        jogos.push(
+          { home: x, away: y, gh: -1, ga: -1, humanoEnvolvido: false },
+          { home: y, away: x, gh: -1, ga: -1, humanoEnvolvido: false },
+        );
+      } else {
+        jogos.push({ home: x, away: y, gh: -1, ga: -1, humanoEnvolvido: false });
+      }
+    }
+  } else {
+    return null;
+  }
+
+  for (const j of jogos) j.humanoEnvolvido = jogoEnvolveHumano(j, playerId);
+  return { jogos, label };
+}
+
+/**
+ * @param {JogoKoCampanha[]} jogos
  */
 function todosJogosRodadaDecididos(jogos) {
   return jogos.every((j) => j.gh >= 0);
@@ -679,72 +1015,101 @@ function vencedoresNaOrdem(jogos) {
 }
 
 /**
- * @param {TorneioContinentalEstado} T
+ * Vencedor do confronto ida e volta (agregado; desempate: gols fora; sorteio).
+ * `j1` e `j2` são as duas pernas entre os mesmos times (j1.home = um time, j1.away = outro).
+ * @param {JogoKoCampanha} j1
+ * @param {JogoKoCampanha} j2
  * @param {() => number} rng
  */
-function montarPrimeiraRodadaKo(T, rng) {
-  const { times, primeiraFaseKo } = qualificadosAposGrupos(T, rng);
+export function vencedorConfrontoIdaVoltaEliminatorias(j1, j2, rng) {
+  const a = j1.home;
+  const b = j1.away;
+  const gA = j1.gh + j2.ga;
+  const gB = j1.ga + j2.gh;
+  if (gA > gB) return a;
+  if (gB > gA) return b;
+  const awayA = j2.ga;
+  const awayB = j1.ga;
+  if (awayA > awayB) return a;
+  if (awayB > awayA) return b;
+  return rng() < 0.5 ? a : b;
+}
+
+/**
+ * @param {TorneioContinentalEstado} T
+ * @param {JogoKoCampanha[]} jogos
+ * @param {() => number} rng
+ */
+function vencedoresRodadaMataMata(T, jogos, rng) {
+  if (!T.idaVoltaMataMata) return vencedoresNaOrdem(jogos);
+  /** @type {string[]} */
+  const w = [];
+  for (let i = 0; i < jogos.length; i += 2) {
+    w.push(vencedorConfrontoIdaVoltaEliminatorias(jogos[i], jogos[i + 1], rng));
+  }
+  return w;
+}
+
+/**
+ * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
+ * @param {number} anoCalendario
+ * @param {() => number} rng
+ * @param {SlotTorneioCampanha} slot
+ */
+function montarPrimeiraRodadaKo(estado, anoCalendario, rng, slot) {
+  const T = slot === "wcq" ? estado.eliminatoriasCopa : estado.torneioContinental;
+  if (!T) return;
+
+  let { times, primeiraFaseKo } = qualificadosAposGrupos(T, rng);
   if (!times.includes(T.playerId)) {
+    simularPartidasPendentesTodosGrupos(T, rng);
+    ({ times, primeiraFaseKo } = qualificadosAposGrupos(T, rng));
     T.eliminado = true;
-    T.fase = "fim";
+    const builtNq = construirJogosPrimeiraRodadaKo(
+      times,
+      primeiraFaseKo,
+      T.playerId,
+      Boolean(T.idaVoltaMataMata),
+    );
+    if (!builtNq) {
+      T.fase = "fim";
+      marcarEventosCompeticaoConcluidosFantasma(estado, slot, anoCalendario);
+      return;
+    }
+    T.fase = "mata_mata";
+    T.ko = {
+      fase: builtNq.label,
+      jogosRodada: builtNq.jogos,
+      idxProximoJogoHumano: 0,
+      vencedoresAcumulados: [],
+    };
+    simularTodosCpuNaRodada(builtNq.jogos, T.playerId, rng);
+    completarMataMataAposSaidaHumana(T, rng);
+    marcarEventosCompeticaoConcluidosFantasma(estado, slot, anoCalendario);
     return;
   }
-  /** @type {JogoKoCampanha[]} */
-  let jogos = [];
-  /** @type {FaseMataMataCampanha} */
-  let label = primeiraFaseKo;
 
-  if (primeiraFaseKo === "final") {
-    const jf = {
-      home: times[0],
-      away: times[1],
-      gh: -1,
-      ga: -1,
-      humanoEnvolvido: false,
-    };
-    jf.humanoEnvolvido = jogoEnvolveHumano(jf, T.playerId);
-    jogos = [jf];
-    label = "final";
-  } else if (primeiraFaseKo === "semi") {
-    if (times.length === 4) {
-      jogos = [
-        { home: times[0], away: times[3], gh: -1, ga: -1, humanoEnvolvido: false },
-        { home: times[1], away: times[2], gh: -1, ga: -1, humanoEnvolvido: false },
-      ];
-    } else {
-      T.eliminado = true;
-      T.fase = "fim";
-      return;
-    }
-    for (const j of jogos) j.humanoEnvolvido = jogoEnvolveHumano(j, T.playerId);
-    label = "semi";
-  } else if (primeiraFaseKo === "quartas") {
-    if (times.length !== 8) {
-      T.eliminado = true;
-      T.fase = "fim";
-      return;
-    }
-    for (let i = 0; i < 8; i += 2) {
-      jogos.push({
-        home: times[i],
-        away: times[i + 1],
-        gh: -1,
-        ga: -1,
-        humanoEnvolvido: false,
-      });
-    }
-    for (const j of jogos) j.humanoEnvolvido = jogoEnvolveHumano(j, T.playerId);
-    label = "quartas";
+  const built = construirJogosPrimeiraRodadaKo(
+    times,
+    primeiraFaseKo,
+    T.playerId,
+    Boolean(T.idaVoltaMataMata),
+  );
+  if (!built) {
+    T.eliminado = true;
+    T.fase = "fim";
+    marcarEventosCompeticaoConcluidosFantasma(estado, slot, anoCalendario);
+    return;
   }
 
   T.fase = "mata_mata";
   T.ko = {
-    fase: label,
-    jogosRodada: jogos,
+    fase: built.label,
+    jogosRodada: built.jogos,
     idxProximoJogoHumano: 0,
     vencedoresAcumulados: [],
   };
-  simularTodosCpuNaRodada(jogos, T.playerId, rng);
+  simularTodosCpuNaRodada(built.jogos, T.playerId, rng);
 }
 
 /**
@@ -754,42 +1119,76 @@ function montarPrimeiraRodadaKo(T, rng) {
 function avancarParaProximaRodadaKo(T, rng) {
   const jogos = T.ko?.jogosRodada;
   if (!jogos || !todosJogosRodadaDecididos(jogos)) return;
-  const wins = vencedoresNaOrdem(jogos);
+  registrarRodadaKoConcluidaNoHistorico(T);
+  const wins = vencedoresRodadaMataMata(T, jogos, rng);
+  const iv = T.idaVoltaMataMata === true;
   if (wins.length === 1) {
+    if (T.eliminatoriasCopaMundial) {
+      T.wcqClassificadosKoIds = [wins[0]];
+      T.campeaoContinentalId = null;
+    } else {
+      T.campeaoContinentalId = wins[0];
+    }
     T.fase = "fim";
     T.ko = undefined;
     return;
   }
   if (wins.length === 2) {
+    if (T.eliminatoriasCopaMundial) {
+      T.wcqClassificadosKoIds = [...wins];
+      T.campeaoContinentalId = null;
+      T.fase = "fim";
+      T.ko = undefined;
+      return;
+    }
+    /** @type {JogoKoCampanha[]} */
+    const jr = iv
+      ? [
+          { home: wins[0], away: wins[1], gh: -1, ga: -1, humanoEnvolvido: false },
+          { home: wins[1], away: wins[0], gh: -1, ga: -1, humanoEnvolvido: false },
+        ]
+      : [
+          {
+            home: wins[0],
+            away: wins[1],
+            gh: -1,
+            ga: -1,
+            humanoEnvolvido: false,
+          },
+        ];
+    for (const j of jr) j.humanoEnvolvido = jogoEnvolveHumano(j, T.playerId);
     T.ko = {
       fase: "final",
-      jogosRodada: [
-        {
-          home: wins[0],
-          away: wins[1],
-          gh: -1,
-          ga: -1,
-          humanoEnvolvido: false,
-        },
-      ],
+      jogosRodada: jr,
       idxProximoJogoHumano: 0,
       vencedoresAcumulados: wins,
     };
-    T.ko.jogosRodada[0].humanoEnvolvido = jogoEnvolveHumano(T.ko.jogosRodada[0], T.playerId);
     simularTodosCpuNaRodada(T.ko.jogosRodada, T.playerId, rng);
     return;
   }
   if (wins.length === 4) {
-    T.ko = {
-      fase: "semi",
-      jogosRodada: [
+    /** @type {JogoKoCampanha[]} */
+    const jr = [];
+    if (iv) {
+      jr.push(
+        { home: wins[0], away: wins[1], gh: -1, ga: -1, humanoEnvolvido: false },
+        { home: wins[1], away: wins[0], gh: -1, ga: -1, humanoEnvolvido: false },
+        { home: wins[2], away: wins[3], gh: -1, ga: -1, humanoEnvolvido: false },
+        { home: wins[3], away: wins[2], gh: -1, ga: -1, humanoEnvolvido: false },
+      );
+    } else {
+      jr.push(
         { home: wins[0], away: wins[1], gh: -1, ga: -1, humanoEnvolvido: false },
         { home: wins[2], away: wins[3], gh: -1, ga: -1, humanoEnvolvido: false },
-      ],
+      );
+    }
+    for (const j of jr) j.humanoEnvolvido = jogoEnvolveHumano(j, T.playerId);
+    T.ko = {
+      fase: "semi",
+      jogosRodada: jr,
       idxProximoJogoHumano: 0,
       vencedoresAcumulados: wins,
     };
-    for (const j of T.ko.jogosRodada) j.humanoEnvolvido = jogoEnvolveHumano(j, T.playerId);
     simularTodosCpuNaRodada(T.ko.jogosRodada, T.playerId, rng);
   }
 }
@@ -833,17 +1232,42 @@ function enfileirarProximoJogoKo(estado, anoCalendario, rng, slot = "continental
   const pend = estado.eventos.find(
     (e) => !e.concluido && e.tipo === tipoEv && e.campanhaKoSlot,
   );
-  if (pend && pend.adversarioId === adv && pend.faseContinental === T.ko.fase) return false;
+  if (
+    pend &&
+    pend.adversarioId === adv &&
+    pend.faseContinental === T.ko.fase &&
+    pend.campanhaParHome === humano.home &&
+    pend.campanhaParAway === humano.away
+  ) {
+    return false;
+  }
   const nKo = estado.eventos.filter((e) => e.id.includes(`-${tag}-ko`)).length;
   const fase = T.ko.fase;
   const rotuloFase =
     fase === "quartas" ? "quartas de final" : fase === "semi" ? "semifinal" : "final";
-  const mesKo = Math.min(8, 7 + nKo);
+  /** @type {number} */
+  let mesKo;
+  if (slot === "wcq") {
+    let maxMesGrupos = 0;
+    for (const ev of estado.eventos) {
+      if (ev.tipo !== "eliminatorias_copa") continue;
+      if (ev.campanhaKoSlot) continue;
+      if (ev.faseContinental !== "grupos") continue;
+      maxMesGrupos = Math.max(maxMesGrupos, ev.campanhaMes ?? 0);
+    }
+    const baseMes = maxMesGrupos > 0 ? maxMesGrupos + 1 : 7;
+    mesKo = Math.min(12, baseMes + nKo);
+  } else {
+    mesKo = MES_FIM_TORNEIO_CONTINENTAL_CAMPANHA;
+  }
   const pre = textoMesAno(mesKo, anoCalendario);
+  const idxH = jogos.indexOf(humano);
+  const pernaTxt =
+    T.idaVoltaMataMata && jogos.length >= 2 ? (idxH % 2 === 0 ? " (ida)" : " (volta)") : "";
   const novo = {
     id: `${base}ko${nKo}`,
     tipo: tipoEv,
-    rotulo: `${pre} — ${T.nomeTorneio} — ${rotuloFase}`,
+    rotulo: `${pre} — ${T.nomeTorneio} — ${rotuloFase}${pernaTxt}`,
     adversarioId: adv,
     concluido: false,
     torneioNome: T.nomeTorneio,
@@ -855,8 +1279,8 @@ function enfileirarProximoJogoKo(estado, anoCalendario, rng, slot = "continental
     campanhaAno: anoCalendario,
     campanhaMes: mesKo,
   };
-  const pos = indiceInserirKoAntesAmistososFinais(estado.eventos);
-  estado.eventos.splice(pos, 0, novo);
+  estado.eventos.push(novo);
+  ordenarEventosCalendarioCampanhaNoAno(estado.eventos);
   return true;
 }
 
@@ -869,8 +1293,19 @@ function enfileirarProximoJogoKo(estado, anoCalendario, rng, slot = "continental
 export function iniciarMataMataSeAplicavel(estado, anoCalendario, rng, slot = "continental") {
   const T = slot === "wcq" ? estado.eliminatoriasCopa : estado.torneioContinental;
   if (!T || T.eliminado || T.fase !== "grupos") return;
-  montarPrimeiraRodadaKo(T, rng);
-  if (T.eliminado || T.fase !== "mata_mata") return;
+
+  /** Eliminatórias da Copa: vagas por ranking no ciclo (grupos), não mata-mata estilo continental. */
+  if (slot === "wcq" || T.eliminatoriasCopaMundial) {
+    T.fase = "fim";
+    T.ko = undefined;
+    T.campeaoContinentalId = null;
+    T.wcqClassificadosKoIds = null;
+    marcarEventosCompeticaoConcluidosFantasma(estado, slot, anoCalendario);
+    return;
+  }
+
+  montarPrimeiraRodadaKo(estado, anoCalendario, rng, slot);
+  if (T.fase !== "mata_mata") return;
   enfileirarProximoJogoKo(estado, anoCalendario, rng, slot);
 }
 
@@ -909,8 +1344,9 @@ export function aplicarResultadoPartidaTorneioCampanha(estado, evento, golsJogad
     aplicarResultadoNaLista(lista, h, a, gh, ga);
     const rodadaIdx = (evento.campanhaRodadaGrupo ?? 1) - 1;
     simularRodadaGruposExcetoPar(T, rodadaIdx, h, a, rng);
-    const rodadasP = T.rodadasPorGrupo[L];
-    if (rodadaIdx >= rodadasP.length - 1 && slot !== "wcq") {
+    // Não exigir que este jogo seja a “última rodada” do índice: no calendário misto (FIFA / Euro / WCQ)
+    // o jogador pode disputar a rodada 1 por último; o mata-mata só depende de todos os grupos fechados.
+    if (todasPartidasFaseGruposDecididas(T)) {
       iniciarMataMataSeAplicavel(estado, anoCal, rng, slot);
     }
     return;
@@ -919,30 +1355,96 @@ export function aplicarResultadoPartidaTorneioCampanha(estado, evento, golsJogad
   if (T.fase === "mata_mata" && T.ko && evento.campanhaKoSlot) {
     const h = /** @type {string} */ (evento.campanhaParHome);
     const a = /** @type {string} */ (evento.campanhaParAway);
-    const jogo = T.ko.jogosRodada.find(
-      (j) =>
-        (j.home === h && j.away === a) || (j.home === a && j.away === h),
-    );
+    const jogo = T.ko.jogosRodada.find((j) => j.home === h && j.away === a);
     if (!jogo) return;
     jogo.gh = gh;
     jogo.ga = ga;
-    let win = jogo.gh > jogo.ga ? jogo.home : jogo.away;
-    if (jogo.gh === jogo.ga) win = rng() < 0.5 ? jogo.home : jogo.away;
-    if (win !== pid) {
-      T.eliminado = true;
-      T.fase = "fim";
-      T.ko = undefined;
+    const iv = T.idaVoltaMataMata === true;
+    if (!iv) {
+      let win = jogo.gh > jogo.ga ? jogo.home : jogo.away;
+      if (jogo.gh === jogo.ga) win = rng() < 0.5 ? jogo.home : jogo.away;
+      if (win !== pid) {
+        T.eliminado = true;
+        completarMataMataAposSaidaHumana(T, rng);
+        marcarEventosCompeticaoConcluidosFantasma(estado, slot, anoCal);
+        return;
+      }
+      simularTodosCpuNaRodada(T.ko.jogosRodada, pid, rng);
+      if (todosJogosRodadaDecididos(T.ko.jogosRodada)) {
+        avancarParaProximaRodadaKo(T, rng);
+        if (T.fase === "mata_mata" && T.ko) {
+          simularTodosCpuNaRodada(T.ko.jogosRodada, pid, rng);
+        }
+      }
+      enfileirarProximoJogoKo(estado, anoCal, rng, slot);
       return;
     }
+
+    const idx = T.ko.jogosRodada.indexOf(jogo);
+    const idxPar = idx % 2 === 0 ? idx + 1 : idx - 1;
+    const jPar = T.ko.jogosRodada[idxPar];
     simularTodosCpuNaRodada(T.ko.jogosRodada, pid, rng);
-    if (todosJogosRodadaDecididos(T.ko.jogosRodada)) {
-      avancarParaProximaRodadaKo(T, rng);
-      if (T.fase === "mata_mata" && T.ko) {
-        simularTodosCpuNaRodada(T.ko.jogosRodada, pid, rng);
-      }
+    if (jPar.gh < 0) {
+      enfileirarProximoJogoKo(estado, anoCal, rng, slot);
+      return;
+    }
+    const j1 = T.ko.jogosRodada[Math.min(idx, idxPar)];
+    const j2 = T.ko.jogosRodada[Math.max(idx, idxPar)];
+    const winTie = vencedorConfrontoIdaVoltaEliminatorias(j1, j2, rng);
+    if (winTie !== pid) {
+      T.eliminado = true;
+      completarMataMataAposSaidaHumana(T, rng);
+      marcarEventosCompeticaoConcluidosFantasma(estado, slot, anoCal);
+      return;
+    }
+    if (!todosJogosRodadaDecididos(T.ko.jogosRodada)) {
+      enfileirarProximoJogoKo(estado, anoCal, rng, slot);
+      return;
+    }
+    avancarParaProximaRodadaKo(T, rng);
+    if (T.fase === "mata_mata" && T.ko) {
+      simularTodosCpuNaRodada(T.ko.jogosRodada, pid, rng);
     }
     enfileirarProximoJogoKo(estado, anoCal, rng, slot);
   }
+}
+
+/**
+ * Gols da sua seleção × adversário para o calendário (gravado no evento ou lido do estado do torneio).
+ * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
+ * @param {import('./campaign-calendar.js').EventoCampanha} e
+ * @returns {{ voce: number, adv: number } | null}
+ */
+export function placarDisplayJogadorVsAdversario(estado, e) {
+  if (typeof e.placarVoce === "number" && typeof e.placarAdv === "number") {
+    return { voce: e.placarVoce, adv: e.placarAdv };
+  }
+  if (!e.concluido) return null;
+  if (e.tipo !== "torneio_continental" && e.tipo !== "eliminatorias_copa") return null;
+
+  const T = e.tipo === "eliminatorias_copa" ? estado.eliminatoriasCopa : estado.torneioContinental;
+  if (!T) return null;
+  const pid = estado.selecaoId;
+
+  if (e.faseContinental === "grupos" && e.campanhaGrupo != null && e.campanhaIdxPartidaGrupo != null) {
+    const lista = T.partidasPorGrupo[e.campanhaGrupo];
+    const p = lista?.[e.campanhaIdxPartidaGrupo];
+    if (!p || p.gh < 0) return null;
+    const emCasa = p.home === pid;
+    return { voce: emCasa ? p.gh : p.ga, adv: emCasa ? p.ga : p.gh };
+  }
+
+  if (e.campanhaKoSlot && T.ko) {
+    const h = e.campanhaParHome;
+    const a = e.campanhaParAway;
+    if (!h || !a) return null;
+    const jogo = T.ko.jogosRodada.find((j) => j.home === h && j.away === a);
+    if (!jogo || jogo.gh < 0) return null;
+    const emCasa = jogo.home === pid;
+    return { voce: emCasa ? jogo.gh : jogo.ga, adv: emCasa ? jogo.ga : jogo.gh };
+  }
+
+  return null;
 }
 
 /**

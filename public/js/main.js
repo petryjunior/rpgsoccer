@@ -45,7 +45,11 @@ import {
   ROTULOS_QUARTAS_FIFA,
   ROTULOS_SEMI_FIFA,
   simularPlacar,
+  simularPlacarCopaMundial,
+  COPA_BONUS_MANDANTE_GRUPO,
+  COPA_BONUS_MANDANTE_KO,
   simularRodadaGruposExcetoJogoHumano,
+  simularRodadaGruposCopaTodasAsPartidas,
   sortearGrupos,
   sortear32IdsCopa,
   montarEstadoCopaCom32Ids,
@@ -73,22 +77,35 @@ import {
   montarTimeJogadorCampanhaParaPartida,
   proximoEventoPendente,
   criarCalendarioTemporada,
+  arquivarEventosCalendarioCampanha,
+  garantirEventoCopaMundialNoCalendarioAtual,
+  jogouTudoAntesDoSlotCopaMundialNoCalendario,
+  remendarConflitosCalendarioCampanhaAoCarregar,
   ANO_BASE_CAMPANHA,
   textoMesAno,
   aplicarEfeitoPosPartidaCampanha,
   aplicarProgressaoFimDeJanela,
   aplicarOscilacaoPreCompeticao,
+  aplicarOscilacaoMensalCampanha,
+  incrementarIdadeElencoCampanha,
+  snapshotReferenciasTemporadaCampanha,
   aplicarResultadoPartidaTorneioCampanha,
+  placarDisplayJogadorVsAdversario,
   textoRegrasClassificacaoTorneioCampanha,
+  paragrafosHistoricoMataMataCampanha,
+  repararFaseGruposTorneioCampanha,
   dadosTorneioContinental,
+  confederacaoId,
   anoComEdicaoContinental,
   anoComEliminatoriasCopa,
   agregarPontosEliminatoriasDoAno,
   agregarSimulacaoOutrasConfederacoesWcq,
-  finalizarClassificadosCopa2030,
+  finalizarClassificadosCopaMundial,
+  copaAlvoEliminatoriasDoAno,
+  anoEhCopaMundialCampanha,
   ANO_COPA_MUNDO_CAMPANHA,
-  ANO_ULTIMA_ELIMINATORIA,
   textoRegrasEliminatoriasCopaCampanha,
+  tituloEliminatoriasCopaMundial,
 } from "./campaign.js";
 
 const els = {
@@ -119,6 +136,11 @@ const els = {
   copaCelebracao: document.getElementById("copa-celebracao"),
   copaCelebracaoBandeira: document.getElementById("copa-celebracao-bandeira"),
   copaCelebracaoNome: document.getElementById("copa-celebracao-nome"),
+  copaEliminacao: document.getElementById("copa-eliminacao"),
+  copaEliminacaoBandeira: document.getElementById("copa-eliminacao-bandeira"),
+  copaEliminacaoNome: document.getElementById("copa-eliminacao-nome"),
+  copaEliminacaoSub: document.getElementById("copa-eliminacao-sub"),
+  copaEliminacaoTexto: document.getElementById("copa-eliminacao-texto"),
   copaResultadosRodadaWrap: document.getElementById("copa-resultados-rodada-wrap"),
   copaResultadosRodadaTitulo: document.getElementById("copa-resultados-rodada-titulo"),
   copaResultadosRodadaLista: document.getElementById("copa-resultados-rodada-lista"),
@@ -130,6 +152,7 @@ const els = {
   copaSalvarFeedback: document.getElementById("copa-salvar-feedback"),
   copaHubSavesLista: document.getElementById("copa-hub-saves-lista"),
   btnCopaProximoJogo: document.getElementById("btn-copa-proximo-jogo"),
+  btnCopaSimularProximoJogo: document.getElementById("btn-copa-simular-proximo-jogo"),
   btnCopaVerTabela: document.getElementById("btn-copa-ver-tabela"),
   btnCopaVerArtilheiros: document.getElementById("btn-copa-ver-artilheiros"),
   btnCopaVoltarInicioHub: document.getElementById("btn-copa-voltar-inicio-hub"),
@@ -224,10 +247,13 @@ const els = {
   btnCampanhaConvocacaoAuto: document.getElementById("btn-campanha-convocacao-auto"),
   btnCampanhaVoltarHubConvoc: document.getElementById("btn-campanha-voltar-hub-convoc"),
   campanhaHubResumo: document.getElementById("campanha-hub-resumo"),
+  campanhaHubEventosTituloAno: document.getElementById("campanha-hub-eventos-titulo-ano"),
   campanhaHubEventos: document.getElementById("campanha-hub-eventos"),
+  campanhaHubEventosHistorico: document.getElementById("campanha-hub-eventos-historico"),
   campanhaHubTorneio: document.getElementById("campanha-hub-torneio"),
   campanhaHubEliminatorias: document.getElementById("campanha-hub-elims"),
   btnCampanhaJogarProximo: document.getElementById("btn-campanha-jogar-proximo"),
+  btnCampanhaSimularProximo: document.getElementById("btn-campanha-simular-proximo"),
   btnCampanhaRefazerConvocacao: document.getElementById("btn-campanha-refazer-convocacao"),
   btnCampanhaHubVoltarMenu: document.getElementById("btn-campanha-hub-voltar-menu"),
   btnCampanhaCopa2030: document.getElementById("btn-campanha-copa-2030"),
@@ -710,6 +736,37 @@ function htmlStatVersusPartida(j, attr) {
   return `${v}<span class="${cls}">(${par})</span>`;
 }
 
+/**
+ * @param {import('./campaign-pool.js').JogadorCampanha} j
+ * @param {"ataque" | "defesa"} attr
+ */
+function htmlStatCampanhaConvocacao(j, attr) {
+  const v = j[attr];
+  const refKey = attr === "ataque" ? "refAtaqueTemporada" : "refDefesaTemporada";
+  const campKey = attr === "ataque" ? "refAtaqueCampanha" : "refDefesaCampanha";
+  const baseAno = j[refKey] != null ? j[refKey] : v;
+  const baseCamp = j[campKey] != null ? j[campKey] : baseAno;
+  const dAno = v - baseAno;
+  const dCamp = v - baseCamp;
+  if (dAno === 0 && dCamp === 0) return String(v);
+  const fmt = (d) => (d > 0 ? `+${d}` : String(d));
+  /** @param {number} d */
+  const cls = (d) => (d < 0 ? "stat-delta-neg" : "stat-delta-pos");
+  const parts = [];
+  if (dAno !== 0) {
+    parts.push(
+      `<span class="${cls(dAno)}" title="Desde o início do ano civil (temporada)">${fmt(dAno)} ano</span>`,
+    );
+  }
+  if (dCamp !== 0 && dCamp !== dAno) {
+    parts.push(
+      `<span class="${cls(dCamp)}" title="Desde o início da campanha">${fmt(dCamp)} total</span>`,
+    );
+  }
+  if (parts.length === 0) return String(v);
+  return `${v} <span class="campanha-convocacao-deltas">${parts.join(" · ")}</span>`;
+}
+
 /** @type {{ titulares: object[], reservas: object[] }} */
 let timeJogador = { titulares: [], reservas: [] };
 /** @type {{ titulares: object[], reservas: object[] }} */
@@ -838,6 +895,7 @@ function opcoesValidarElencoHumano() {
  *     semi: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[] | null,
  *     final: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[] | null,
  *   },
+ *   detalheEliminacaoCopa?: null | "grupos" | "oitavas" | "quartas" | "semi" | "final",
  * }}
  */
 let copaEstado = null;
@@ -2138,6 +2196,8 @@ function simularRodadaGruposCopa(/** @type {1 | 2 | 3} */ numeroRodada) {
       registradas.push({ L, homeId, awayId, gh, ga });
       registrarGolsPartidaSimuladaCopa(homeId, awayId, gh, ga, copaEstado.rng);
     },
+    simularPlacarCopaMundial,
+    COPA_BONUS_MANDANTE_GRUPO,
   );
   return registradas;
 }
@@ -2658,13 +2718,21 @@ function pintarResultadosRodadaCopa() {
   }
   els.copaResultadosRodadaWrap.hidden = false;
   els.copaResultadosRodadaTitulo.textContent = `Resultados da ${ordinalRodadaGruposPt(u.numero)} rodada (fase de grupos)`;
-  const ord = [...u.partidas].sort(
-    (a, b) => a.L.localeCompare(b.L) || a.homeId.localeCompare(b.homeId),
-  );
+  const pid = copaEstado?.playerTeamId;
+  const ord = [...u.partidas].sort((a, b) => {
+    const aSeu = pid && (a.homeId === pid || a.awayId === pid);
+    const bSeu = pid && (b.homeId === pid || b.awayId === pid);
+    if (aSeu !== bSeu) return aSeu ? -1 : 1;
+    return a.L.localeCompare(b.L) || a.homeId.localeCompare(b.homeId);
+  });
   els.copaResultadosRodadaLista.replaceChildren();
   for (const row of ord) {
     const div = document.createElement("div");
-    div.className = "copa-res-rodada-linha";
+    const seuJogo = Boolean(pid && (row.homeId === pid || row.awayId === pid));
+    div.className = seuJogo
+      ? "copa-res-rodada-linha copa-res-rodada-linha--seu-jogo"
+      : "copa-res-rodada-linha";
+    if (seuJogo) div.setAttribute("aria-label", "Seu jogo nesta rodada");
     const sh = siglaSelecaoIdCopa(row.homeId);
     const sa = siglaSelecaoIdCopa(row.awayId);
     div.textContent = `Grupo ${row.L}: ${sh} ${row.gh} × ${row.ga} ${sa}`;
@@ -2694,12 +2762,153 @@ function finalizarGruposCopa() {
   copaEstado.amarelosAcumulado = {};
 }
 
+/**
+ * Simula grupos e mata-mata por completo (campanha: seleção não classificada).
+ */
+function completarCopaCampanhaModoEspectador() {
+  if (!copaEstado?.copaEspectadorCampanha) return;
+  for (const nr of /** @type {(1 | 2 | 3)[]} */ ([1, 2, 3])) {
+    simularRodadaGruposCopaTodasAsPartidas(
+      copaEstado.grupos,
+      copaEstado.partidasPorGrupo,
+      nr,
+      forcaSelecaoId,
+      copaEstado.rng,
+      (L, homeId, awayId, gh, ga) => {
+        registrarGolsPartidaSimuladaCopa(homeId, awayId, gh, ga, copaEstado.rng);
+      },
+      simularPlacarCopaMundial,
+      COPA_BONUS_MANDANTE_GRUPO,
+    );
+  }
+  finalizarGruposCopa();
+  for (let guard = 0; guard < 24; guard++) {
+    const lista = copaEstado.jogosEliminatorios;
+    if (!lista?.length) break;
+    for (const j of lista) {
+      if (!j.winnerId) j.winnerId = simularJogoCpuVsCpu(j);
+    }
+    const fase = copaEstado.faseCopa;
+    if (fase === "oitavas") {
+      if (lista.some((j) => !j.winnerId)) continue;
+      const v = lista.map((x) => x.winnerId).filter(Boolean);
+      if (v.length !== 8) break;
+      const qua = montarQuartasFifa(v);
+      if (copaEstado.eliminatoria) copaEstado.eliminatoria.quartas = qua;
+      copaEstado.jogosEliminatorios = qua;
+      copaEstado.faseCopa = "quartas";
+      continue;
+    }
+    if (fase === "quartas") {
+      if (lista.some((j) => !j.winnerId)) continue;
+      const v = lista.map((x) => x.winnerId).filter(Boolean);
+      if (v.length !== 4) break;
+      const semi = montarSemiFifa(v);
+      if (copaEstado.eliminatoria) copaEstado.eliminatoria.semi = semi;
+      copaEstado.jogosEliminatorios = semi;
+      copaEstado.faseCopa = "semi";
+      continue;
+    }
+    if (fase === "semi") {
+      if (lista.some((j) => !j.winnerId)) continue;
+      const v = lista.map((x) => x.winnerId).filter(Boolean);
+      if (v.length !== 2) break;
+      const fin = montarFinal(v[0], v[1]);
+      if (copaEstado.eliminatoria) copaEstado.eliminatoria.final = fin;
+      copaEstado.jogosEliminatorios = fin;
+      copaEstado.faseCopa = "final";
+      continue;
+    }
+    if (fase === "final") {
+      const j0 = lista[0];
+      if (!j0?.winnerId) continue;
+      copaEstado.campeaoId = j0.winnerId;
+      copaEstado.faseCopa = "campeao";
+      break;
+    }
+    break;
+  }
+}
+
 function ocultarCelebracaoCopa() {
   if (els.copaCelebracao) els.copaCelebracao.hidden = true;
 }
 
-function mostrarTelaCopaHubAposJogoGrupo() {
+function ocultarEliminacaoCopa() {
+  if (els.copaEliminacao) els.copaEliminacao.hidden = true;
+}
+
+function ocultarBannersDestaqueCopa() {
   ocultarCelebracaoCopa();
+  ocultarEliminacaoCopa();
+}
+
+/**
+ * Fase em que a seleção do jogador foi eliminada (para texto do banner). Saves antigos sem campo: grupos se não há mata-mata; senão texto genérico.
+ * @returns {"grupos"|"oitavas"|"quartas"|"semi"|"final"|null}
+ */
+function resolverDetalheEliminacaoCopa() {
+  if (!copaEstado) return "grupos";
+  const d = copaEstado.detalheEliminacaoCopa;
+  if (d === "grupos" || d === "oitavas" || d === "quartas" || d === "semi" || d === "final") return d;
+  if (copaEstado.faseCopa !== "eliminado") return "grupos";
+  if (!copaEstado.eliminatoria?.oitavas) return "grupos";
+  return null;
+}
+
+/**
+ * @param {"grupos"|"oitavas"|"quartas"|"semi"|"final"|null} det
+ */
+function subtituloEliminacaoCopa(det) {
+  if (det === "grupos") return "Fora na fase de grupos";
+  if (det === "oitavas") return "Eliminado nas oitavas de final";
+  if (det === "quartas") return "Eliminado nas quartas de final";
+  if (det === "semi") return "Eliminado na semifinal";
+  if (det === "final") return "Vice-campeão";
+  return "Eliminado da Copa";
+}
+
+/**
+ * @param {"grupos"|"oitavas"|"quartas"|"semi"|"final"|null} det
+ */
+function textoParagrafoEliminacaoCopa(det) {
+  if (det === "grupos") {
+    return "Sua seleção não ficou entre as duas primeiras do grupo e está eliminada da Copa do Mundo.";
+  }
+  if (det === "oitavas") {
+    return "Sua seleção foi eliminada nas oitavas de final. Abaixo, a chave mostra o caminho até o título.";
+  }
+  if (det === "quartas") {
+    return "Sua seleção foi eliminada nas quartas de final. Confira a chave e o campeão abaixo.";
+  }
+  if (det === "semi") {
+    return "Sua seleção parou na semifinal. Veja abaixo quem saiu campeão.";
+  }
+  if (det === "final") {
+    return "Sua seleção chegou à final, mas não levantou a taça. Abaixo, o resultado da decisão e a chave completa.";
+  }
+  return "Sua seleção foi eliminada da Copa do Mundo. A chave abaixo mostra os resultados até a final.";
+}
+
+function mostrarEliminacaoCopaHub() {
+  ocultarCelebracaoCopa();
+  if (!copaEstado || !els.copaEliminacao) return;
+  const sel = SELECOES.find((x) => x.id === copaEstado.playerTeamId);
+  const nome = sel?.nome ?? "Sua seleção";
+  const det = resolverDetalheEliminacaoCopa();
+  if (els.copaEliminacaoNome) els.copaEliminacaoNome.textContent = nome;
+  if (els.copaEliminacaoBandeira && sel) {
+    els.copaEliminacaoBandeira.src = urlBandeira(sel.iso, 132);
+    els.copaEliminacaoBandeira.alt = `Bandeira de ${sel.nome}`;
+  }
+  if (els.copaEliminacaoSub) els.copaEliminacaoSub.textContent = subtituloEliminacaoCopa(det);
+  if (els.copaEliminacaoTexto) els.copaEliminacaoTexto.textContent = textoParagrafoEliminacaoCopa(det);
+  els.copaEliminacao.hidden = false;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function mostrarTelaCopaHubAposJogoGrupo() {
+  ocultarBannersDestaqueCopa();
   esconderJogoMostrarCopa();
   if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = true;
   if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
@@ -2722,17 +2931,15 @@ function mostrarTelaCopaHubAposJogoGrupo() {
           : "";
     }
   }
-  if (els.btnCopaProximoJogo) {
+  {
     const prontoOitavas = copaEstado && copaEstado.idxAdversarioGrupo >= 3;
-    els.btnCopaProximoJogo.hidden = false;
-    if (prontoOitavas) {
-      els.btnCopaProximoJogo.textContent = "Ir às oitavas de final";
-    } else if (copaEstado && copaEstado.idxAdversarioGrupo < 3) {
+    let txt = "Próximo jogo";
+    if (prontoOitavas) txt = "Ir às oitavas de final";
+    else if (copaEstado && copaEstado.idxAdversarioGrupo < 3) {
       const n = copaEstado.idxAdversarioGrupo + 1;
-      els.btnCopaProximoJogo.textContent = `${n}.º jogo do grupo`;
-    } else {
-      els.btnCopaProximoJogo.textContent = "Próximo jogo";
+      txt = `${n}.º jogo do grupo`;
     }
+    copaHubBotoesJogoMostrar(txt, { mostrarSimular: !prontoOitavas });
   }
   if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = false;
   mostrarSecaoArtilheirosCopaNoHub();
@@ -2747,7 +2954,7 @@ function mostrarTelaCopaHubAposJogoGrupo() {
 }
 
 function mostrarTelaCopaHubMataMata() {
-  ocultarCelebracaoCopa();
+  ocultarBannersDestaqueCopa();
   esconderJogoMostrarCopa();
   if (copaEstado) copaEstado.ultimaRodadaResultados = undefined;
   pintarResultadosRodadaCopa();
@@ -2760,10 +2967,7 @@ function mostrarTelaCopaHubMataMata() {
     els.copaHubMsg.hidden = true;
     els.copaHubMsg.textContent = "";
   }
-  if (els.btnCopaProximoJogo) {
-    els.btnCopaProximoJogo.hidden = false;
-    els.btnCopaProximoJogo.textContent = "Entrar em campo";
-  }
+  copaHubBotoesJogoMostrar("Entrar em campo");
   if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = true;
   mostrarSecaoArtilheirosCopaNoHub();
   if (els.btnCopaVoltarInicioHub) {
@@ -2777,7 +2981,6 @@ function mostrarTelaCopaHubMataMata() {
 }
 
 function mostrarTelaCopaEliminado() {
-  ocultarCelebracaoCopa();
   esconderJogoMostrarCopa();
   if (copaEstado) copaEstado.ultimaRodadaResultados = undefined;
   pintarResultadosRodadaCopa();
@@ -2797,7 +3000,7 @@ function mostrarTelaCopaEliminado() {
     els.copaHubMsg.textContent =
       `Sua seleção foi eliminada. Campeão mundial: ${nomeCamp}. A chave abaixo mostra os resultados até a final. Volte ao menu para uma nova Copa ou um amistoso.`;
   }
-  if (els.btnCopaProximoJogo) els.btnCopaProximoJogo.hidden = true;
+  copaHubBotoesJogoOcultar();
   if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = true;
   if (els.btnCopaVoltarInicioHub) {
     els.btnCopaVoltarInicioHub.hidden = false;
@@ -2805,11 +3008,13 @@ function mostrarTelaCopaEliminado() {
       ? "Voltar à campanha"
       : "Voltar ao menu";
   }
+  mostrarEliminacaoCopaHub();
   pintarChaveamentoCopa();
   pintarListaSavesCopaHub();
 }
 
 function mostrarTelaCopaCampeao() {
+  ocultarEliminacaoCopa();
   esconderJogoMostrarCopa();
   if (copaEstado) copaEstado.ultimaRodadaResultados = undefined;
   pintarResultadosRodadaCopa();
@@ -2830,11 +3035,12 @@ function mostrarTelaCopaCampeao() {
   if (els.copaCelebracao) els.copaCelebracao.hidden = false;
   if (els.copaHubMsg) {
     els.copaHubMsg.hidden = false;
-    els.copaHubMsg.textContent =
-      "Abaixo: chave completa, artilheiros da campanha e opção de salvar este título no dispositivo.";
+    els.copaHubMsg.textContent = copaEstado?.copaEspectadorCampanha
+      ? "Modo acompanhamento: chave completa e artilheiros. Use «Ver tabela» para as classificações dos oito grupos."
+      : "Abaixo: chave completa, artilheiros da campanha e opção de salvar este título no dispositivo.";
   }
-  if (els.btnCopaProximoJogo) els.btnCopaProximoJogo.hidden = true;
-  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = true;
+  copaHubBotoesJogoOcultar();
+  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = !copaEstado?.copaEspectadorCampanha;
   if (els.btnCopaVoltarInicioHub) {
     els.btnCopaVoltarInicioHub.hidden = false;
     els.btnCopaVoltarInicioHub.textContent = copaEstado?.origemCampanha
@@ -2847,7 +3053,6 @@ function mostrarTelaCopaCampeao() {
 }
 
 function mostrarTelaCopaNaoClassificou() {
-  ocultarCelebracaoCopa();
   esconderJogoMostrarCopa();
   if (copaEstado) copaEstado.ultimaRodadaResultados = undefined;
   pintarResultadosRodadaCopa();
@@ -2861,7 +3066,7 @@ function mostrarTelaCopaNaoClassificou() {
     els.copaHubMsg.textContent =
       "Sua seleção não ficou entre as duas primeiras do grupo. Volte ao menu para tentar outra Copa.";
   }
-  if (els.btnCopaProximoJogo) els.btnCopaProximoJogo.hidden = true;
+  copaHubBotoesJogoOcultar();
   if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = false;
   mostrarSecaoArtilheirosCopaNoHub();
   if (els.btnCopaVoltarInicioHub) {
@@ -2870,6 +3075,7 @@ function mostrarTelaCopaNaoClassificou() {
       ? "Voltar à campanha"
       : "Voltar ao menu";
   }
+  mostrarEliminacaoCopaHub();
   ocultarChaveamentoCopa();
   pintarListaSavesCopaHub();
 }
@@ -2883,6 +3089,7 @@ function tentarAvancarDosGruposCopa() {
   const pos = ordem.indexOf(copaEstado.playerTeamId);
   if (pos < 0 || pos > 1) {
     copaEstado.faseCopa = "eliminado";
+    copaEstado.detalheEliminacaoCopa = "grupos";
     mostrarTelaCopaNaoClassificou();
     return;
   }
@@ -2915,12 +3122,65 @@ function handleCopaProximoJogo() {
   }
 }
 
+function prepararElencoCopaParaSimulacao(cpuId) {
+  if (!copaEstado) return;
+  tipoModoJogo = "copa";
+  timeJogador = elencoDaSelecao(copaEstado.playerTeamId);
+  timeCpu = elencoDaSelecao(cpuId);
+  metaSelecaoJogador =
+    SELECOES.find((x) => x.id === copaEstado.playerTeamId) ?? null;
+  metaSelecaoCpu = SELECOES.find((x) => x.id === cpuId) ?? null;
+  aplicarRestricoesCopaNoElencoHumano();
+}
+
+function simularProximoJogoCopaNoHub() {
+  if (!copaEstado) return;
+  if (copaEstado.faseCopa === "grupos" && copaEstado.idxAdversarioGrupo >= 3) {
+    return;
+  }
+  /** @type {string | null} */
+  let cpuId = null;
+  if (copaEstado.faseCopa === "grupos") {
+    cpuId = copaEstado.adversariosGrupo[copaEstado.idxAdversarioGrupo] ?? null;
+  } else if (
+    copaEstado.faseCopa === "oitavas" ||
+    copaEstado.faseCopa === "quartas" ||
+    copaEstado.faseCopa === "semi" ||
+    copaEstado.faseCopa === "final"
+  ) {
+    const jogo = copaEstado.jogosEliminatorios[copaEstado.idxJogoEliminatorio];
+    if (!jogo || jogo.winnerId) return;
+    cpuId =
+      jogo.homeId === copaEstado.playerTeamId ? jogo.awayId : jogo.homeId;
+  }
+  if (!cpuId) return;
+  prepararElencoCopaParaSimulacao(cpuId);
+  const fh = forcaSelecaoId(copaEstado.playerTeamId);
+  const fa = forcaSelecaoId(cpuId);
+  const { gh, ga } = simularPlacarSemEmpate(fh, fa, copaEstado.rng, (fc, ff, r) =>
+    simularPlacarCopaMundial(fc, ff, r, 1.5),
+  );
+  golsJogador = gh;
+  golsCpu = ga;
+  placarPenaltisPosDecisao = null;
+  processarFimDeJogoCopa({ irDiretoAoHub: true, simulacaoNoHub: true });
+  atualizarBtnCentroRodada();
+}
+
 function voltarHubCampanhaDesdeCopa2030() {
   const terminal =
     copaEstado &&
     (copaEstado.faseCopa === "campeao" || copaEstado.faseCopa === "eliminado");
   if (!campanhaEstadoMemoria) campanhaEstadoMemoria = carregarCampanhaAtiva();
   if (campanhaEstadoMemoria && terminal) {
+    const anoArquivar =
+      campanhaEstadoMemoria.anoCalendario ??
+      ANO_BASE_CAMPANHA + (campanhaEstadoMemoria.temporada ?? 1) - 1;
+    const evCopaSlot = campanhaEstadoMemoria.eventos?.find(
+      (e) => e.tipo === "copa_mundial" && e.campanhaAno === anoArquivar,
+    );
+    if (evCopaSlot) evCopaSlot.concluido = true;
+    arquivarEventosCalendarioCampanha(campanhaEstadoMemoria, anoArquivar);
     campanhaEstadoMemoria.copa2030Concluida = true;
     campanhaEstadoMemoria.temporada = (campanhaEstadoMemoria.temporada ?? 1) + 1;
     campanhaEstadoMemoria.anoCalendario =
@@ -3018,8 +3278,8 @@ function resetCopaUi() {
     els.copaHubMsg.hidden = true;
     els.copaHubMsg.textContent = "";
   }
-  ocultarCelebracaoCopa();
-  if (els.btnCopaProximoJogo) els.btnCopaProximoJogo.hidden = true;
+  ocultarBannersDestaqueCopa();
+  copaHubBotoesJogoOcultar();
   if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = true;
   if (els.btnCopaVerArtilheiros) els.btnCopaVerArtilheiros.hidden = true;
   esconderSecaoArtilheirosCopaNoHub();
@@ -3115,6 +3375,7 @@ function iniciarCopaComSorteio() {
     jogosSuspensao: {},
     amarelosAcumulado: {},
     eliminatoria: null,
+    detalheEliminacaoCopa: null,
   };
   if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = true;
   if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
@@ -3129,7 +3390,7 @@ function iniciarCopaComSorteio() {
   if (els.copaGruposIntro) els.copaGruposIntro.hidden = false;
   if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = false;
   if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = false;
-  ocultarCelebracaoCopa();
+  ocultarBannersDestaqueCopa();
   pintarTabelaGrupoCopa();
   pintarResultadosRodadaCopa();
   if (els.copaHubMsg) {
@@ -3137,10 +3398,7 @@ function iniciarCopaComSorteio() {
     els.copaHubMsg.textContent =
       "Nenhuma partida da 1.ª rodada foi jogada ainda nos outros grupos. Dispute o seu 1.º jogo; em seguida os demais jogos da rodada serão simulados e listados em “Resultados da rodada”.";
   }
-  if (els.btnCopaProximoJogo) {
-    els.btnCopaProximoJogo.hidden = false;
-    els.btnCopaProximoJogo.textContent = "1.º jogo do grupo";
-  }
+  copaHubBotoesJogoMostrar("1.º jogo do grupo");
   if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = false;
   mostrarSecaoArtilheirosCopaNoHub();
   if (els.btnCopaVoltarInicioHub) els.btnCopaVoltarInicioHub.hidden = false;
@@ -3154,9 +3412,12 @@ function iniciarCopa2030DaCampanha() {
   if (!campanhaEstadoMemoria) return;
   const ids32 = campanhaEstadoMemoria.classificadosCopa2030;
   if (!Array.isArray(ids32) || ids32.length !== 32) return;
-  if (!ids32.includes(campanhaEstadoMemoria.selecaoId)) return;
-  const seed = (campanhaEstadoMemoria.seedCampanha ^ 0xf1f42630) >>> 0;
-  copaEstado = montarEstadoCopaCom32Ids(ids32, campanhaEstadoMemoria.selecaoId, seed);
+  const anoCopa =
+    campanhaEstadoMemoria.copaClassificadosAno ?? ANO_COPA_MUNDO_CAMPANHA;
+  const seed = (campanhaEstadoMemoria.seedCampanha ^ 0xf1f42630 ^ anoCopa * 0x51ed) >>> 0;
+  copaEstado = montarEstadoCopaCom32Ids(ids32, campanhaEstadoMemoria.selecaoId, seed, {
+    campanhaSelecaoId: campanhaEstadoMemoria.selecaoId,
+  });
   copaEstado.origemCampanha = true;
   idSelecaoCopaEscolhida = campanhaEstadoMemoria.selecaoId;
   tipoModoJogo = "copa";
@@ -3174,10 +3435,30 @@ function iniciarCopa2030DaCampanha() {
   }
   if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = true;
   if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
+  if (copaEstado.copaEspectadorCampanha) {
+    completarCopaCampanhaModoEspectador();
+    if (els.copaGruposGrid) {
+      preencherGradeGruposCopa(copaEstado.grupos);
+      els.copaGruposGrid.hidden = false;
+    }
+    if (els.copaGruposIntro) {
+      const sn =
+        SELECOES.find((x) => x.id === campanhaEstadoMemoria.selecaoId)?.nome ?? "";
+      els.copaGruposIntro.textContent = `Copa ${anoCopa} (campanha): ${sn} não se classificou. A competição foi simulada na íntegra — confira tabelas, chave e artilheiros.`;
+      els.copaGruposIntro.hidden = false;
+    }
+    if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = true;
+    if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = true;
+    ocultarBannersDestaqueCopa();
+    pintarTabelaGrupoCopa();
+    pintarResultadosRodadaCopa();
+    mostrarTelaCopaCampeao();
+    return;
+  }
   if (els.copaGruposIntro) {
     const sn =
       SELECOES.find((x) => x.id === campanhaEstadoMemoria.selecaoId)?.nome ?? "";
-    els.copaGruposIntro.textContent = `Copa ${ANO_COPA_MUNDO_CAMPANHA} (campanha): você comanda ${sn}, no grupo ${copaEstado.grupoPlayer}.`;
+    els.copaGruposIntro.textContent = `Copa ${anoCopa} (campanha): você comanda ${sn}, no grupo ${copaEstado.grupoPlayer}.`;
   }
   if (els.copaGruposGrid) {
     preencherGradeGruposCopa(copaEstado.grupos);
@@ -3186,7 +3467,7 @@ function iniciarCopa2030DaCampanha() {
   if (els.copaGruposIntro) els.copaGruposIntro.hidden = false;
   if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = false;
   if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = false;
-  ocultarCelebracaoCopa();
+  ocultarBannersDestaqueCopa();
   pintarTabelaGrupoCopa();
   pintarResultadosRodadaCopa();
   if (els.copaHubMsg) {
@@ -3194,10 +3475,7 @@ function iniciarCopa2030DaCampanha() {
     els.copaHubMsg.textContent =
       "Classificados definidos pelas eliminatórias da campanha. Dispute o 1.º jogo; os outros jogos da rodada serão simulados em seguida.";
   }
-  if (els.btnCopaProximoJogo) {
-    els.btnCopaProximoJogo.hidden = false;
-    els.btnCopaProximoJogo.textContent = "1.º jogo do grupo";
-  }
+  copaHubBotoesJogoMostrar("1.º jogo do grupo");
   if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = false;
   mostrarSecaoArtilheirosCopaNoHub();
   if (els.btnCopaVoltarInicioHub) {
@@ -3741,14 +4019,42 @@ function finalizarCampanhaAposPartida() {
       rngTor,
     );
   }
-  if (ev) ev.concluido = true;
+  if (ev) {
+    ev.placarVoce = golsJogador;
+    ev.placarAdv = golsCpu;
+    ev.concluido = true;
+    if (ev.tipo === "eliminatorias_copa" && Array.isArray(campanhaEstadoMemoria.wcqAgendaHumano)) {
+      const tpl = campanhaEstadoMemoria.wcqAgendaHumano.find((x) => x.id === ev.id);
+      if (tpl) {
+        tpl.placarVoce = golsJogador;
+        tpl.placarAdv = golsCpu;
+      }
+    }
+  }
   if (ev && ev.campanhaMes != null) {
-    campanhaEstadoMemoria.mesAtual = ev.campanhaMes;
+    const mesEvt = ev.campanhaMes;
+    let ult = campanhaEstadoMemoria.campanhaUltimoMesOscStats;
+    if (ult == null) {
+      campanhaEstadoMemoria.campanhaUltimoMesOscStats = mesEvt;
+    } else if (mesEvt !== ult) {
+      aplicarOscilacaoMensalCampanha(
+        campanhaEstadoMemoria.jogadores,
+        (campanhaEstadoMemoria.seedCampanha ^
+          campanhaEstadoMemoria.temporada * 7919 ^
+          mesEvt * 17) >>>
+          0,
+      );
+      campanhaEstadoMemoria.campanhaUltimoMesOscStats = mesEvt;
+    }
+    campanhaEstadoMemoria.mesAtual = mesEvt;
   }
   campanhaEventoAtualId = null;
   const pend = proximoEventoPendente(campanhaEstadoMemoria.eventos);
   if (!pend) {
-    const anoQueTermina = campanhaEstadoMemoria.anoCalendario;
+    const anoQueTermina =
+      campanhaEstadoMemoria.anoCalendario ??
+      ANO_BASE_CAMPANHA + (campanhaEstadoMemoria.temporada ?? 1) - 1;
+    arquivarEventosCalendarioCampanha(campanhaEstadoMemoria, anoQueTermina);
     if (anoComEliminatoriasCopa(anoQueTermina)) {
       const rngWcq = criarRng((campanhaEstadoMemoria.seedCampanha ^ 0x11e17) >>> 0);
       agregarPontosEliminatoriasDoAno(campanhaEstadoMemoria, rngWcq);
@@ -3758,18 +4064,25 @@ function finalizarCampanhaAposPartida() {
         rngWcq,
       );
     }
-    if (anoQueTermina === ANO_ULTIMA_ELIMINATORIA) {
-      const rngF = criarRng((campanhaEstadoMemoria.seedCampanha ^ 0xc0da032) >>> 0);
-      finalizarClassificadosCopa2030(
+    const cupAlvo = copaAlvoEliminatoriasDoAno(anoQueTermina);
+    if (
+      cupAlvo != null &&
+      anoQueTermina === cupAlvo - 1
+    ) {
+      const rngF = criarRng((campanhaEstadoMemoria.seedCampanha ^ 0xc0da032 ^ cupAlvo) >>> 0);
+      finalizarClassificadosCopaMundial(
         campanhaEstadoMemoria,
         SELECOES.map((s) => s.id),
         rngF,
+        cupAlvo,
       );
     }
+    incrementarIdadeElencoCampanha(campanhaEstadoMemoria.jogadores);
     aplicarProgressaoFimDeJanela(
       campanhaEstadoMemoria.jogadores,
       (campanhaEstadoMemoria.seedCampanha + campanhaEstadoMemoria.temporada * 1009) >>> 0,
     );
+    snapshotReferenciasTemporadaCampanha(campanhaEstadoMemoria.jogadores);
     campanhaEstadoMemoria.temporada += 1;
     campanhaEstadoMemoria.anoCalendario =
       ANO_BASE_CAMPANHA + campanhaEstadoMemoria.temporada - 1;
@@ -3788,6 +4101,7 @@ function finalizarCampanhaAposPartida() {
     campanhaEstadoMemoria.torneioContinental = calNovo.torneioContinental;
     campanhaEstadoMemoria.eliminatoriasCopa = calNovo.eliminatoriasCopa ?? null;
     campanhaEstadoMemoria.mesAtual = calNovo.eventos[0]?.campanhaMes ?? 3;
+    campanhaEstadoMemoria.campanhaUltimoMesOscStats = campanhaEstadoMemoria.mesAtual;
     const convObjs = campanhaEstadoMemoria.convocadosIds
       .map((id) => campanhaEstadoMemoria.jogadores.find((x) => x.id === id))
       .filter(Boolean);
@@ -3821,8 +4135,123 @@ function voltarAoHubCampanhaDesdeJogo() {
   atualizarBtnCentroRodada();
 }
 
+/**
+ * @param {HTMLUListElement} ul
+ * @param {import('./campaign-calendar.js').EventoCampanha[]} eventos
+ * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
+ * @param {import('./campaign-calendar.js').EventoCampanha | null} proxEv destaca o próximo pendente (só calendário atual)
+ */
+function appendCampanhaCalendarioLinhas(ul, eventos, estado, proxEv) {
+  let prevTipo = /** @type {string | null} */ (null);
+  for (const e of eventos) {
+    const li = document.createElement("li");
+    const base = `${e.rotulo}${e.adversarioId ? ` · vs ${selecaoPorId(e.adversarioId)?.nome ?? e.adversarioId}` : ""}`;
+    li.appendChild(document.createTextNode(base));
+    const placar = e.concluido ? placarDisplayJogadorVsAdversario(estado, e) : null;
+    if (placar) {
+      const sp = document.createElement("span");
+      sp.className = "campanha-ev-placar";
+      sp.textContent = ` — ${placar.voce} × ${placar.adv}`;
+      li.appendChild(sp);
+    }
+    if (e.concluido) li.classList.add("campanha-ev-feito");
+    if (proxEv && e.id === proxEv.id) li.classList.add("campanha-ev-atual");
+    if (e.tipo === "torneio_continental") {
+      li.classList.add("campanha-ev-torneio");
+      if (prevTipo === "amistoso" || prevTipo === "eliminatorias_copa") {
+        li.classList.add("campanha-ev-torneio-bloco");
+      }
+    }
+    if (e.tipo === "eliminatorias_copa") {
+      li.classList.add("campanha-ev-wcq");
+      if (prevTipo === "amistoso" || prevTipo === "torneio_continental") {
+        li.classList.add("campanha-ev-torneio-bloco");
+      }
+    }
+    if (e.tipo === "copa_mundial") {
+      li.classList.add("campanha-ev-copa-mundial");
+      if (prevTipo === "amistoso" || prevTipo === "torneio_continental" || prevTipo === "eliminatorias_copa") {
+        li.classList.add("campanha-ev-torneio-bloco");
+      }
+    }
+    prevTipo = e.tipo;
+    ul.appendChild(li);
+  }
+}
+
+/**
+ * Mensagem verde no hub das eliminatórias: lista à Copa quando as 32 vagas existem; senão as seleções após o KO local.
+ * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
+ * @param {object} We eliminatoriasCopa
+ */
+function textoHubEliminatoriasClassificadosCopa(estado, We) {
+  const anoCopa = estado.wcqCicloCopaAlvo ?? ANO_COPA_MUNDO_CAMPANHA;
+  const confKey = We.confKey ?? dadosTorneioContinental(estado.selecaoId).key;
+  const lista32 = estado.classificadosCopa2030;
+  const anoCls = estado.copaClassificadosAno;
+  if (Array.isArray(lista32) && lista32.length === 32 && anoCls === anoCopa) {
+    const naZona = lista32.filter((id) => confederacaoId(id) === confKey);
+    const nomes = naZona
+      .map((id) => selecaoPorId(id)?.nome ?? id)
+      .sort((a, b) => a.localeCompare(b, "pt"));
+    return `Classificados para a Copa ${anoCopa} (${confKey}): ${nomes.join(", ")}.`;
+  }
+  const koIds = We.wcqClassificadosKoIds;
+  if (Array.isArray(koIds) && koIds.length) {
+    const nomesKo = [...new Set(koIds)]
+      .map((id) => selecaoPorId(id)?.nome ?? id)
+      .sort((a, b) => a.localeCompare(b, "pt"));
+    return `Fase eliminatória da zona encerrada — na disputa das vagas à Copa ${anoCopa}: ${nomesKo.join(", ")}.`;
+  }
+  if (We.campeaoContinentalId) {
+    const nm = selecaoPorId(We.campeaoContinentalId)?.nome ?? We.campeaoContinentalId;
+    return `Fase eliminatória da zona encerrada (save anterior): ${nm}.`;
+  }
+  return "";
+}
+
+/**
+ * Ano civil da edição (menor `campanhaAno` nos eventos da competição), para títulos no hub.
+ * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
+ * @param {'torneio_continental' | 'eliminatorias_copa'} tipo
+ * @param {string | undefined} nomeTorneio
+ * @param {number} fallbackAno
+ */
+function anoEdicaoCompeticaoCampanhaNoHub(estado, tipo, nomeTorneio, fallbackAno) {
+  if (!nomeTorneio) return fallbackAno;
+  /** @type {number | null} */
+  let best = null;
+  const considerar = (/** @type {import('./campaign-calendar.js').EventoCampanha} */ e) => {
+    if (e.tipo !== tipo || e.torneioNome !== nomeTorneio) return;
+    const a = e.campanhaAno;
+    if (a == null || !Number.isFinite(a)) return;
+    best = best == null ? a : Math.min(best, a);
+  };
+  for (const e of estado.eventos ?? []) considerar(e);
+  for (const bloco of estado.historicoEventosCampanha ?? []) {
+    for (const e of bloco.eventos ?? []) considerar(e);
+  }
+  if (tipo === "eliminatorias_copa" && Array.isArray(estado.wcqAgendaHumano)) {
+    for (const e of estado.wcqAgendaHumano) considerar(e);
+  }
+  return best ?? fallbackAno;
+}
+
 function pintarCampanhaHub() {
   if (!campanhaEstadoMemoria) return;
+  const rngReparo = criarRng(
+    (campanhaEstadoMemoria.seedCampanha ^ 0x6d616d61 ^ (campanhaEstadoMemoria.temporada ?? 1) * 997) >>> 0,
+  );
+  if (repararFaseGruposTorneioCampanha(campanhaEstadoMemoria, rngReparo)) {
+    salvarCampanhaAtiva(campanhaEstadoMemoria);
+  }
+  let salvouCalHub = false;
+  if (garantirEventoCopaMundialNoCalendarioAtual(campanhaEstadoMemoria)) salvouCalHub = true;
+  if (remendarConflitosCalendarioCampanhaAoCarregar(campanhaEstadoMemoria)) salvouCalHub = true;
+  if (salvouCalHub) salvarCampanhaAtiva(campanhaEstadoMemoria);
+  const anoCalAtual =
+    campanhaEstadoMemoria.anoCalendario ??
+    ANO_BASE_CAMPANHA + (campanhaEstadoMemoria.temporada ?? 1) - 1;
   const sel = selecaoPorId(campanhaEstadoMemoria.selecaoId);
   const nomeSel = sel?.nome ?? campanhaEstadoMemoria.selecaoId;
   const proxEv = proximoEventoPendente(campanhaEstadoMemoria.eventos);
@@ -3836,14 +4265,19 @@ function pintarCampanhaHub() {
               : ""
           }.`
         : "";
+    const Tcur = campanhaEstadoMemoria.torneioContinental;
+    const nomCampTor =
+      Tcur?.campeaoContinentalId != null
+        ? selecaoPorId(Tcur.campeaoContinentalId)?.nome ?? Tcur.campeaoContinentalId
+        : "";
     const elim =
-      campanhaEstadoMemoria.torneioContinental?.eliminado
-        ? ` Eliminado do torneio continental em ${campanhaEstadoMemoria.anoCalendario ?? ANO_BASE_CAMPANHA + campanhaEstadoMemoria.temporada - 1}.`
+      Tcur?.eliminado
+        ? ` Eliminado do ${Tcur.nomeTorneio ?? "torneio continental"} em ${
+            campanhaEstadoMemoria.anoCalendario ?? ANO_BASE_CAMPANHA + campanhaEstadoMemoria.temporada - 1
+          }.${nomCampTor ? ` Campeão: ${nomCampTor}.` : ""}`
         : "";
     const elimWcq = "";
-    const anoHub =
-      campanhaEstadoMemoria.anoCalendario ??
-      ANO_BASE_CAMPANHA + campanhaEstadoMemoria.temporada - 1;
+    const anoHub = anoCalAtual;
     const mesHub = proxEv?.campanhaMes ?? campanhaEstadoMemoria.mesAtual ?? 3;
     const dataHub = textoMesAno(mesHub, anoHub);
     const infoTor = dadosTorneioContinental(campanhaEstadoMemoria.selecaoId);
@@ -3851,11 +4285,14 @@ function pintarCampanhaHub() {
       !campanhaEstadoMemoria.torneioContinental && !anoComEdicaoContinental(infoTor.key, anoHub)
         ? ` Sem ${infoTor.nomeTorneio} neste ano civil (calendário FIFA); só amistosos.`
         : "";
+    const anoCopaMsg = campanhaEstadoMemoria.copaClassificadosAno ?? ANO_COPA_MUNDO_CAMPANHA;
     const linhaCopa2030 =
       Array.isArray(campanhaEstadoMemoria.classificadosCopa2030) &&
       campanhaEstadoMemoria.classificadosCopa2030.length === 32 &&
-      anoHub >= ANO_COPA_MUNDO_CAMPANHA
-        ? ` Copa ${ANO_COPA_MUNDO_CAMPANHA}: 32 vagas preenchidas por confederação (quotas). Use o botão abaixo para disputar o torneio final (continua na campanha após o fim).`
+      anoEhCopaMundialCampanha(anoHub) &&
+      anoCopaMsg === anoHub &&
+      !campanhaEstadoMemoria.copa2030Concluida
+        ? ` Copa ${anoHub}: 32 vagas preenchidas por confederação (quotas). O calendário inclui a janela do Mundial (junho ou julho, conforme haja torneio continental no mesmo ano); use “Jogar próximo evento” ou o botão abaixo para disputar ou acompanhar o torneio (continua na campanha após o fim).`
         : "";
     els.campanhaHubResumo.textContent = `${nomeSel} — ${dataHub} · temporada ${campanhaEstadoMemoria.temporada}. Elenco ampliado: ${campanhaEstadoMemoria.jogadores.length} jogadores; convocados: ${campanhaEstadoMemoria.convocadosIds.length}/23.${torneioLinha}${elim}${elimWcq}${semContinental}${linhaCopa2030}`;
   }
@@ -3871,9 +4308,14 @@ function pintarCampanhaHub() {
       );
       const pid = campanhaEstadoMemoria.selecaoId;
       const Lplay = T.playerGrupo ?? "A";
+      const anoEdicaoTor = anoEdicaoCompeticaoCampanhaNoHub(
+        campanhaEstadoMemoria,
+        "torneio_continental",
+        T.nomeTorneio,
+        anoCalAtual,
+      );
 
-      const regrasTxt =
-        T.fase === "grupos" ? textoRegrasClassificacaoTorneioCampanha(T) : "";
+      const regrasTxt = textoRegrasClassificacaoTorneioCampanha(T);
       if (regrasTxt) {
         const pRegras = document.createElement("p");
         pRegras.className = "campanha-torneio-regras";
@@ -3885,7 +4327,7 @@ function pintarCampanhaHub() {
       wrapPrincipal.className = "campanha-torneio-grupo-jogador";
       const hPrin = document.createElement("h4");
       hPrin.className = "copa-subtitulo";
-      hPrin.textContent = `Classificação — grupo ${Lplay}`;
+      hPrin.textContent = `${T.nomeTorneio} ${anoEdicaoTor} — grupo ${Lplay}`;
       const tabPrin = document.createElement("div");
       tabPrin.className = "copa-tabela-grupo";
       tabPrin.innerHTML = htmlTabelaClassificacaoGrupoCampanha(T, Lplay, rngTab, pid, false);
@@ -3912,6 +4354,37 @@ function pintarCampanhaHub() {
         }
         els.campanhaHubTorneio.appendChild(grid);
       }
+
+      if (T.fase === "fim") {
+        const linhasHist = paragrafosHistoricoMataMataCampanha(T);
+        if (linhasHist.length) {
+          const boxHist = document.createElement("div");
+          boxHist.className = "campanha-torneio-historico-ko";
+          for (const linha of linhasHist) {
+            const p = document.createElement("p");
+            p.className = linha.startsWith("  ")
+              ? "campanha-torneio-historico-ko-jogo"
+              : "campanha-torneio-historico-ko-titulo";
+            p.textContent = linha.trimStart();
+            boxHist.appendChild(p);
+          }
+          els.campanhaHubTorneio.appendChild(boxHist);
+        } else if (T.campeaoContinentalId) {
+          const pLeg = document.createElement("p");
+          pLeg.className = "campanha-torneio-regras";
+          pLeg.textContent =
+            "O título foi decidido no mata-mata após a fase de grupos. Este save não guarda o detalhe dos placares (campanha iniciada antes da atualização).";
+          els.campanhaHubTorneio.appendChild(pLeg);
+        }
+      }
+
+      if (T.fase === "fim" && T.campeaoContinentalId) {
+        const pCamp = document.createElement("p");
+        pCamp.className = "campanha-torneio-campeao";
+        const nm = selecaoPorId(T.campeaoContinentalId)?.nome ?? T.campeaoContinentalId;
+        pCamp.textContent = `Campeão — ${T.nomeTorneio} ${anoEdicaoTor}: ${nm}.`;
+        els.campanhaHubTorneio.appendChild(pCamp);
+      }
     }
   } else if (els.campanhaHubTorneio) {
     els.campanhaHubTorneio.replaceChildren();
@@ -3930,15 +4403,28 @@ function pintarCampanhaHub() {
       );
       const pidW = campanhaEstadoMemoria.selecaoId;
       const Lw = We.playerGrupo ?? "A";
+      const tituloWcq = tituloEliminatoriasCopaMundial(
+        We.confKey,
+        campanhaEstadoMemoria.wcqCicloCopaAlvo ?? ANO_COPA_MUNDO_CAMPANHA,
+      );
+      const anoEdicaoWcq = anoEdicaoCompeticaoCampanhaNoHub(
+        campanhaEstadoMemoria,
+        "eliminatorias_copa",
+        We.nomeTorneio,
+        anoCalAtual,
+      );
       const pRegrasW = document.createElement("p");
       pRegrasW.className = "campanha-torneio-regras";
-      pRegrasW.textContent = textoRegrasEliminatoriasCopaCampanha(We);
+      pRegrasW.textContent = textoRegrasEliminatoriasCopaCampanha(
+        We,
+        campanhaEstadoMemoria,
+      );
       els.campanhaHubEliminatorias.appendChild(pRegrasW);
       const wrapW = document.createElement("div");
       wrapW.className = "campanha-torneio-grupo-jogador campanha-elims-wrap";
       const hW = document.createElement("h4");
       hW.className = "copa-subtitulo";
-      hW.textContent = `Eliminatórias — grupo ${Lw}`;
+      hW.textContent = `${tituloWcq} ${anoEdicaoWcq} — grupo ${Lw}`;
       const tabW = document.createElement("div");
       tabW.className = "copa-tabela-grupo";
       tabW.innerHTML = htmlTabelaClassificacaoGrupoCampanha(We, Lw, rngW, pidW, false);
@@ -3964,55 +4450,125 @@ function pintarCampanhaHub() {
         }
         els.campanhaHubEliminatorias.appendChild(gridW);
       }
+
+      if (We.fase === "fim") {
+        const linhasHistW = paragrafosHistoricoMataMataCampanha(We);
+        if (linhasHistW.length) {
+          const boxHistW = document.createElement("div");
+          boxHistW.className = "campanha-torneio-historico-ko";
+          for (const linha of linhasHistW) {
+            const p = document.createElement("p");
+            p.className = linha.startsWith("  ")
+              ? "campanha-torneio-historico-ko-jogo"
+              : "campanha-torneio-historico-ko-titulo";
+            p.textContent = linha.trimStart();
+            boxHistW.appendChild(p);
+          }
+          els.campanhaHubEliminatorias.appendChild(boxHistW);
+        } else if (We.wcqClassificadosKoIds?.length || We.campeaoContinentalId) {
+          const pLegW = document.createElement("p");
+          pLegW.className = "campanha-torneio-regras";
+          pLegW.textContent =
+            "A fase eliminatória foi simulada após os grupos. Este save não guarda o detalhe dos placares (campanha iniciada antes da atualização).";
+          els.campanhaHubEliminatorias.appendChild(pLegW);
+        }
+      }
+
+      if (We.fase === "fim") {
+        const txtCls = textoHubEliminatoriasClassificadosCopa(campanhaEstadoMemoria, We);
+        if (txtCls) {
+          const pCampW = document.createElement("p");
+          pCampW.className = "campanha-torneio-campeao";
+          pCampW.textContent = txtCls;
+          els.campanhaHubEliminatorias.appendChild(pCampW);
+        }
+      }
     }
   } else if (els.campanhaHubEliminatorias) {
     els.campanhaHubEliminatorias.replaceChildren();
     els.campanhaHubEliminatorias.hidden = true;
   }
 
+  if (els.campanhaHubEventosTituloAno) {
+    els.campanhaHubEventosTituloAno.textContent = `Calendário ${anoCalAtual}`;
+    els.campanhaHubEventosTituloAno.hidden = false;
+  }
   if (els.campanhaHubEventos) {
     els.campanhaHubEventos.replaceChildren();
-    const prox = proxEv;
-    /** @type {string | null} */
-    let prevTipo = null;
-    for (const e of campanhaEstadoMemoria.eventos) {
-      const li = document.createElement("li");
-      li.textContent = `${e.rotulo}${e.adversarioId ? ` · vs ${selecaoPorId(e.adversarioId)?.nome ?? e.adversarioId}` : ""}`;
-      if (e.concluido) li.classList.add("campanha-ev-feito");
-      if (prox && e.id === prox.id) li.classList.add("campanha-ev-atual");
-      if (e.tipo === "torneio_continental") {
-        li.classList.add("campanha-ev-torneio");
-        if (prevTipo === "amistoso" || prevTipo === "eliminatorias_copa") {
-          li.classList.add("campanha-ev-torneio-bloco");
-        }
+    appendCampanhaCalendarioLinhas(
+      els.campanhaHubEventos,
+      campanhaEstadoMemoria.eventos,
+      campanhaEstadoMemoria,
+      proxEv,
+    );
+  }
+  if (els.campanhaHubEventosHistorico) {
+    els.campanhaHubEventosHistorico.replaceChildren();
+    const hist = campanhaEstadoMemoria.historicoEventosCampanha ?? [];
+    if (!hist.length) {
+      els.campanhaHubEventosHistorico.hidden = true;
+    } else {
+      els.campanhaHubEventosHistorico.hidden = false;
+      const intro = document.createElement("p");
+      intro.className = "campanha-hub-calendario-hist-intro tela-menu-sub";
+      intro.textContent =
+        "Anos anteriores: expanda cada ano para ver o calendário completo e os seus resultados.";
+      els.campanhaHubEventosHistorico.appendChild(intro);
+      for (const bloco of hist) {
+        const nConc = bloco.eventos.filter((x) => x.concluido).length;
+        const det = document.createElement("details");
+        det.className = "campanha-hub-calendario-details";
+        const sum = document.createElement("summary");
+        sum.textContent = `Ano civil ${bloco.ano} (${nConc}/${bloco.eventos.length} jogos)`;
+        det.appendChild(sum);
+        const ulh = document.createElement("ul");
+        ulh.className = "campanha-hub-eventos campanha-hub-eventos--historico";
+        appendCampanhaCalendarioLinhas(ulh, bloco.eventos, campanhaEstadoMemoria, null);
+        det.appendChild(ulh);
+        els.campanhaHubEventosHistorico.appendChild(det);
       }
-      if (e.tipo === "eliminatorias_copa") {
-        li.classList.add("campanha-ev-wcq");
-        if (prevTipo === "amistoso" || prevTipo === "torneio_continental") {
-          li.classList.add("campanha-ev-torneio-bloco");
-        }
-      }
-      prevTipo = e.tipo;
-      els.campanhaHubEventos.appendChild(li);
     }
   }
+  const proxEvPend = proximoEventoPendente(campanhaEstadoMemoria.eventos);
   const podeJogar =
-    campanhaEstadoMemoria.convocadosIds.length === 23 && Boolean(proximoEventoPendente(campanhaEstadoMemoria.eventos));
+    campanhaEstadoMemoria.convocadosIds.length === 23 &&
+    Boolean(
+      proxEvPend &&
+        (proxEvPend.tipo === "copa_mundial" || Boolean(proxEvPend.adversarioId)),
+    );
   if (els.btnCampanhaJogarProximo) {
     els.btnCampanhaJogarProximo.disabled = !podeJogar;
   }
+  if (els.btnCampanhaSimularProximo) {
+    els.btnCampanhaSimularProximo.disabled = !podeJogar;
+  }
   if (els.btnCampanhaCopa2030) {
-    const anoHub =
-      campanhaEstadoMemoria.anoCalendario ??
-      ANO_BASE_CAMPANHA + campanhaEstadoMemoria.temporada - 1;
     const ids32 = campanhaEstadoMemoria.classificadosCopa2030;
-    const podeCopa =
-      anoHub === ANO_COPA_MUNDO_CAMPANHA &&
+    const anoCopaEdicao =
+      campanhaEstadoMemoria.copaClassificadosAno ?? ANO_COPA_MUNDO_CAMPANHA;
+    const classificadosServemEstaCopa =
       Array.isArray(ids32) &&
       ids32.length === 32 &&
-      ids32.includes(campanhaEstadoMemoria.selecaoId) &&
-      !campanhaEstadoMemoria.copa2030Concluida;
+      anoCopaEdicao === anoCalAtual &&
+      anoEhCopaMundialCampanha(anoCalAtual);
+    const podeCopa =
+      classificadosServemEstaCopa && !campanhaEstadoMemoria.copa2030Concluida;
+    const calendarioLiberouCopa = jogouTudoAntesDoSlotCopaMundialNoCalendario(
+      campanhaEstadoMemoria,
+      anoCalAtual,
+    );
     els.btnCampanhaCopa2030.hidden = !podeCopa;
+    els.btnCampanhaCopa2030.disabled = Boolean(podeCopa && !calendarioLiberouCopa);
+    els.btnCampanhaCopa2030.title =
+      podeCopa && !calendarioLiberouCopa
+        ? "Conclua primeiro todos os jogos do calendário anteriores ao mês da Copa do Mundo."
+        : "";
+    if (podeCopa && ids32) {
+      const qual = ids32.includes(campanhaEstadoMemoria.selecaoId);
+      els.btnCampanhaCopa2030.textContent = qual
+        ? `Disputar a Copa do Mundo ${anoCalAtual}`
+        : `Acompanhar a Copa do Mundo ${anoCalAtual} (sua seleção não se classificou)`;
+    }
   }
 }
 
@@ -4040,8 +4596,16 @@ function pintarCampanhaConvocacaoLista() {
     cb.checked = campanhaConvocadosPendentes.has(j.id);
     cb.dataset.jogadorId = j.id;
     const meta = document.createElement("span");
-    meta.className = "campanha-jogador-meta";
-    meta.textContent = `${j.nome} · ${POSITION_LABEL[j.posicao]} · ${j.idade}a · ${j.ataque}/${j.defesa}`;
+    meta.className = "campanha-jogador-meta campanha-jogador-meta--stats";
+    meta.append(
+      document.createTextNode(
+        `${j.nome} · ${POSITION_LABEL[j.posicao]} · ${j.idade}a · `,
+      ),
+    );
+    const statsWrap = document.createElement("span");
+    statsWrap.className = "campanha-jogador-stats";
+    statsWrap.innerHTML = `${htmlStatCampanhaConvocacao(j, "ataque")}/${htmlStatCampanhaConvocacao(j, "defesa")}`;
+    meta.appendChild(statsWrap);
     row.append(cb, meta);
     row.addEventListener("click", (ev) => {
       if (ev.target === cb) return;
@@ -4147,6 +4711,53 @@ function abrirTelaCampanhaMenuInicial() {
   }
 }
 
+function forcaMediaTitularesCampanha() {
+  const t = timeJogador?.titulares ?? [];
+  if (!t.length) return 50;
+  let s = 0;
+  for (const j of t) s += (j.ataque + j.defesa) / 2;
+  return s / t.length;
+}
+
+function simularProximoJogoCampanhaHub() {
+  if (!campanhaEstadoMemoria) campanhaEstadoMemoria = carregarCampanhaAtiva();
+  if (!campanhaEstadoMemoria || campanhaEstadoMemoria.convocadosIds.length !== 23) {
+    alert("Defina a convocação de 23 jogadores no hub da campanha.");
+    return;
+  }
+  const prox = proximoEventoPendente(campanhaEstadoMemoria.eventos);
+  if (prox?.tipo === "copa_mundial") {
+    alert(
+      "O próximo passo é a Copa do Mundo. Abra o hub da competição com “Jogar próximo evento” ou com o botão “Disputar a Copa do Mundo”; não é um amistoso para simular aqui.",
+    );
+    return;
+  }
+  if (!prox || !prox.adversarioId) {
+    alert("Não há próximo jogo simulável no calendário.");
+    return;
+  }
+  campanhaEventoAtualId = prox.id;
+  try {
+    const { titulares, reservas } = montarTimeJogadorCampanhaParaPartida(campanhaEstadoMemoria);
+    timeJogador = { titulares, reservas };
+    const rng = criarRng((campanhaEstadoMemoria.seedCampanha ^ Date.now() ^ 0x51937131) >>> 0);
+    const fHum = forcaMediaTitularesCampanha();
+    const fAdv = forcaSelecaoId(prox.adversarioId);
+    const { gh, ga } = simularPlacarSemEmpate(fHum, fAdv, rng);
+    golsJogador = gh;
+    golsCpu = ga;
+    tipoModoJogo = "campanha";
+    metaSelecaoJogador = selecaoPorId(campanhaEstadoMemoria.selecaoId);
+    metaSelecaoCpu = selecaoPorId(prox.adversarioId);
+    finalizarCampanhaAposPartida();
+    pintarCampanhaHub();
+  } catch (e) {
+    console.error(e);
+    campanhaEventoAtualId = null;
+    alert(String(e?.message ?? e));
+  }
+}
+
 function entrarNoJogoCampanhaProximoEvento() {
   if (!campanhaEstadoMemoria) campanhaEstadoMemoria = carregarCampanhaAtiva();
   if (!campanhaEstadoMemoria || campanhaEstadoMemoria.convocadosIds.length !== 23) {
@@ -4154,7 +4765,15 @@ function entrarNoJogoCampanhaProximoEvento() {
     return;
   }
   const prox = proximoEventoPendente(campanhaEstadoMemoria.eventos);
-  if (!prox || !prox.adversarioId) {
+  if (!prox) {
+    alert("Não há próximo evento no calendário.");
+    return;
+  }
+  if (prox.tipo === "copa_mundial") {
+    iniciarCopa2030DaCampanha();
+    return;
+  }
+  if (!prox.adversarioId) {
     alert("Não há próximo evento no calendário.");
     return;
   }
@@ -4297,7 +4916,12 @@ els.btnCampanhaJogarProximo?.addEventListener("click", () => {
   entrarNoJogoCampanhaProximoEvento();
 });
 
+els.btnCampanhaSimularProximo?.addEventListener("click", () => {
+  simularProximoJogoCampanhaHub();
+});
+
 els.btnCampanhaCopa2030?.addEventListener("click", () => {
+  if (els.btnCampanhaCopa2030?.disabled) return;
   iniciarCopa2030DaCampanha();
 });
 
@@ -4420,6 +5044,10 @@ els.btnCopaSortearGrupos?.addEventListener("click", () => {
 
 els.btnCopaProximoJogo?.addEventListener("click", () => {
   handleCopaProximoJogo();
+});
+
+els.btnCopaSimularProximoJogo?.addEventListener("click", () => {
+  simularProximoJogoCopaNoHub();
 });
 
 els.btnCopaVerTabela?.addEventListener("click", () => {
@@ -5250,7 +5878,58 @@ function forcaSelecaoId(id) {
   return s ? forcaMediaSelecao(s) : 50;
 }
 
-function processarFimDeJogoCopa() {
+/**
+ * Sem empate no placar final. `placarFn` recebe (fCasa, fFora, rng); use wrapper para Copa com bônus mandante.
+ * @param {(fCasa: number, fFora: number, rng: () => number) => { gh: number, ga: number }} [placarFn]
+ */
+function simularPlacarSemEmpate(fHome, fAway, rng, placarFn = simularPlacar) {
+  let { gh, ga } = placarFn(fHome, fAway, rng);
+  if (gh === ga) {
+    const pFav =
+      fHome + fAway > 0 ? fHome / (fHome + fAway) : 0.5;
+    const g = rng() < pFav ? { gh: gh + 1, ga } : { gh, ga: ga + 1 };
+    gh = g.gh;
+    ga = g.ga;
+  }
+  return { gh, ga };
+}
+
+function copaHubBotoesJogoOcultar() {
+  if (els.btnCopaProximoJogo) els.btnCopaProximoJogo.hidden = true;
+  if (els.btnCopaSimularProximoJogo) els.btnCopaSimularProximoJogo.hidden = true;
+}
+
+/**
+ * @param {string | undefined} textoProximo texto do botão “Próximo jogo” / “Entrar em campo” / etc.
+ * @param {{ mostrarSimular?: boolean }} [opts] após a 3.ª rodada de grupos, “Simular próximo jogo” fica oculto (só “Ir às oitavas” avança a classificação).
+ */
+function copaHubBotoesJogoMostrar(textoProximo, opts) {
+  opts = opts ?? {};
+  const mostrarSimular = opts.mostrarSimular !== false;
+  if (els.btnCopaProximoJogo) {
+    els.btnCopaProximoJogo.hidden = false;
+    if (textoProximo) els.btnCopaProximoJogo.textContent = textoProximo;
+  }
+  if (els.btnCopaSimularProximoJogo) els.btnCopaSimularProximoJogo.hidden = !mostrarSimular;
+}
+
+/**
+ * @param {{ irDiretoAoHub?: boolean, simulacaoNoHub?: boolean }} [op]
+ */
+function processarFimDeJogoCopa(op) {
+  op = op ?? {};
+  const irDireto = Boolean(op.irDiretoAoHub);
+  const simHub = Boolean(op.simulacaoNoHub);
+  const irHub = (/** @type {() => void} */ fn) => {
+    if (irDireto) {
+      copaTransicaoHubPendente = null;
+      fn();
+    } else {
+      agendarTransicaoCopaAposContinuar(fn);
+    }
+  };
+  const adiarElim = !irDireto;
+
   if (!copaEstado) return;
   const gh = golsJogador;
   const gc = golsCpu;
@@ -5258,18 +5937,32 @@ function processarFimDeJogoCopa() {
   copaPartidaKnockout = false;
   const j = metaSelecaoJogador?.sigla ?? "";
   const c = metaSelecaoCpu?.sigla ?? "";
-  appendLog(`<strong>Fim de jogo.</strong> ${j} ${gh} × ${gc} ${c}`);
+  appendLog(
+    simHub
+      ? `<strong>Simulação.</strong> ${j} ${gh} × ${gc} ${c}`
+      : `<strong>Fim de jogo.</strong> ${j} ${gh} × ${gc} ${c}`,
+  );
 
   aplicarEfeitosPosJogoCopaLesaoDisciplina();
 
   if (copaEstado.faseCopa === "grupos") {
     const adv = copaEstado.adversariosGrupo[copaEstado.idxAdversarioGrupo];
     registrarResultadoGrupoCopa(copaEstado, copaEstado.playerTeamId, adv, gh, gc);
+    const listaG = copaEstado.partidasPorGrupo[copaEstado.grupoPlayer];
+    if (simHub) {
+      const pjArt = listaG.find(
+        (x) =>
+          (x.home === copaEstado.playerTeamId && x.away === adv) ||
+          (x.home === adv && x.away === copaEstado.playerTeamId),
+      );
+      if (pjArt && pjArt.gh >= 0) {
+        registrarGolsPartidaSimuladaCopa(pjArt.home, pjArt.away, pjArt.gh, pjArt.ga, copaEstado.rng);
+      }
+    }
     copaEstado.idxAdversarioGrupo++;
     const nr = copaEstado.idxAdversarioGrupo;
     const partidasSim =
       nr >= 1 && nr <= 3 ? simularRodadaGruposCopa(/** @type {1 | 2 | 3} */ (nr)) : [];
-    const listaG = copaEstado.partidasPorGrupo[copaEstado.grupoPlayer];
     const pj = listaG.find(
       (x) =>
         (x.home === copaEstado.playerTeamId && x.away === adv) ||
@@ -5288,27 +5981,33 @@ function processarFimDeJogoCopa() {
     const todas = jogoHumano ? [jogoHumano, ...partidasSim] : [...partidasSim];
     copaEstado.ultimaRodadaResultados =
       nr >= 1 && nr <= 3 ? { numero: nr, partidas: todas } : undefined;
-    agendarTransicaoCopaAposContinuar(() => mostrarTelaCopaHubAposJogoGrupo());
+    irHub(() => mostrarTelaCopaHubAposJogoGrupo());
     return;
   }
 
   const jogo = copaEstado.jogosEliminatorios[copaEstado.idxJogoEliminatorio];
   if (!jogo) return;
   aplicarPlacarJogoEliminatorioAtualKnockout(null);
+  if (simHub && jogo.gh != null && jogo.ga != null) {
+    registrarGolsPartidaSimuladaCopa(jogo.homeId, jogo.awayId, jogo.gh, jogo.ga, copaEstado.rng);
+  }
   const humanVence = gh > gc;
   const faseAntesEliminacao = copaEstado.faseCopa;
   if (!humanVence) {
+    copaEstado.detalheEliminacaoCopa = /** @type {"oitavas"|"quartas"|"semi"|"final"} */ (
+      faseAntesEliminacao
+    );
     jogo.winnerId =
       jogo.homeId === copaEstado.playerTeamId ? jogo.awayId : jogo.homeId;
     copaEstado.faseCopa = "eliminado";
     completarEliminatoriaAposEliminacaoHumana(
       /** @type {"oitavas"|"quartas"|"semi"|"final"} */ (faseAntesEliminacao),
     );
-    agendarTransicaoCopaAposContinuar(() => mostrarTelaCopaEliminado());
+    irHub(() => mostrarTelaCopaEliminado());
     return;
   }
   jogo.winnerId = copaEstado.playerTeamId;
-  avancarEliminatoriaCopa(true);
+  avancarEliminatoriaCopa(adiarElim);
 }
 
 function registrarResultadoGrupoCopa(est, humanId, advId, gHuman, gAdv) {
@@ -5398,8 +6097,15 @@ function simularJogoCpuVsCpu(
 ) {
   if (!copaEstado) return jogo.homeId;
   const { homeId, awayId } = jogo;
-  const { gh, ga } = simularPlacar(forcaSelecaoId(homeId), forcaSelecaoId(awayId), copaEstado.rng);
-  const g = gh === ga ? (copaEstado.rng() < 0.5 ? { gh: gh + 1, ga } : { gh, ga: ga + 1 }) : { gh, ga };
+  const fh = forcaSelecaoId(homeId);
+  const fa = forcaSelecaoId(awayId);
+  let { gh, ga } = simularPlacarCopaMundial(fh, fa, copaEstado.rng, COPA_BONUS_MANDANTE_KO);
+  const g =
+    gh === ga
+      ? copaEstado.rng() < (fh + COPA_BONUS_MANDANTE_KO) / (fh + fa + COPA_BONUS_MANDANTE_KO)
+        ? { gh: gh + 1, ga }
+        : { gh, ga: ga + 1 }
+      : { gh, ga };
   jogo.gh = g.gh;
   jogo.ga = g.ga;
   delete jogo.penGh;
@@ -5518,6 +6224,9 @@ async function tratarFimPartidaCopaKnockout(humGanhouPenaltis) {
   if (humGanhouPenaltis) {
     avancarEliminatoriaCopa(true);
   } else {
+    copaEstado.detalheEliminacaoCopa = /** @type {"oitavas"|"quartas"|"semi"|"final"} */ (
+      faseAntesEliminacao
+    );
     copaEstado.faseCopa = "eliminado";
     completarEliminatoriaAposEliminacaoHumana(
       /** @type {"oitavas"|"quartas"|"semi"|"final"} */ (faseAntesEliminacao),

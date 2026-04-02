@@ -126,12 +126,26 @@ export function sortearGrupos(ids32, rng) {
  * @param {string[]} ids32
  * @param {string} playerTeamId
  * @param {number} seed
+ * @param {{ campanhaSelecaoId?: string | null }} [opts] se `campanhaSelecaoId` não estiver nas 32, entra em modo espectador (acompanhar a competição).
  */
-export function montarEstadoCopaCom32Ids(ids32, playerTeamId, seed) {
+export function montarEstadoCopaCom32Ids(ids32, playerTeamId, seed, opts) {
+  opts = opts ?? {};
   if (ids32.length !== 32) {
     throw new Error("Copa: são necessárias 32 seleções.");
   }
-  if (!ids32.includes(playerTeamId)) {
+  /** @type {boolean} */
+  let copaEspectadorCampanha = false;
+  /** @type {string} */
+  let effectivePlayerId = playerTeamId;
+  if (opts.campanhaSelecaoId != null && opts.campanhaSelecaoId !== "") {
+    const sid = opts.campanhaSelecaoId;
+    if (ids32.includes(sid)) {
+      effectivePlayerId = sid;
+    } else {
+      copaEspectadorCampanha = true;
+      effectivePlayerId = ids32[0];
+    }
+  } else if (!ids32.includes(playerTeamId)) {
     throw new Error("Copa: a sua seleção tem de estar entre as 32.");
   }
   const rng = criarRng(seed >>> 0);
@@ -143,19 +157,21 @@ export function montarEstadoCopaCom32Ids(ids32, playerTeamId, seed) {
   }
   let grupoPlayer = "A";
   for (const L of Object.keys(grupos)) {
-    if (grupos[L].includes(playerTeamId)) {
+    if (grupos[L].includes(effectivePlayerId)) {
       grupoPlayer = L;
       break;
     }
   }
   const quatro = grupos[grupoPlayer];
-  const adversariosGrupo = adversariosNasRodadas(quatro, playerTeamId);
+  const adversariosGrupo = adversariosNasRodadas(quatro, effectivePlayerId);
   return {
     rng,
     seed: seed >>> 0,
     grupos,
     partidasPorGrupo,
-    playerTeamId,
+    playerTeamId: effectivePlayerId,
+    copaEspectadorCampanha,
+    selecaoCampanhaOrigem: opts.campanhaSelecaoId ?? effectivePlayerId,
     grupoPlayer,
     adversariosGrupo,
     idxAdversarioGrupo: 0,
@@ -169,6 +185,7 @@ export function montarEstadoCopaCom32Ids(ids32, playerTeamId, seed) {
     jogosSuspensao: {},
     amarelosAcumulado: {},
     eliminatoria: null,
+    detalheEliminacaoCopa: null,
   };
 }
 
@@ -232,6 +249,9 @@ export function simularRodadaGruposExcetoJogoHumano(
   rng,
   /** @type {((grupo: string, homeId: string, awayId: string, gh: number, ga: number) => void) | undefined} */
   aoSimularPartida,
+  /** @type {(fCasa: number, fFora: number, rng: () => number, bonusCasa?: number) => { gh: number, ga: number }} */
+  simPlacarFn = simularPlacar,
+  bonusMandanteGrupo = 0,
 ) {
   if (numeroRodada < 1 || numeroRodada > 3) return;
   const rodadaIdx = PARTIDAS_GRUPO_POR_RODADA[numeroRodada - 1];
@@ -243,7 +263,41 @@ export function simularRodadaGruposExcetoJogoHumano(
       const p = lista[pi];
       if (!p || p.gh >= 0) continue;
       if (L === grupoPlayer && (p.home === playerTeamId || p.away === playerTeamId)) continue;
-      const { gh, ga } = simularPlacar(forcaFn(p.home), forcaFn(p.away), rng);
+      const { gh, ga } = simPlacarFn(forcaFn(p.home), forcaFn(p.away), rng, bonusMandanteGrupo);
+      aplicarResultadoNaLista(lista, p.home, p.away, gh, ga);
+      if (aoSimularPartida) aoSimularPartida(L, p.home, p.away, gh, ga);
+    }
+  }
+}
+
+/**
+ * Simula todos os jogos da rodada (1–3) em todos os grupos (ex.: modo espectador na Copa).
+ * @param {Record<string, string[]>} grupos
+ * @param {Record<string, ResultadoPartida[]>} partidasPorGrupo
+ * @param {number} numeroRodada 1, 2 ou 3
+ */
+export function simularRodadaGruposCopaTodasAsPartidas(
+  grupos,
+  partidasPorGrupo,
+  numeroRodada,
+  forcaFn,
+  rng,
+  /** @type {((grupo: string, homeId: string, awayId: string, gh: number, ga: number) => void) | undefined} */
+  aoSimularPartida,
+  /** @type {(fCasa: number, fFora: number, rng: () => number, bonusCasa?: number) => { gh: number, ga: number }} */
+  simPlacarFn = simularPlacar,
+  bonusMandanteGrupo = 0,
+) {
+  if (numeroRodada < 1 || numeroRodada > 3) return;
+  const rodadaIdx = PARTIDAS_GRUPO_POR_RODADA[numeroRodada - 1];
+  const letters = Object.keys(grupos).sort();
+  for (const L of letters) {
+    const lista = partidasPorGrupo[L];
+    if (!lista) continue;
+    for (const pi of rodadaIdx) {
+      const p = lista[pi];
+      if (!p || p.gh >= 0) continue;
+      const { gh, ga } = simPlacarFn(forcaFn(p.home), forcaFn(p.away), rng, bonusMandanteGrupo);
       aplicarResultadoNaLista(lista, p.home, p.away, gh, ga);
       if (aoSimularPartida) aoSimularPartida(L, p.home, p.away, gh, ga);
     }
@@ -371,6 +425,27 @@ export function simularPlacar(fCasa, fFora, rng) {
   const base = 1.05;
   const lc = Math.max(0.2, base + diff * 0.38);
   const lv = Math.max(0.2, base - diff * 0.38);
+  return { gh: poisson(lc, rng), ga: poisson(lv, rng) };
+}
+
+/** Leve vantagem de mandante na fase de grupos da Copa (CPU×CPU). */
+export const COPA_BONUS_MANDANTE_GRUPO = 1.35;
+
+/** Vantagem de mandante no mata-mata da Copa. */
+export const COPA_BONUS_MANDANTE_KO = 2.25;
+
+/**
+ * Copa do Mundo (simulação CPU): lambdas mais sensíveis à diferença de qualidade entre seleções,
+ * para zebras raras e favoritos mais consistentes que `simularPlacar` genérico.
+ * @param {number} bonusCasa somado à força da casa (mandante)
+ */
+export function simularPlacarCopaMundial(fCasa, fFora, rng, bonusCasa = 0) {
+  const fc = fCasa + bonusCasa;
+  const diff = (fc - fFora) / 14.5;
+  const base = 1.02;
+  const k = 0.78;
+  const lc = Math.max(0.14, base + diff * k);
+  const lv = Math.max(0.14, base - diff * k);
   return { gh: poisson(lc, rng), ga: poisson(lv, rng) };
 }
 

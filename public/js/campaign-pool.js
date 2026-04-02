@@ -156,6 +156,10 @@ export function tamanhoPoolCampanha(selecaoId) {
  *   idade: number,
  *   potencial: number,
  *   forma: number,
+ *   refAtaqueTemporada?: number,
+ *   refDefesaTemporada?: number,
+ *   refAtaqueCampanha?: number,
+ *   refDefesaCampanha?: number,
  * }} JogadorCampanha
  */
 

@@ -1888,6 +1888,86 @@ body {
   color: var(--muted);
 }
 
+/* Eliminação da seleção do jogador (hub Copa). */
+.copa-eliminacao {
+  position: relative;
+  margin: 0 0 1.35rem;
+  padding: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid rgba(196, 76, 76, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 18px 44px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.copa-eliminacao-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 120% 70% at 50% -10%, rgba(196, 76, 76, 0.2), transparent 50%),
+    linear-gradient(168deg, #241a1c 0%, #0e1419 50%, #151820 100%);
+  pointer-events: none;
+}
+
+.copa-eliminacao-inner {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 1.35rem 1.2rem 1.5rem;
+}
+
+.copa-eliminacao-icone {
+  margin: 0 auto 0.2rem;
+  color: var(--perigo);
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+  opacity: 0.92;
+}
+
+.copa-eliminacao-rotulo {
+  margin: 0 0 0.2rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: rgba(232, 160, 160, 0.75);
+  font-weight: 700;
+}
+
+.copa-eliminacao-nome {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.35rem, 4vw, 1.85rem);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--texto, #f0f0f0);
+  text-shadow: 0 2px 14px rgba(196, 76, 76, 0.22);
+}
+
+.copa-eliminacao-bandeira {
+  display: block;
+  margin: 0 auto 0.4rem;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  filter: saturate(0.88);
+}
+
+.copa-eliminacao-sub {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #e08080;
+  letter-spacing: 0.04em;
+}
+
+.copa-eliminacao-texto {
+  margin: 0 auto;
+  max-width: 26rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .copa-resultados-rodada-wrap {
   margin: 0.5rem 0 1rem;
   padding: 0.65rem 0.85rem;
@@ -1917,6 +1997,18 @@ body {
 
 .copa-res-rodada-linha:last-child {
   border-bottom: none;
+}
+
+.copa-res-rodada-linha--seu-jogo {
+  font-weight: 600;
+  padding: 0.35rem 0.5rem;
+  margin: 0.1rem -0.25rem;
+  border-radius: 8px;
+  border-left: 3px solid var(--verde-claro);
+  background: rgba(45, 157, 108, 0.12);
+  box-shadow: 0 0 0 1px rgba(45, 157, 108, 0.22);
+  border-bottom: none;
+  color: var(--texto);
 }
 
 .copa-chave-wrap {
@@ -2350,6 +2442,24 @@ body {
   font-size: 0.88rem;
 }
 
+.campanha-jogador-meta--stats {
+  font-variant-numeric: tabular-nums;
+}
+
+.campanha-jogador-stats .stat-delta-neg {
+  color: #e85555;
+}
+
+.campanha-jogador-stats .stat-delta-pos {
+  color: #3ecf8e;
+}
+
+.campanha-convocacao-deltas {
+  font-size: 0.82em;
+  font-weight: 500;
+  color: var(--muted);
+}
+
 .campanha-hub-torneio {
   margin: 0.65rem 0 0.85rem;
   padding: 0.55rem 0.65rem 0.65rem;
@@ -2366,6 +2476,32 @@ body {
   color: var(--muted);
 }
 
+.campanha-torneio-historico-ko {
+  margin: 0.75rem 0 0.35rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.08);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.campanha-torneio-historico-ko-titulo {
+  margin: 0.35rem 0 0.15rem;
+  font-weight: 650;
+}
+
+.campanha-torneio-historico-ko-titulo:first-child {
+  margin-top: 0;
+  font-weight: 700;
+}
+
+.campanha-torneio-historico-ko-jogo {
+  margin: 0.1rem 0;
+  padding-left: 0.35rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Tabela principal do grupo do jogador — mesmo visual da classificação da Copa. */
 .campanha-torneio-grupo-jogador {
   margin: 0;
@@ -2378,6 +2514,13 @@ body {
 
 .campanha-torneio-grupo-jogador .copa-subtitulo {
   margin: 0 0 0.45rem;
+}
+
+.campanha-torneio-campeao {
+  margin: 0.85rem 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--verde-claro, #5cb85c);
 }
 
 .campanha-torneio-outros-hint {
@@ -2411,8 +2554,14 @@ body {
 }
 
 .campanha-hub-eventos li.campanha-ev-feito {
-  text-decoration: line-through;
-  opacity: 0.65;
+  opacity: 0.88;
+}
+
+.campanha-hub-eventos li.campanha-ev-feito .campanha-ev-placar {
+  font-weight: 700;
+  color: var(--texto);
+  opacity: 1;
+  margin-left: 0.15em;
 }
 
 .campanha-hub-eventos li.campanha-ev-atual {
@@ -2422,6 +2571,10 @@ body {
 
 .campanha-hub-eventos li.campanha-ev-wcq {
   border-left: 3px solid cornflowerblue;
+}
+
+.campanha-hub-eventos li.campanha-ev-copa-mundial {
+  border-left: 3px solid #d4a520;
 }
 
 .campanha-hub-eventos li.campanha-ev-torneio {
@@ -2437,5 +2590,40 @@ body {
   margin-top: 0.65rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--borda);
+}
+
+.campanha-hub-calendario-titulo {
+  margin: 0.85rem 0 0.15rem;
+  font-weight: 650;
+}
+
+.campanha-hub-eventos-historico {
+  margin: 0.5rem 0 0.75rem;
+  text-align: left;
+}
+
+.campanha-hub-calendario-hist-intro {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+}
+
+.campanha-hub-calendario-details {
+  margin: 0.35rem 0;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem 0.5rem;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.campanha-hub-calendario-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--texto);
+  padding: 0.2rem 0;
+}
+
+.campanha-hub-eventos--historico {
+  margin-top: 0.45rem;
+  margin-bottom: 0;
 }
 

@@ -90,10 +90,15 @@
           <p id="campanha-hub-resumo" class="tela-menu-sub"></p>
           <div id="campanha-hub-torneio" class="campanha-hub-torneio" hidden aria-label="Tabelas do torneio continental"></div>
           <div id="campanha-hub-elims" class="campanha-hub-torneio campanha-hub-elims" hidden aria-label="Tabelas das eliminatórias da Copa"></div>
-          <ul id="campanha-hub-eventos" class="campanha-hub-eventos" aria-label="Calendário da temporada"></ul>
+          <p id="campanha-hub-eventos-titulo-ano" class="campanha-hub-calendario-titulo tela-menu-sub"></p>
+          <ul id="campanha-hub-eventos" class="campanha-hub-eventos" aria-label="Calendário da temporada em andamento"></ul>
+          <div id="campanha-hub-eventos-historico" class="campanha-hub-eventos-historico" hidden aria-label="Calendários de anos anteriores"></div>
           <div class="tela-menu-acoes">
             <button type="button" id="btn-campanha-copa-2030" class="btn pri" hidden>
-              Disputar a Copa do Mundo 2030
+              Copa do Mundo (campanha)
+            </button>
+            <button type="button" id="btn-campanha-simular-proximo" class="btn sec" disabled>
+              Simular próximo jogo
             </button>
             <button type="button" id="btn-campanha-jogar-proximo" class="btn pri" disabled>Jogar próximo evento</button>
             <button type="button" id="btn-campanha-refazer-convocacao" class="btn sec">Refazer convocação</button>
@@ -218,6 +223,35 @@
               </p>
             </div>
           </div>
+          <div id="copa-eliminacao" class="copa-eliminacao" hidden aria-live="polite">
+            <div class="copa-eliminacao-bg" aria-hidden="true"></div>
+            <div class="copa-eliminacao-inner">
+              <div class="copa-eliminacao-icone" aria-hidden="true">
+                <svg class="copa-eliminacao-svg" viewBox="0 0 96 96" width="72" height="72" focusable="false">
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="currentColor" stroke-width="5" opacity="0.35" />
+                  <path
+                    d="M28 28 L68 68 M68 28 L28 68"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="6"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </div>
+              <p class="copa-eliminacao-rotulo">Copa do Mundo</p>
+              <h3 id="copa-eliminacao-nome" class="copa-eliminacao-nome"></h3>
+              <img
+                id="copa-eliminacao-bandeira"
+                class="copa-eliminacao-bandeira"
+                alt=""
+                width="132"
+                height="99"
+                decoding="async"
+              />
+              <p id="copa-eliminacao-sub" class="copa-eliminacao-sub"></p>
+              <p id="copa-eliminacao-texto" class="copa-eliminacao-texto"></p>
+            </div>
+          </div>
           <p id="copa-grupos-intro" class="tela-menu-sub"></p>
           <div id="copa-grupos-grid" class="copa-grupos-grid" aria-label="Grupos da Copa"></div>
           <div id="copa-classificacao-wrap" class="copa-classificacao-wrap" hidden>
@@ -276,6 +310,9 @@
             <div id="copa-hub-saves-lista" class="copa-saves-lista" role="list" aria-label="Lista de saves"></div>
           </div>
           <div class="tela-menu-acoes">
+            <button type="button" id="btn-copa-simular-proximo-jogo" class="btn sec" hidden>
+              Simular próximo jogo
+            </button>
             <button type="button" id="btn-copa-proximo-jogo" class="btn pri" hidden>Próximo jogo</button>
             <button type="button" id="btn-copa-ver-tabela" class="btn sec" hidden>Ver classificação</button>
             <button type="button" id="btn-copa-ver-artilheiros" class="btn sec" hidden>Artilheiros</button>

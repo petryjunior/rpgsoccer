@@ -167,11 +167,6 @@ export function dadosTorneioContinental(selecaoId) {
   return { key, nomeTorneio: INFO_CONFED[key].nomeTorneio };
 }
 
-/** Anos com Copa América “cheia” no calendário FIFA (ajuste quando o formato mudar). */
-const ANOS_COPA_AMERICA = new Set([
-  2024, 2025, 2027, 2030, 2033, 2036, 2039, 2042, 2045, 2048,
-]);
-
 /**
  * Há fase final da competição continental da confederação nesse ano civil,
  * em linha com o calendário real (aproximação; atualize listas/regras quando a FIFA/CONMEBOL/etc. mudarem).
@@ -184,9 +179,9 @@ export function anoComEdicaoContinental(confKey, ano) {
     case "UEFA":
       return ano >= 2024 && (ano - 2024) % 4 === 0;
     case "CONMEBOL":
-      if (ANOS_COPA_AMERICA.has(ano)) return true;
-      if (ano > 2048) return (ano - 2027) % 3 === 0;
-      return false;
+      // Copa América principal a cada 4 anos em ano bissexto civil (2024, 2028, 2032…), alinhado ao calendário
+      // divulgado (próxima após 2024 ≈ 2028). Não coincide com os anos de Copa do Mundo do modo campanha (2030, 2034…).
+      return ano >= 2024 && ano % 4 === 0;
     case "CAF":
       return ano >= 2023 && ano % 2 === 1;
     case "CONCACAF":

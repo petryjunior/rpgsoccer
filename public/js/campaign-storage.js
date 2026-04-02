@@ -4,9 +4,14 @@
 
 import { ANO_BASE_CAMPANHA, textoMesAno } from "./campaign-dates.js";
 import { POOL_DATA_VERSION } from "./campaign-pool.js";
+import { remendarConflitosCalendarioCampanhaAoCarregar } from "./campaign-calendar.js";
+import {
+  corrigirTitulosEliminatoriasCopaNoEstado,
+  inferirMetadadosCiclosCopaCampanha,
+} from "./campaign-wc-qualifiers.js";
 
 const STORAGE_KEY = "qwerty-football-campanha-v1";
-export const CAMPANHA_FORMAT_VERSION = 5;
+export const CAMPANHA_FORMAT_VERSION = 7;
 
 /**
  * @typedef {import('./campaign-pool.js').JogadorCampanha} JogadorCampanha
@@ -28,8 +33,12 @@ export const CAMPANHA_FORMAT_VERSION = 5;
  *   eliminatoriasCopa?: object | null,
  *   wcqPontosAcumulados?: Record<string, number>,
  *   classificadosCopa2030?: string[] | null,
+ *   copaClassificadosAno?: number | null,
+ *   wcqCicloCopaAlvo?: number | null,
  *   wcqAgendaHumano?: import('./campaign-calendar.js').EventoCampanha[] | null,
  *   copa2030Concluida?: boolean,
+ *   campanhaUltimoMesOscStats?: number,
+ *   historicoEventosCampanha?: { ano: number, eventos: import('./campaign-calendar.js').EventoCampanha[] }[],
  *   savedAt?: string,
  * }} CampanhaEstadoPersistido
  */
@@ -45,6 +54,35 @@ function migrarCampanhaV4ParaV5(d) {
   d.wcqPontosAcumulados = {};
   d.classificadosCopa2030 = null;
   d.copa2030Concluida = false;
+}
+
+/**
+ * Referências de stats por temporada + controle de oscilação mensal.
+ * @param {object} d
+ */
+function migrarCampanhaV5ParaV6(d) {
+  d.formatVersion = 6;
+  const mes = d.mesAtual ?? 3;
+  d.campanhaUltimoMesOscStats = mes;
+  if (Array.isArray(d.jogadores)) {
+    for (const j of d.jogadores) {
+      j.refAtaqueTemporada = j.ataque;
+      j.refDefesaTemporada = j.defesa;
+    }
+  }
+}
+
+/** Referência de atributos desde o início da campanha (delta na convocação). */
+function migrarCampanhaV6ParaV7(d) {
+  d.formatVersion = 7;
+  if (Array.isArray(d.jogadores)) {
+    for (const j of d.jogadores) {
+      if (j.refAtaqueCampanha == null) {
+        j.refAtaqueCampanha = j.ataque;
+        j.refDefesaCampanha = j.defesa;
+      }
+    }
+  }
 }
 
 /**
@@ -112,6 +150,14 @@ export function carregarCampanhaAtiva() {
       migrarCampanhaV4ParaV5(d);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
     }
+    if (d.formatVersion === 5) {
+      migrarCampanhaV5ParaV6(d);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+    }
+    if (d.formatVersion === 6) {
+      migrarCampanhaV6ParaV7(d);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+    }
     if (d.formatVersion !== CAMPANHA_FORMAT_VERSION) return null;
     if (d.anoCalendario == null) {
       d.anoCalendario = ANO_BASE_CAMPANHA + ((d.temporada ?? 1) - 1);
@@ -127,7 +173,28 @@ export function carregarCampanhaAtiva() {
     }
     if (d.classificadosCopa2030 === undefined) d.classificadosCopa2030 = null;
     if (d.wcqAgendaHumano === undefined) d.wcqAgendaHumano = null;
+    if (d.copaClassificadosAno === undefined) d.copaClassificadosAno = null;
+    if (d.wcqCicloCopaAlvo === undefined) d.wcqCicloCopaAlvo = null;
     if (d.copa2030Concluida === undefined) d.copa2030Concluida = false;
+    if (d.campanhaUltimoMesOscStats == null) {
+      d.campanhaUltimoMesOscStats = d.mesAtual ?? 3;
+    }
+    if (!Array.isArray(d.historicoEventosCampanha)) {
+      d.historicoEventosCampanha = [];
+    }
+    if (Array.isArray(d.jogadores)) {
+      for (const j of d.jogadores) {
+        if (j.refAtaqueTemporada == null) j.refAtaqueTemporada = j.ataque;
+        if (j.refDefesaTemporada == null) j.refDefesaTemporada = j.defesa;
+        if (j.refAtaqueCampanha == null) {
+          j.refAtaqueCampanha = j.ataque;
+          j.refDefesaCampanha = j.defesa;
+        }
+      }
+    }
+    inferirMetadadosCiclosCopaCampanha(/** @type {CampanhaEstadoPersistido} */ (d));
+    corrigirTitulosEliminatoriasCopaNoEstado(/** @type {CampanhaEstadoPersistido} */ (d));
+    remendarConflitosCalendarioCampanhaAoCarregar(/** @type {CampanhaEstadoPersistido} */ (d));
     return d;
   } catch {
     return null;

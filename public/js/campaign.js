@@ -8,6 +8,7 @@ import { gerarPoolCampanha, POOL_DATA_VERSION } from "./campaign-pool.js";
 import { criarCalendarioTemporada } from "./campaign-calendar.js";
 import { criarRng } from "./world-cup.js";
 import { salvarCampanhaAtiva, carregarCampanhaAtiva, CAMPANHA_FORMAT_VERSION } from "./campaign-storage.js";
+import { snapshotReferenciasTemporadaCampanha } from "./campaign-progress.js";
 import { escalaçãoInicialDeConvocados23, podeMontarEscalaçãoCompleta23 } from "./squad.js";
 
 /**
@@ -136,7 +137,11 @@ export function criarEstadoCampanhaNovo(selecaoId, todosIdsSelecoes) {
     wcqAgendaHumano: null,
     wcqPontosAcumulados: {},
     classificadosCopa2030: null,
+    copaClassificadosAno: null,
+    wcqCicloCopaAlvo: null,
     copa2030Concluida: false,
+    campanhaUltimoMesOscStats: 3,
+    historicoEventosCampanha: [],
   };
   const { eventos, torneioContinental, eliminatoriasCopa } = criarCalendarioTemporada(
     selecaoId,
@@ -149,6 +154,12 @@ export function criarEstadoCampanhaNovo(selecaoId, todosIdsSelecoes) {
   estado.torneioContinental = torneioContinental;
   estado.eliminatoriasCopa = eliminatoriasCopa ?? null;
   estado.mesAtual = eventos[0]?.campanhaMes ?? 3;
+  estado.campanhaUltimoMesOscStats = estado.mesAtual;
+  snapshotReferenciasTemporadaCampanha(estado.jogadores);
+  for (const j of estado.jogadores) {
+    j.refAtaqueCampanha = j.ataque;
+    j.refDefesaCampanha = j.defesa;
+  }
   salvarCampanhaAtiva(estado);
   return estado;
 }
@@ -176,20 +187,49 @@ export function montarTimeJogadorCampanhaParaPartida(estado) {
 }
 
 export { carregarCampanhaAtiva, salvarCampanhaAtiva, limparCampanhaAtiva, haCampanhaSalva } from "./campaign-storage.js";
-export { anoComEdicaoContinental, dadosTorneioContinental } from "./campaign-confederation.js";
+export {
+  anoComEdicaoContinental,
+  confederacaoId,
+  dadosTorneioContinental,
+} from "./campaign-confederation.js";
 export { ANO_BASE_CAMPANHA, textoMesAno } from "./campaign-dates.js";
-export { proximoEventoPendente, criarCalendarioTemporada } from "./campaign-calendar.js";
+export {
+  proximoEventoPendente,
+  criarCalendarioTemporada,
+  arquivarEventosCalendarioCampanha,
+  garantirEventoCopaMundialNoCalendarioAtual,
+  jogouTudoAntesDoSlotCopaMundialNoCalendario,
+  mesCalendarioSlotCopaMundialCampanha,
+  remendarConflitosCalendarioCampanhaAoCarregar,
+} from "./campaign-calendar.js";
 export {
   aplicarResultadoPartidaTorneioCampanha,
+  placarDisplayJogadorVsAdversario,
+  vencedorConfrontoIdaVoltaEliminatorias,
   textoRegrasClassificacaoTorneioCampanha,
+  paragrafosHistoricoMataMataCampanha,
+  repararFaseGruposTorneioCampanha,
 } from "./campaign-tournament.js";
 export {
   anoComEliminatoriasCopa,
   agregarPontosEliminatoriasDoAno,
   agregarSimulacaoOutrasConfederacoesWcq,
   finalizarClassificadosCopa2030,
+  finalizarClassificadosCopaMundial,
+  copaAlvoEliminatoriasDoAno,
+  anoEhCopaMundialCampanha,
+  campanhaEstaNaJanelaCopaDoMundo,
+  ultimoAnoEliminatoriasAntesCopa,
   ANO_COPA_MUNDO_CAMPANHA,
   ANO_ULTIMA_ELIMINATORIA,
   textoRegrasEliminatoriasCopaCampanha,
+  tituloEliminatoriasCopaMundial,
 } from "./campaign-wc-qualifiers.js";
-export { aplicarEfeitoPosPartidaCampanha, aplicarProgressaoFimDeJanela, aplicarOscilacaoPreCompeticao } from "./campaign-progress.js";
+export {
+  aplicarEfeitoPosPartidaCampanha,
+  aplicarProgressaoFimDeJanela,
+  aplicarOscilacaoPreCompeticao,
+  aplicarOscilacaoMensalCampanha,
+  incrementarIdadeElencoCampanha,
+  snapshotReferenciasTemporadaCampanha,
+} from "./campaign-progress.js";
