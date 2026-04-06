@@ -392,22 +392,24 @@ export function textoRegrasEliminatoriasCopaCampanha(T, estado) {
       ? /** @type {import('./campaign-confederation.js').ConfedKey} */ (raw)
       : "UEFA";
   const vagasZona = VAGAS_COPA_POR_CONFEDERACAO[conf];
+  const textoGrupos =
+    `Ao todo são 32 vagas na Copa ${alvo}; na zona ${conf} há ${vagasZona} vagas. ` +
+    `Distribuição geral: ${TEXTO_VAGAS_POR_CONFEDERACAO}. ` +
+    `Conta só a classificação final de cada grupo após todas as rodadas (pontos, saldo e desempates como na tabela do hub). ` +
+    `Classificam primeiro os 1.º colocados de cada grupo; depois entram os melhores entre os restantes colocados (2.º, 3.º, etc., na ordem necessária) até completar as ${vagasZona} vagas — ` +
+    `entre os que estão no “mesmo degrau” (ex.: todos os 2.º) entram os de melhor campanha na tabela e ficam de fora os de pior campanha até o número bater certo. ` +
+    `Empates usam os mesmos critérios da tabela e, se preciso, a força média do elenco. ` +
+    `Cada ciclo de Copa sorteia de novo os grupos na sua zona.`;
+
   if (conf === "OFC") {
     return (
       `Ao todo são 32 vagas na Copa ${alvo}; na OFC há ${vagasZona} vaga. ` +
-      `Distribuição geral no jogo: ${TEXTO_VAGAS_POR_CONFEDERACAO}. ` +
-      `Como só existem duas seleções na zona, não há grupos: a vaga decide-se num confronto direto em ida e volta (agregado; gols fora; sorteio). ` +
+      `Distribuição geral: ${TEXTO_VAGAS_POR_CONFEDERACAO}. ` +
+      `Só há duas seleções: não há fase de grupos — a vaga é do vencedor do confronto em ida e volta (agregado; gols fora; critérios de desempate no jogo). ` +
       `Cada ciclo de Copa repete esse formato entre as duas.`
     );
   }
-  return (
-    `Ao todo são 32 vagas na Copa ${alvo}; na sua confederação (${conf}) há ${vagasZona} vagas. ` +
-    `Distribuição geral: ${TEXTO_VAGAS_POR_CONFEDERACAO}. ` +
-    `As seleções classificadas na sua zona são as ${vagasZona} com mais pontos acumulados nos três anos de fase de grupos (jogos em ida e volta, em janelas tipo datas FIFA). ` +
-    `Empates no ranking usam, entre outras coisas, a força média do elenco. ` +
-    `Não há semifinal nem final entre grupos para distribuir essas vagas — só a fase de grupos alimenta o ranking do ciclo. ` +
-    `Cada ciclo de Copa sorteia de novo os grupos na sua zona.`
-  );
+  return textoGrupos;
 }
 
 /**
@@ -529,6 +531,135 @@ export function agregarSimulacaoOutrasConfederacoesWcq(estado, idsTodos, rng) {
 }
 
 /**
+ * Compara linhas da tabela FIFA: retorno > 0 se `a` é estritamente melhor que `b`.
+ * @param {import('./world-cup.js').LinhaGrupo} a
+ * @param {import('./world-cup.js').LinhaGrupo} b
+ */
+function linhaGrupoMelhorQue(a, b) {
+  if (a.pts !== b.pts) return a.pts - b.pts;
+  if (a.sg !== b.sg) return a.sg - b.sg;
+  if (a.gf !== b.gf) return a.gf - b.gf;
+  if (a.gc !== b.gc) return b.gc - a.gc;
+  return 0;
+}
+
+/**
+ * Classificados à Copa na zona do jogador a partir do estado das eliminatórias no save:
+ * tabela final de cada grupo (1.º, depois 2.º, 3.º… por “degrau” até encher as vagas) ou,
+ * na OFC, vencedor da final ida/volta entre as duas seleções.
+ *
+ * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
+ * @param {string[]} idsTodos
+ * @param {import('./campaign-confederation.js').ConfedKey} confKey
+ * @param {() => number} rng
+ * @returns {string[] | null} lista com `min(vagas, pool)` ids, ou null se não houver dados utilizáveis
+ */
+export function classificadosZonaCopaPorEliminatoriasNoEstado(estado, idsTodos, confKey, rng) {
+  const T = estado.eliminatoriasCopa;
+  if (!T || T.confKey !== confKey) return null;
+  const vagasConf = VAGAS_COPA_POR_CONFEDERACAO[confKey];
+  const pool = selecoesPorConfederacao(idsTodos)[confKey];
+  if (!pool?.length) return null;
+  const k = Math.min(vagasConf, pool.length);
+
+  if (confKey === "OFC" && T.formato === "OFC_2_final" && T.ko?.jogosRodada?.length) {
+    const jogos = T.ko.jogosRodada;
+    if (T.idaVoltaMataMata && jogos.length >= 2) {
+      const j1 = jogos[0];
+      const j2 = jogos[1];
+      if (j1.gh < 0 || j2.gh < 0) return null;
+      const win = vencedorConfrontoIdaVoltaEliminatorias(j1, j2, rng);
+      if (win && pool.includes(win) && k === 1) return [win];
+      return null;
+    }
+    const j = jogos[0];
+    if (!j || j.gh < 0) return null;
+    const win = j.gh > j.ga ? j.home : j.away;
+    if (win && pool.includes(win) && k === 1) return [win];
+    return null;
+  }
+
+  if (!T.grupos || !T.partidasPorGrupo) return null;
+  const letras = Object.keys(T.grupos).sort();
+  if (letras.length === 0) return null;
+
+  /** @type {{ ordem: string[], agg: Record<string, import('./world-cup.js').LinhaGrupo> }[]} */
+  const gruposOk = [];
+  for (const L of letras) {
+    const ids = T.grupos[L];
+    const lista = T.partidasPorGrupo[L];
+    if (!ids?.length || !lista) continue;
+    const partidas = lista.filter((x) => x.gh >= 0);
+    if (partidas.length === 0) continue;
+    const ordem = ordenarGrupoFifa(ids, partidas, rng);
+    const agg = agregarClassificacao(ids, partidas);
+    gruposOk.push({ ordem, agg });
+  }
+  if (gruposOk.length === 0) return null;
+
+  /** @type {string[]} */
+  const out = [];
+  const seen = new Set();
+
+  for (const g of gruposOk) {
+    const w = g.ordem[0];
+    if (w && !seen.has(w)) {
+      seen.add(w);
+      out.push(w);
+    }
+  }
+
+  let maxCol = 0;
+  for (const g of gruposOk) maxCol = Math.max(maxCol, g.ordem.length - 1);
+  let colIdx = 1;
+  while (out.length < k && colIdx <= maxCol) {
+    /** @type {{ id: string, linha: import('./world-cup.js').LinhaGrupo }[]} */
+    const bucket = [];
+    for (const g of gruposOk) {
+      if (g.ordem.length <= colIdx) continue;
+      const id = g.ordem[colIdx];
+      if (seen.has(id)) continue;
+      bucket.push({ id, linha: g.agg[id] });
+    }
+    bucket.sort((a, b) => {
+      const c = linhaGrupoMelhorQue(b.linha, a.linha);
+      if (c !== 0) return c;
+      return (
+        forcaMediaSelecao(elencoDaSelecao(b.id)) - forcaMediaSelecao(elencoDaSelecao(a.id)) + (rng() - 0.5) * 0.01
+      );
+    });
+    for (const b of bucket) {
+      if (out.length >= k) break;
+      seen.add(b.id);
+      out.push(b.id);
+    }
+    colIdx++;
+  }
+
+  if (out.length < k) {
+    const rest = pool.filter((id) => !seen.has(id));
+    rest.sort(
+      (a, b) =>
+        forcaMediaSelecao(elencoDaSelecao(b)) - forcaMediaSelecao(elencoDaSelecao(a)) + (rng() - 0.5) * 0.01,
+    );
+    for (const id of rest) {
+      if (out.length >= k) break;
+      seen.add(id);
+      out.push(id);
+    }
+  }
+
+  return out.length >= k ? out.slice(0, k) : null;
+}
+
+/**
+ * @deprecated Use {@link classificadosZonaCopaPorEliminatoriasNoEstado}(estado, idsTodos, "UEFA", rng).
+ */
+export function classificadosUefaCopaPorTabelaFinalGrupos(estado, idsTodos, rng) {
+  return classificadosZonaCopaPorEliminatoriasNoEstado(estado, idsTodos, "UEFA", rng);
+}
+
+/**
  * Define os 32 classificados (quotas por confederação + ranking dentro de cada pool).
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
  * @param {string[]} idsTodos
@@ -552,6 +683,11 @@ export function finalizarClassificadosCopaMundial(estado, idsTodos, rng, anoCopa
     const pool = por[ck];
     const vagas = VAGAS_COPA_POR_CONFEDERACAO[ck];
     const k = Math.min(vagas, pool.length);
+    const porTabela = classificadosZonaCopaPorEliminatoriasNoEstado(estado, idsTodos, ck, rng);
+    if (porTabela && porTabela.length === k) {
+      for (const id of porTabela) classificados.push(id);
+      continue;
+    }
     const sorted = [...pool].sort((a, b) => {
       const d = (pts[b] ?? 0) - (pts[a] ?? 0);
       if (d !== 0) return d;

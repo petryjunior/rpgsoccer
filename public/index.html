@@ -15,7 +15,7 @@
             type="button"
             id="btn-menu-amistoso"
             class="btn pri menu-mod-btn"
-            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');if(i){i.style.display='none';i.setAttribute('hidden','');}if(c){c.style.display='none';c.setAttribute('hidden','');}if(a){a.style.removeProperty('display');a.removeAttribute('hidden');}var fn=window.__qwertyFootballAoAbrirAmistoso;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
+            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');var cfg=document.getElementById('tela-configuracoes');if(i){i.style.display='none';i.setAttribute('hidden','');}if(c){c.style.display='none';c.setAttribute('hidden','');}if(cfg){cfg.style.display='none';cfg.setAttribute('hidden','');}if(a){a.style.removeProperty('display');a.removeAttribute('hidden');}var fn=window.__qwertyFootballAoAbrirAmistoso;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
           >
             Amistoso
           </button>
@@ -23,7 +23,7 @@
             type="button"
             id="btn-menu-copa"
             class="btn pri menu-mod-btn"
-            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');if(i){i.style.display='none';i.setAttribute('hidden','');}if(a){a.style.display='none';a.setAttribute('hidden','');}if(c){c.style.removeProperty('display');c.removeAttribute('hidden');}var fn=window.__qwertyFootballAoAbrirCopa;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
+            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');var cfg=document.getElementById('tela-configuracoes');if(i){i.style.display='none';i.setAttribute('hidden','');}if(a){a.style.display='none';a.setAttribute('hidden','');}if(cfg){cfg.style.display='none';cfg.setAttribute('hidden','');}if(c){c.style.removeProperty('display');c.removeAttribute('hidden');}var fn=window.__qwertyFootballAoAbrirCopa;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
           >
             Copa do Mundo
           </button>
@@ -31,7 +31,7 @@
             type="button"
             id="btn-menu-carregar-copa"
             class="btn sec menu-mod-btn"
-            onclick="(function(){var fn=window.__qwertyFootballAbrirTelaCarregarCopa;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
+            onclick="(function(){var cfg=document.getElementById('tela-configuracoes');if(cfg){cfg.style.display='none';cfg.setAttribute('hidden','');}var fn=window.__qwertyFootballAbrirTelaCarregarCopa;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
           >
             Carregar Copa
           </button>
@@ -39,11 +39,55 @@
             type="button"
             id="btn-menu-campanha"
             class="btn pri menu-mod-btn"
-            onclick="(function(){var fn=window.__qwertyFootballAoAbrirCampanha;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
+            onclick="(function(){var cfg=document.getElementById('tela-configuracoes');if(cfg){cfg.style.display='none';cfg.setAttribute('hidden','');}var fn=window.__qwertyFootballAoAbrirCampanha;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
           >
             Campanha
           </button>
+          <button
+            type="button"
+            id="btn-menu-configuracoes"
+            class="btn sec menu-mod-btn"
+            onclick="(function(){var i=document.getElementById('tela-inicio');var cfg=document.getElementById('tela-configuracoes');if(i){i.style.display='none';i.setAttribute('hidden','');}if(cfg){cfg.style.removeProperty('display');cfg.removeAttribute('hidden');}var fn=window.__qwertyFootballAoAbrirConfiguracoes;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
+          >
+            Configurações
+          </button>
         </nav>
+      </div>
+    </div>
+
+    <div id="tela-configuracoes" class="tela-menu tela-configuracoes" hidden>
+      <div class="tela-menu-inner">
+        <h2 class="tela-menu-titulo">Configurações</h2>
+        <p class="tela-menu-sub">
+          Valem para <strong>qualquer modo</strong> nesta sessão (até fechar a aba ou o navegador).
+        </p>
+        <fieldset class="config-fieldset" aria-labelledby="legenda-dificuldade">
+          <legend id="legenda-dificuldade" class="config-legend">Dificuldade</legend>
+          <div class="config-radio-linhas">
+            <label class="config-radio-linha">
+              <input type="radio" name="qwerty-dificuldade" value="facil" />
+              Fácil — desafios de letra ~25% mais lentos que na média
+            </label>
+            <label class="config-radio-linha">
+              <input type="radio" name="qwerty-dificuldade" value="media" checked />
+              Média — equilíbrio atual do jogo
+            </label>
+            <label class="config-radio-linha">
+              <input type="radio" name="qwerty-dificuldade" value="dificil" />
+              Difícil — desafios de letra ~25% mais rápidos que na média
+            </label>
+          </div>
+        </fieldset>
+        <div class="tela-menu-acoes">
+          <button
+            type="button"
+            id="btn-config-voltar-menu"
+            class="btn sec"
+            onclick="(function(){var i=document.getElementById('tela-inicio');var cfg=document.getElementById('tela-configuracoes');if(cfg){cfg.style.display='none';cfg.setAttribute('hidden','');}if(i){i.style.removeProperty('display');i.removeAttribute('hidden');}})()"
+          >
+            Voltar ao menu
+          </button>
+        </div>
       </div>
     </div>
 
@@ -151,7 +195,7 @@
             type="button"
             id="btn-voltar-menu"
             class="btn sec"
-            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');if(a){a.style.display='none';a.setAttribute('hidden','');}if(c){c.style.display='none';c.setAttribute('hidden','');}if(i){i.style.removeProperty('display');i.removeAttribute('hidden');}})()"
+            onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');var cfg=document.getElementById('tela-configuracoes');if(a){a.style.display='none';a.setAttribute('hidden','');}if(c){c.style.display='none';c.setAttribute('hidden','');}if(cfg){cfg.style.display='none';cfg.setAttribute('hidden','');}if(i){i.style.removeProperty('display');i.removeAttribute('hidden');}})()"
           >
             Voltar
           </button>
@@ -163,18 +207,32 @@
       <div class="tela-copa-inner">
         <h2 class="tela-menu-titulo">Copa do Mundo</h2>
         <div id="copa-passo-selecao" class="copa-passo">
-          <p class="tela-menu-sub">Escolha a seleção que você vai comandar. Os grupos serão sorteados na sequência.</p>
+          <p class="tela-menu-sub">
+            Escolha a seleção que você vai comandar. Depois você escolhe 23 convocados entre o elenco ampliado da seleção (jogadores fixos + pool como no modo campanha); só então os grupos são sorteados. Na competição não será possível refazer a convocação.
+          </p>
           <div id="copa-cards-jogador" class="selecoes-cards" role="group" aria-label="Sua seleção na Copa"></div>
           <div class="tela-menu-acoes">
-            <button type="button" id="btn-copa-sortear-grupos" class="btn pri" disabled>Ver grupos</button>
+            <button type="button" id="btn-copa-ir-convocacao" class="btn pri" disabled>Convocar seleção</button>
             <button
               type="button"
               id="btn-copa-voltar-inicio"
               class="btn sec"
-              onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');if(c){c.style.display='none';c.setAttribute('hidden','');}if(a){a.style.display='none';a.setAttribute('hidden','');}if(i){i.style.removeProperty('display');i.removeAttribute('hidden');}})()"
+              onclick="(function(){var i=document.getElementById('tela-inicio');var a=document.getElementById('tela-amistoso');var c=document.getElementById('tela-copa');var cfg=document.getElementById('tela-configuracoes');if(c){c.style.display='none';c.setAttribute('hidden','');}if(a){a.style.display='none';a.setAttribute('hidden','');}if(cfg){cfg.style.display='none';cfg.setAttribute('hidden','');}if(i){i.style.removeProperty('display');i.removeAttribute('hidden');}})()"
             >
               Voltar
             </button>
+          </div>
+        </div>
+        <div id="copa-passo-convocacao" class="copa-passo" hidden>
+          <p class="tela-menu-sub">
+            Lista completa da seleção para convocação: jogadores da base nacional e o restante do elenco gerado (mesmo critério da campanha). Escolha <strong>23 jogadores</strong> (mesmas regras: 11 titulares em formação válida e banco com requisitos de posição). Use <strong>Seleção automática</strong> se quiser.
+          </p>
+          <p id="copa-convocacao-contador" class="campanha-convocacao-contador" aria-live="polite">0 / 23</p>
+          <div id="copa-convocacao-lista" class="campanha-convocacao-lista" role="group"></div>
+          <div class="tela-menu-acoes campanha-convocacao-acoes">
+            <button type="button" id="btn-copa-convocacao-auto" class="btn sec">Seleção automática</button>
+            <button type="button" id="btn-copa-sortear-grupos" class="btn pri" disabled>Sortear grupos</button>
+            <button type="button" id="btn-copa-voltar-selecao-convoc" class="btn sec">Voltar</button>
           </div>
         </div>
         <div id="copa-passo-grupos" class="copa-passo" hidden>

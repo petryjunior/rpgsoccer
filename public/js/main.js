@@ -26,7 +26,15 @@ import {
   tipoFinalizacaoGoleiro,
 } from "./match.js";
 import { parametrosLetra } from "./qte.js";
-import { SELECOES, elencoDaSelecao, selecaoPorId, urlBandeira } from "./national-teams.js";
+import {
+  SELECOES,
+  elencoDaSelecao,
+  elencoSelecaoCom12Reservas,
+  selecaoPorId,
+  urlBandeira,
+} from "./national-teams.js";
+import { ordenarEventosCalendarioCampanhaNoAno } from "./campaign-calendar-order.js";
+import { gerarPoolCampanha } from "./campaign-pool.js";
 import {
   adversariosNasRodadas,
   agregarClassificacao,
@@ -64,7 +72,12 @@ import {
   substituirSaveCopa,
 } from "./copa-storage.js";
 import { ordenarPorPosicao } from "./squadSort.js";
-import { validarElenco } from "./squad.js";
+import { validarElenco, escalaçãoInicialDeConvocados23 } from "./squad.js";
+import {
+  getDificuldadeSessao,
+  setDificuldadeSessao,
+  multiplicadorTempoQtePorDificuldade,
+} from "./game-settings.js";
 import {
   carregarCampanhaAtiva,
   salvarCampanhaAtiva,
@@ -111,6 +124,7 @@ import {
 const els = {
   jogoRoot: document.getElementById("jogo-root"),
   telaInicio: document.getElementById("tela-inicio"),
+  telaConfiguracoes: document.getElementById("tela-configuracoes"),
   telaCarregarCopa: document.getElementById("tela-carregar-copa"),
   carregarCopaLista: document.getElementById("carregar-copa-lista"),
   carregarCopaVazio: document.getElementById("carregar-copa-vazio"),
@@ -123,9 +137,15 @@ const els = {
   btnVoltarMenu: document.getElementById("btn-voltar-menu"),
   telaCopa: document.getElementById("tela-copa"),
   copaPassoSelecao: document.getElementById("copa-passo-selecao"),
+  copaPassoConvocacao: document.getElementById("copa-passo-convocacao"),
   copaPassoGrupos: document.getElementById("copa-passo-grupos"),
   copaCardsJogador: document.getElementById("copa-cards-jogador"),
+  btnCopaIrConvocacao: document.getElementById("btn-copa-ir-convocacao"),
   btnCopaSortearGrupos: document.getElementById("btn-copa-sortear-grupos"),
+  copaConvocacaoLista: document.getElementById("copa-convocacao-lista"),
+  copaConvocacaoContador: document.getElementById("copa-convocacao-contador"),
+  btnCopaConvocacaoAuto: document.getElementById("btn-copa-convocacao-auto"),
+  btnCopaVoltarSelecaoConvoc: document.getElementById("btn-copa-voltar-selecao-convoc"),
   copaGruposIntro: document.getElementById("copa-grupos-intro"),
   copaGruposGrid: document.getElementById("copa-grupos-grid"),
   copaClassificacaoWrap: document.getElementById("copa-classificacao-wrap"),
@@ -292,10 +312,25 @@ const RELOGIO_MS_POR_MINUTO = 400;
 /** Quantos jogadores a tabela de artilheiros do hub da Copa exibe. */
 const COPA_ARTILHEIROS_HUB_MAX = 10;
 
+function aplicarMultiplicadorMsQte(ms) {
+  const m = multiplicadorTempoQtePorDificuldade();
+  return Math.max(40, Math.round(Number(ms) * m));
+}
+
+/**
+ * Parâmetros de letra QTE com dificuldade da sessão (±25 % vs média no tempo).
+ * @param {number} ratio
+ */
+function parametrosLetraDificuldade(ratio) {
+  const p = parametrosLetra(ratio);
+  return { ...p, tempoLimiteMs: aplicarMultiplicadorMsQte(p.tempoLimiteMs) };
+}
+
 function sortearIntervaloContagemQte() {
   const a = QTE_COUNTDOWN_MS_MIN;
   const b = QTE_COUNTDOWN_MS_MAX;
-  return a + Math.floor(Math.random() * (b - a + 1));
+  const base = a + Math.floor(Math.random() * (b - a + 1));
+  return aplicarMultiplicadorMsQte(base);
 }
 
 /** ms → segundos para texto do QTE (3 casas decimais, vírgula decimal pt-BR). */
@@ -432,7 +467,11 @@ function aplicarRestricoesCopaNoElencoHumano() {
           timeJogador.reservas[r],
           timeJogador.titulares[i],
         ];
-        const v = validarElenco(timeJogador.titulares, timeJogador.reservas);
+        const v = validarElenco(
+          timeJogador.titulares,
+          timeJogador.reservas,
+          opcoesValidarElencoHumano(),
+        );
         if (!v.ok) {
           [timeJogador.titulares[i], timeJogador.reservas[r]] = [
             timeJogador.reservas[r],
@@ -592,7 +631,7 @@ function substituirLesionadosTitularCpu() {
       const res = timeCpu.reservas[ri];
       if (jogadorJaSubstituidoNaoPodeVoltar(res.id)) continue;
       [timeCpu.titulares[ti], timeCpu.reservas[ri]] = [timeCpu.reservas[ri], timeCpu.titulares[ti]];
-      const v = validarElenco(timeCpu.titulares, timeCpu.reservas);
+      const v = validarElenco(timeCpu.titulares, timeCpu.reservas, opcoesValidarElencoCpu());
       if (v.ok) {
         jogadoresSubstituidosForaIds.add(tit.id);
         appendLog(
@@ -864,7 +903,11 @@ let idSelecaoCampanhaPendente = /** @type {string | null} */ (null);
 let campanhaConvocadosPendentes = new Set();
 
 function opcoesValidarElencoHumano() {
-  return tipoModoJogo === "campanha" ? { numReservas: 12 } : undefined;
+  return { numReservas: 12 };
+}
+
+function opcoesValidarElencoCpu() {
+  return { numReservas: 12 };
 }
 
 /**
@@ -920,6 +963,18 @@ let copaCardsMontados = false;
 let copaSalvarFeedbackTimer = null;
 /** @type {string | null} */
 let idSelecaoCopaEscolhida = null;
+/**
+ * Copa standalone: elenco ampliado (pool gerado como na campanha + jogadores fixos da seleção)
+ * para escolher os 23 convocados.
+ * @type {(import('./campaign-pool.js').JogadorCampanha | { id: string, nome: string, posicao: import('./constants.js').Position, ataque: number, defesa: number })[]}
+ */
+let copaElencoPool = [];
+/** @type {Set<string>} */
+let copaConvocadosPendentesCopa = new Set();
+/** Convocados confirmados imediatamente antes do sorteio dos grupos (Copa standalone). */
+let copaSnapshotConvocadosPreSorteio = /** @type {null | { id: string, nome: string, posicao: import('./constants.js').Position, ataque: number, defesa: number }[]} */ (
+  null
+);
 
 /** @type {ReturnType<typeof setTimeout> | null} */
 let qteTimerLate = null;
@@ -1728,14 +1783,16 @@ function esconderUiIntervalo() {
 function tentarSubstituicaoCpu() {
   if (substituicoesCpuUsadas >= 5) return;
   if (Math.random() > 0.42) return;
+  const nRes = timeCpu.reservas.length;
+  if (nRes < 1) return;
   for (let k = 0; k < 45; k++) {
     const ti = Math.floor(Math.random() * 11);
-    const ri = Math.floor(Math.random() * 11);
+    const ri = Math.floor(Math.random() * nRes);
     const tit = timeCpu.titulares[ti];
     const res = timeCpu.reservas[ri];
     if (jogadorJaSubstituidoNaoPodeVoltar(res.id)) continue;
     [timeCpu.titulares[ti], timeCpu.reservas[ri]] = [timeCpu.reservas[ri], timeCpu.titulares[ti]];
-    const v = validarElenco(timeCpu.titulares, timeCpu.reservas);
+    const v = validarElenco(timeCpu.titulares, timeCpu.reservas, opcoesValidarElencoCpu());
     if (v.ok) {
       jogadoresSubstituidosForaIds.add(tit.id);
       substituicoesCpuUsadas++;
@@ -2428,6 +2485,10 @@ function abrirTelaCarregarCopa() {
     els.telaCarregarCopa.removeAttribute("hidden");
     els.telaCarregarCopa.style.removeProperty("display");
   }
+  if (els.telaConfiguracoes) {
+    els.telaConfiguracoes.setAttribute("hidden", "");
+    els.telaConfiguracoes.style.display = "none";
+  }
   pintarListaCarregarCopa();
   window.scrollTo(0, 0);
 }
@@ -2475,8 +2536,7 @@ function restaurarUiCopaCarregada() {
     copaCardsMontados = true;
   }
   sincronizarCardSelecaoCopaComEstado();
-  if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = true;
-  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
+  mostrarPassoCopa("grupos");
   preencherGradeGruposCopa(copaEstado.grupos);
   const f = copaEstado.faseCopa;
   if (f === "grupos") {
@@ -2763,10 +2823,12 @@ function finalizarGruposCopa() {
 }
 
 /**
- * Simula grupos e mata-mata por completo (campanha: seleção não classificada).
+ * Completa jogos de grupo em aberto, monta o mata-mata e simula até o campeão (CPU×CPU).
+ * Útil na campanha: não classificado entre os 32, ou eliminado na fase de grupos mas ainda
+ * quer ver o restante da Copa.
  */
-function completarCopaCampanhaModoEspectador() {
-  if (!copaEstado?.copaEspectadorCampanha) return;
+function simularRestanteCopaDoEstadoAtualAteCampeao() {
+  if (!copaEstado) return;
   for (const nr of /** @type {(1 | 2 | 3)[]} */ ([1, 2, 3])) {
     simularRodadaGruposCopaTodasAsPartidas(
       copaEstado.grupos,
@@ -2830,6 +2892,14 @@ function completarCopaCampanhaModoEspectador() {
   }
 }
 
+/**
+ * Campanha: seleção não estava entre as 32 classificadas — simula a Copa inteira só para consulta.
+ */
+function completarCopaCampanhaModoEspectador() {
+  if (!copaEstado?.copaEspectadorCampanha) return;
+  simularRestanteCopaDoEstadoAtualAteCampeao();
+}
+
 function ocultarCelebracaoCopa() {
   if (els.copaCelebracao) els.copaCelebracao.hidden = true;
 }
@@ -2873,7 +2943,9 @@ function subtituloEliminacaoCopa(det) {
  */
 function textoParagrafoEliminacaoCopa(det) {
   if (det === "grupos") {
-    return "Sua seleção não ficou entre as duas primeiras do grupo e está eliminada da Copa do Mundo.";
+    return copaEstado?.origemCampanha
+      ? "Sua seleção não ficou entre as duas primeiras do grupo. O restante da Copa foi simulado — confira a chave, «Ver tabela» e os artilheiros."
+      : "Sua seleção não ficou entre as duas primeiras do grupo e está eliminada da Copa do Mundo.";
   }
   if (det === "oitavas") {
     return "Sua seleção foi eliminada nas oitavas de final. Abaixo, a chave mostra o caminho até o título.";
@@ -2991,17 +3063,24 @@ function mostrarTelaCopaEliminado() {
   if (els.copaGruposGrid) els.copaGruposGrid.hidden = true;
   if (els.copaGruposIntro) els.copaGruposIntro.hidden = true;
   mostrarSecaoArtilheirosCopaNoHub();
+  const hubCampanhaComChave =
+    Boolean(copaEstado?.origemCampanha && copaEstado.eliminatoria?.oitavas?.length);
   if (els.copaHubMsg) {
     els.copaHubMsg.hidden = false;
     const nomeCamp =
       copaEstado?.campeaoId != null
         ? SELECOES.find((x) => x.id === copaEstado.campeaoId)?.nome ?? "—"
         : "—";
-    els.copaHubMsg.textContent =
-      `Sua seleção foi eliminada. Campeão mundial: ${nomeCamp}. A chave abaixo mostra os resultados até a final. Volte ao menu para uma nova Copa ou um amistoso.`;
+    if (hubCampanhaComChave && copaEstado?.detalheEliminacaoCopa === "grupos") {
+      els.copaHubMsg.textContent =
+        `Sua seleção foi eliminada na fase de grupos. Campeão mundial: ${nomeCamp}. A chave abaixo mostra o mata-mata completo; use «Ver tabela» para as classificações dos oito grupos.`;
+    } else {
+      els.copaHubMsg.textContent =
+        `Sua seleção foi eliminada. Campeão mundial: ${nomeCamp}. A chave abaixo mostra os resultados até a final. Volte ao menu para uma nova Copa ou um amistoso.`;
+    }
   }
   copaHubBotoesJogoOcultar();
-  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = true;
+  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = !hubCampanhaComChave;
   if (els.btnCopaVoltarInicioHub) {
     els.btnCopaVoltarInicioHub.hidden = false;
     els.btnCopaVoltarInicioHub.textContent = copaEstado?.origemCampanha
@@ -3090,7 +3169,13 @@ function tentarAvancarDosGruposCopa() {
   if (pos < 0 || pos > 1) {
     copaEstado.faseCopa = "eliminado";
     copaEstado.detalheEliminacaoCopa = "grupos";
-    mostrarTelaCopaNaoClassificou();
+    if (copaEstado.origemCampanha) {
+      simularRestanteCopaDoEstadoAtualAteCampeao();
+      copaEstado.faseCopa = "eliminado";
+      mostrarTelaCopaEliminado();
+    } else {
+      mostrarTelaCopaNaoClassificou();
+    }
     return;
   }
   finalizarGruposCopa();
@@ -3122,11 +3207,61 @@ function handleCopaProximoJogo() {
   }
 }
 
+/**
+ * Elenco do humano na Copa: campanha usa os 23 da campanha; standalone usa convocados gravados no estado; fallback = elenco padrão da seleção.
+ * @returns {{ titulares: object[], reservas: object[] }}
+ */
+function montarTimeJogadorCopaHumano() {
+  if (!copaEstado) throw new Error("Sem estado da Copa.");
+  if (copaEstado.origemCampanha) {
+    const est = campanhaEstadoMemoria ?? carregarCampanhaAtiva();
+    if (est && est.selecaoId === copaEstado.playerTeamId) {
+      return montarTimeJogadorCampanhaParaPartida(est);
+    }
+  }
+  const list = copaEstado.convocadosHumanoLista;
+  if (Array.isArray(list) && list.length === 23) {
+    const clones = list.map((j) => ({ ...j }));
+    return escalaçãoInicialDeConvocados23(clones);
+  }
+  return elencoSelecaoCom12Reservas(copaEstado.playerTeamId);
+}
+
+/**
+ * Adversário na Copa: pool ampliado (como no humano) + 23 convocados automáticos + 11 titulares e 12 reservas.
+ * @param {string} selecaoId
+ * @returns {{ titulares: object[], reservas: object[] }}
+ */
+function montarTimeAdversarioCopaElencoAmpliado(selecaoId) {
+  const ampliado = gerarPoolCampanha(selecaoId);
+  const { titulares, reservas } = elencoDaSelecao(selecaoId);
+  const pool = [...ampliado, ...titulares, ...reservas];
+  let conv = sugerirConvocacaoAutomatica23(pool);
+  let mapSource = pool;
+  if (!conv.ok) {
+    conv = sugerirConvocacaoAutomatica23(ampliado);
+    mapSource = ampliado;
+  }
+  if (!conv.ok) {
+    throw new Error(`Copa: não foi possível montar convocados do adversário (${selecaoId}).`);
+  }
+  const porId = new Map(mapSource.map((j) => [j.id, j]));
+  const vinteETres = [];
+  for (const id of conv.ids) {
+    const j = porId.get(id);
+    if (!j) {
+      throw new Error(`Copa: convocado inválido no adversário (${selecaoId}).`);
+    }
+    vinteETres.push({ ...j });
+  }
+  return escalaçãoInicialDeConvocados23(vinteETres);
+}
+
 function prepararElencoCopaParaSimulacao(cpuId) {
   if (!copaEstado) return;
   tipoModoJogo = "copa";
-  timeJogador = elencoDaSelecao(copaEstado.playerTeamId);
-  timeCpu = elencoDaSelecao(cpuId);
+  timeJogador = montarTimeJogadorCopaHumano();
+  timeCpu = montarTimeAdversarioCopaElencoAmpliado(cpuId);
   metaSelecaoJogador =
     SELECOES.find((x) => x.id === copaEstado.playerTeamId) ?? null;
   metaSelecaoCpu = SELECOES.find((x) => x.id === cpuId) ?? null;
@@ -3173,35 +3308,21 @@ function voltarHubCampanhaDesdeCopa2030() {
     (copaEstado.faseCopa === "campeao" || copaEstado.faseCopa === "eliminado");
   if (!campanhaEstadoMemoria) campanhaEstadoMemoria = carregarCampanhaAtiva();
   if (campanhaEstadoMemoria && terminal) {
-    const anoArquivar =
+    const anoCivil =
       campanhaEstadoMemoria.anoCalendario ??
       ANO_BASE_CAMPANHA + (campanhaEstadoMemoria.temporada ?? 1) - 1;
     const evCopaSlot = campanhaEstadoMemoria.eventos?.find(
-      (e) => e.tipo === "copa_mundial" && e.campanhaAno === anoArquivar,
+      (e) => e.tipo === "copa_mundial" && e.campanhaAno === anoCivil,
     );
     if (evCopaSlot) evCopaSlot.concluido = true;
-    arquivarEventosCalendarioCampanha(campanhaEstadoMemoria, anoArquivar);
     campanhaEstadoMemoria.copa2030Concluida = true;
-    campanhaEstadoMemoria.temporada = (campanhaEstadoMemoria.temporada ?? 1) + 1;
-    campanhaEstadoMemoria.anoCalendario =
-      ANO_BASE_CAMPANHA + campanhaEstadoMemoria.temporada - 1;
-    campanhaEstadoMemoria.eliminatoriasCopa = null;
-    campanhaEstadoMemoria.wcqAgendaHumano = null;
-    const ids = SELECOES.map((s) => s.id);
-    const rngCal = criarRng(
-      (campanhaEstadoMemoria.seedCampanha ^ campanhaEstadoMemoria.temporada * 0xf00d) >>> 0,
-    );
-    const cal = criarCalendarioTemporada(
-      campanhaEstadoMemoria.selecaoId,
-      ids,
-      campanhaEstadoMemoria.anoCalendario,
-      rngCal,
-      campanhaEstadoMemoria,
-    );
-    campanhaEstadoMemoria.eventos = cal.eventos;
-    campanhaEstadoMemoria.torneioContinental = cal.torneioContinental;
-    campanhaEstadoMemoria.eliminatoriasCopa = cal.eliminatoriasCopa ?? null;
-    campanhaEstadoMemoria.mesAtual = cal.eventos[0]?.campanhaMes ?? 3;
+    const evs = campanhaEstadoMemoria.eventos;
+    if (Array.isArray(evs) && evs.length) {
+      const ord = [...evs];
+      ordenarEventosCalendarioCampanhaNoAno(ord);
+      const pend = ord.find((e) => !e.concluido);
+      if (pend?.campanhaMes != null) campanhaEstadoMemoria.mesAtual = pend.campanhaMes;
+    }
     salvarCampanhaAtiva(campanhaEstadoMemoria);
   }
   copaTransicaoHubPendente = null;
@@ -3261,17 +3382,29 @@ function voltarMenuPrincipalDaCopa() {
   resetCopaUi();
 }
 
+function mostrarPassoCopa(/** @type {"selecao"|"convocacao"|"grupos"} */ passo) {
+  if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = passo !== "selecao";
+  if (els.copaPassoConvocacao) els.copaPassoConvocacao.hidden = passo !== "convocacao";
+  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = passo !== "grupos";
+}
+
 function resetCopaUi() {
   idSelecaoCopaEscolhida = null;
+  copaElencoPool = [];
+  copaConvocadosPendentesCopa = new Set();
+  copaSnapshotConvocadosPreSorteio = null;
   els.copaCardsJogador?.querySelectorAll(".card-selecao").forEach((b) => {
     b.classList.remove("card-selecao--ativa");
   });
+  if (els.btnCopaIrConvocacao) {
+    els.btnCopaIrConvocacao.disabled = true;
+    els.btnCopaIrConvocacao.setAttribute("disabled", "");
+  }
   if (els.btnCopaSortearGrupos) {
     els.btnCopaSortearGrupos.disabled = true;
     els.btnCopaSortearGrupos.setAttribute("disabled", "");
   }
-  if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = false;
-  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = true;
+  mostrarPassoCopa("selecao");
   if (els.copaClassificacaoWrap) els.copaClassificacaoWrap.hidden = true;
   if (els.copaClassificacaoTodosWrap) els.copaClassificacaoTodosWrap.hidden = true;
   if (els.copaHubMsg) {
@@ -3327,17 +3460,44 @@ function montarCardsCopaSelecao() {
       els.copaCardsJogador?.querySelectorAll(".card-selecao").forEach((b) => {
         b.classList.toggle("card-selecao--ativa", b.dataset.selecaoId === s.id);
       });
-      if (els.btnCopaSortearGrupos) {
-        els.btnCopaSortearGrupos.disabled = false;
-        els.btnCopaSortearGrupos.removeAttribute("disabled");
+      if (els.btnCopaIrConvocacao) {
+        els.btnCopaIrConvocacao.disabled = false;
+        els.btnCopaIrConvocacao.removeAttribute("disabled");
       }
     });
     els.copaCardsJogador.appendChild(btn);
   }
 }
 
+function confirmarConvocacaoCopaEIniciarSorteio() {
+  if (!idSelecaoCopaEscolhida) return;
+  const map = new Map(copaElencoPool.map((x) => [x.id, x]));
+  const ids = [...copaConvocadosPendentesCopa];
+  const v = validarConvocacao23(ids, map);
+  if (!v.ok) {
+    alert(v.msg);
+    return;
+  }
+  const snap = ids.map((id) => {
+    const j = map.get(id);
+    return j ? { ...j } : null;
+  }).filter(Boolean);
+  if (snap.length !== 23) {
+    alert("Convocação inválida.");
+    return;
+  }
+  copaSnapshotConvocadosPreSorteio = /** @type {typeof copaSnapshotConvocadosPreSorteio} */ (snap);
+  iniciarCopaComSorteio();
+}
+
 function iniciarCopaComSorteio() {
   if (!idSelecaoCopaEscolhida) return;
+  if (!copaSnapshotConvocadosPreSorteio || copaSnapshotConvocadosPreSorteio.length !== 23) {
+    alert("Confirme a convocação de 23 jogadores antes de sortear os grupos.");
+    return;
+  }
+  const convList = copaSnapshotConvocadosPreSorteio.map((j) => ({ ...j }));
+  copaSnapshotConvocadosPreSorteio = null;
   const seed = Date.now() % 2147483647;
   const rng = criarRng(seed);
   const ids32 = sortear32IdsCopa(SELECOES, idSelecaoCopaEscolhida, rng);
@@ -3376,9 +3536,9 @@ function iniciarCopaComSorteio() {
     amarelosAcumulado: {},
     eliminatoria: null,
     detalheEliminacaoCopa: null,
+    convocadosHumanoLista: convList,
   };
-  if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = true;
-  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
+  mostrarPassoCopa("grupos");
   if (els.copaGruposIntro) {
     const sn = SELECOES.find((x) => x.id === idSelecaoCopaEscolhida)?.nome ?? "";
     els.copaGruposIntro.textContent = `Você comanda ${sn}, no grupo ${grupoPlayer}. Há 8 grupos (A–H) com 4 seleções.`;
@@ -3433,8 +3593,7 @@ function iniciarCopa2030DaCampanha() {
     els.telaCopa.removeAttribute("hidden");
     els.telaCopa.style.removeProperty("display");
   }
-  if (els.copaPassoSelecao) els.copaPassoSelecao.hidden = true;
-  if (els.copaPassoGrupos) els.copaPassoGrupos.hidden = false;
+  mostrarPassoCopa("grupos");
   if (copaEstado.copaEspectadorCampanha) {
     completarCopaCampanhaModoEspectador();
     if (els.copaGruposGrid) {
@@ -3490,8 +3649,8 @@ function entrarNoJogoCopaVersus(cpuId) {
   if (!copaEstado) return;
   try {
     tipoModoJogo = "copa";
-    timeJogador = elencoDaSelecao(copaEstado.playerTeamId);
-    timeCpu = elencoDaSelecao(cpuId);
+    timeJogador = montarTimeJogadorCopaHumano();
+    timeCpu = montarTimeAdversarioCopaElencoAmpliado(cpuId);
     metaSelecaoJogador =
       SELECOES.find((x) => x.id === copaEstado.playerTeamId) ?? null;
     metaSelecaoCpu = SELECOES.find((x) => x.id === cpuId) ?? null;
@@ -3738,7 +3897,7 @@ function executarDisputaPenaltis() {
           pintarHudPlacarPen();
           pintarHudAcaoPen(textoAcao);
           const { ratio } = metricasDuelo(atacante, goleiroCpu, true);
-          const p = parametrosLetra(ratio);
+          const p = parametrosLetraDificuldade(ratio);
           els.dueloOverlay.hidden = false;
           mostrarFaseModal("qte");
           hudPenaltisModoQte(true);
@@ -3765,7 +3924,7 @@ function executarDisputaPenaltis() {
           pintarHudPlacarPen();
           pintarHudAcaoPen(textoAcao);
           const { ratio } = metricasDuelo(goleiroHum, atacanteCpu, false);
-          const seq = Array.from({ length: 3 }, () => parametrosLetra(ratio));
+          const seq = Array.from({ length: 3 }, () => parametrosLetraDificuldade(ratio));
           els.dueloOverlay.hidden = false;
           mostrarFaseModal("qte");
           hudPenaltisModoQte(true);
@@ -3969,6 +4128,10 @@ function esconderTodasTelasMenu() {
   if (els.telaCampanha) {
     els.telaCampanha.setAttribute("hidden", "");
     els.telaCampanha.style.display = "none";
+  }
+  if (els.telaConfiguracoes) {
+    els.telaConfiguracoes.setAttribute("hidden", "");
+    els.telaConfiguracoes.style.display = "none";
   }
 }
 
@@ -4660,6 +4823,83 @@ function atualizarUiConvocacaoContador() {
   }
 }
 
+function pintarCopaConvocacaoLista() {
+  if (!els.copaConvocacaoLista || !copaElencoPool.length) return;
+  els.copaConvocacaoLista.replaceChildren();
+  const criarLinha = (/** @type {{ id: string, nome: string, posicao: import('./constants.js').Position, ataque: number, defesa: number }} */ j) => {
+    const row = document.createElement("label");
+    row.className = "campanha-jogador-linha";
+    if (copaConvocadosPendentesCopa.has(j.id)) row.classList.add("campanha-jogador-linha--marcado");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = copaConvocadosPendentesCopa.has(j.id);
+    cb.dataset.jogadorId = j.id;
+    const meta = document.createElement("span");
+    meta.className = "campanha-jogador-meta campanha-jogador-meta--stats";
+    const idadeTxt =
+      j != null && typeof j === "object" && "idade" in j && Number.isFinite(/** @type {{ idade?: number }} */ (j).idade)
+        ? `${/** @type {{ idade: number }} */ (j).idade}a · `
+        : "";
+    meta.append(
+      document.createTextNode(`${j.nome} · ${POSITION_LABEL[j.posicao]} · ${idadeTxt}`),
+    );
+    const statsWrap = document.createElement("span");
+    statsWrap.className = "campanha-jogador-stats";
+    statsWrap.textContent = `${j.ataque} / ${j.defesa}`;
+    meta.appendChild(statsWrap);
+    row.append(cb, meta);
+    row.addEventListener("click", (ev) => {
+      if (ev.target === cb) return;
+      cb.checked = !cb.checked;
+      cb.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    cb.addEventListener("change", () => {
+      if (cb.checked) {
+        if (copaConvocadosPendentesCopa.size >= 23) {
+          cb.checked = false;
+          return;
+        }
+        copaConvocadosPendentesCopa.add(j.id);
+      } else {
+        copaConvocadosPendentesCopa.delete(j.id);
+      }
+      row.classList.toggle("campanha-jogador-linha--marcado", cb.checked);
+      atualizarUiCopaConvocacaoContador();
+    });
+    return row;
+  };
+  for (const pos of POSITION_SORT_ORDER) {
+    const grupo = copaElencoPool
+      .filter((j) => j.posicao === pos)
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    if (!grupo.length) continue;
+    const sec = document.createElement("section");
+    sec.className = "campanha-convocacao-secao";
+    const h = document.createElement("h3");
+    h.className = "campanha-convocacao-secao-titulo";
+    h.textContent = `${CAMPANHA_POS_SECAO_TITULO[pos]} (${grupo.length})`;
+    sec.appendChild(h);
+    const inner = document.createElement("div");
+    inner.className = "campanha-convocacao-secao-lista";
+    for (const j of grupo) inner.appendChild(criarLinha(j));
+    sec.appendChild(inner);
+    els.copaConvocacaoLista.appendChild(sec);
+  }
+  atualizarUiCopaConvocacaoContador();
+}
+
+function atualizarUiCopaConvocacaoContador() {
+  const n = copaConvocadosPendentesCopa.size;
+  if (els.copaConvocacaoContador) els.copaConvocacaoContador.textContent = `${n} / 23`;
+  if (els.btnCopaSortearGrupos) {
+    const map = new Map(copaElencoPool.map((x) => [x.id, x]));
+    const v = validarConvocacao23([...copaConvocadosPendentesCopa], map);
+    els.btnCopaSortearGrupos.disabled = !v.ok;
+    if (v.ok) els.btnCopaSortearGrupos.removeAttribute("disabled");
+    else els.btnCopaSortearGrupos.setAttribute("disabled", "");
+  }
+}
+
 function montarCardsSelecaoCampanha() {
   if (!els.campanhaCardsSelecao) return;
   els.campanhaCardsSelecao.replaceChildren();
@@ -4782,7 +5022,7 @@ function entrarNoJogoCampanhaProximoEvento() {
     tipoModoJogo = "campanha";
     const { titulares, reservas } = montarTimeJogadorCampanhaParaPartida(campanhaEstadoMemoria);
     timeJogador = { titulares, reservas };
-    timeCpu = elencoDaSelecao(prox.adversarioId);
+    timeCpu = elencoSelecaoCom12Reservas(prox.adversarioId);
     snapshotElencoLimpo();
     metaSelecaoJogador = selecaoPorId(campanhaEstadoMemoria.selecaoId);
     metaSelecaoCpu = selecaoPorId(prox.adversarioId);
@@ -4951,8 +5191,8 @@ function entrarNoJogoComSelecoes() {
   if (idSelecaoJogadorEscolhida === idSelecaoCpuEscolhida) return;
   try {
     tipoModoJogo = "amistoso";
-    timeJogador = elencoDaSelecao(idSelecaoJogadorEscolhida);
-    timeCpu = elencoDaSelecao(idSelecaoCpuEscolhida);
+    timeJogador = elencoSelecaoCom12Reservas(idSelecaoJogadorEscolhida);
+    timeCpu = elencoSelecaoCom12Reservas(idSelecaoCpuEscolhida);
     snapshotElencoLimpo();
     metaSelecaoJogador = SELECOES.find((x) => x.id === idSelecaoJogadorEscolhida) ?? null;
     metaSelecaoCpu = SELECOES.find((x) => x.id === idSelecaoCpuEscolhida) ?? null;
@@ -5022,6 +5262,26 @@ window.__qwertyFootballAoAbrirCopa = function qwertyFootballAoAbrirCopa() {
   window.scrollTo(0, 0);
 };
 
+function sincronizarRadiosDificuldadeNaUi() {
+  const cur = getDificuldadeSessao();
+  document.querySelectorAll('input[name="qwerty-dificuldade"]').forEach((el) => {
+    if (el instanceof HTMLInputElement) el.checked = el.value === cur;
+  });
+}
+
+window.__qwertyFootballAoAbrirConfiguracoes = function aoAbrirConfiguracoes() {
+  sincronizarRadiosDificuldadeNaUi();
+  window.scrollTo(0, 0);
+};
+
+(function wireRadiosDificuldade() {
+  document.querySelectorAll('input[name="qwerty-dificuldade"]').forEach((el) => {
+    el.addEventListener("change", () => {
+      if (el instanceof HTMLInputElement && el.checked) setDificuldadeSessao(el.value);
+    });
+  });
+})();
+
 window.__qwertyFootballAbrirTelaCarregarCopa = abrirTelaCarregarCopa;
 
 (function sincronizarAmistosoSeJaVisivel() {
@@ -5038,8 +5298,40 @@ window.__qwertyFootballAbrirTelaCarregarCopa = abrirTelaCarregarCopa;
   }
 })();
 
+els.btnCopaIrConvocacao?.addEventListener("click", () => {
+  if (!idSelecaoCopaEscolhida) return;
+  try {
+    const { titulares, reservas } = elencoDaSelecao(idSelecaoCopaEscolhida);
+    const ampliado = gerarPoolCampanha(idSelecaoCopaEscolhida);
+    copaElencoPool = [...ampliado, ...titulares, ...reservas];
+  } catch (e) {
+    console.error(e);
+    alert("Não foi possível carregar o elenco desta seleção.");
+    return;
+  }
+  const auto = sugerirConvocacaoAutomatica23(copaElencoPool);
+  copaConvocadosPendentesCopa = auto.ok ? new Set(auto.ids) : new Set();
+  mostrarPassoCopa("convocacao");
+  pintarCopaConvocacaoLista();
+});
+
+els.btnCopaConvocacaoAuto?.addEventListener("click", () => {
+  if (!copaElencoPool.length) return;
+  const r = sugerirConvocacaoAutomatica23(copaElencoPool);
+  if (!r.ok) {
+    alert(r.msg);
+    return;
+  }
+  copaConvocadosPendentesCopa = new Set(r.ids);
+  pintarCopaConvocacaoLista();
+});
+
+els.btnCopaVoltarSelecaoConvoc?.addEventListener("click", () => {
+  mostrarPassoCopa("selecao");
+});
+
 els.btnCopaSortearGrupos?.addEventListener("click", () => {
-  iniciarCopaComSorteio();
+  confirmarConvocacaoCopaEIniciarSorteio();
 });
 
 els.btnCopaProximoJogo?.addEventListener("click", () => {
@@ -5342,7 +5634,7 @@ function abrirModalLance(lance) {
 
   mostrarFaseModal("campo_pre_qte");
   const metCampo = metricasDuelo(ctx.jogador, ctx.adversario, ctx.jogadorComBola);
-  const letraParamsCampo = parametrosLetra(metCampo.ratio);
+  const letraParamsCampo = parametrosLetraDificuldade(metCampo.ratio);
   els.qteDica.textContent = `Você tem ${fmtSegundosExatos(letraParamsCampo.tempoLimiteMs)} s para pressionar a tecla certa.`;
 
   ctx.iniciarQteCampo = () => {
@@ -5588,7 +5880,7 @@ function iniciarQteGoleiro() {
     : chuteJogador
       ? 3
       : 2;
-  const seq = Array.from({ length: nLetras }, () => parametrosLetra(met.ratio));
+  const seq = Array.from({ length: nLetras }, () => parametrosLetraDificuldade(met.ratio));
   const msPorLetra = seq.reduce((a, pr) => a + pr.tempoLimiteMs, 0) / nLetras;
   /** @type {Record<number, string>} */
   const porExtenso = { 1: "uma", 2: "duas", 3: "três", 4: "quatro" };
@@ -6278,7 +6570,7 @@ async function iniciarPartida() {
     timeJogador.reservas,
     opcoesValidarElencoHumano(),
   );
-  const vc = validarElenco(timeCpu.titulares, timeCpu.reservas);
+  const vc = validarElenco(timeCpu.titulares, timeCpu.reservas, opcoesValidarElencoCpu());
   if (!vj.ok) {
     alert(vj.msg);
     return;

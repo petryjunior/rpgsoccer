@@ -256,7 +256,7 @@ function countPos(arr, pos) {
 }
 
 /**
- * 11 reservas: pelo menos 1 de cada posição; no máximo 2 goleiros no banco.
+ * 12 reservas: pelo menos 1 de cada posição; no máximo 2 goleiros no banco.
  */
 function montarReservas() {
   const reservas = [
@@ -267,7 +267,7 @@ function montarReservas() {
   ];
   const semGolExcesso = [POSITIONS.ZAGUEIRO, POSITIONS.MEIA, POSITIONS.ATACANTE];
   const todas = [POSITIONS.GOLEIRO, ...semGolExcesso];
-  while (reservas.length < 11) {
+  while (reservas.length < 12) {
     const gols = countPos(reservas, POSITIONS.GOLEIRO);
     const pool = gols >= 2 ? semGolExcesso : todas;
     reservas.push(criarJogador(pick(pool)));
@@ -297,13 +297,13 @@ export function gerarTime() {
 /**
  * @param {ReturnType<typeof criarJogador>[]} titulares
  * @param {ReturnType<typeof criarJogador>[]} reservas
- * @param {{ numReservas?: number }} [opcoes] modo Campanha usa 12 reservas.
+ * @param {{ numReservas?: number }} [opcoes] padrão 12 reservas.
  */
 export function validarElenco(titulares, reservas, opcoes) {
   const count = (arr, pos) => arr.filter((j) => j.posicao === pos).length;
   const t = titulares;
   const r = reservas;
-  const nRes = opcoes?.numReservas ?? 11;
+  const nRes = opcoes?.numReservas ?? 12;
 
   if (t.length !== 11 || r.length !== nRes) {
     return {

@@ -2627,3 +2627,38 @@ body {
   margin-bottom: 0;
 }
 
+.tela-configuracoes .config-fieldset {
+  margin: 1rem 0 1.25rem;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--painel);
+}
+
+.tela-configuracoes .config-legend {
+  padding: 0 0.35rem;
+  font-weight: 600;
+  color: var(--texto);
+}
+
+.tela-configuracoes .config-radio-linhas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.5rem;
+}
+
+.tela-configuracoes .config-radio-linha {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: var(--texto);
+  line-height: 1.35;
+}
+
+.tela-configuracoes .config-radio-linha input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+

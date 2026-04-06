@@ -1103,3 +1103,27 @@ export function elencoDaSelecao(id) {
   );
   return { titulares, reservas };
 }
+
+/**
+ * Elenco da seleção com 12 reservas: dados oficiais (11 titulares + 11 banco) + 12.º
+ * (clone do pior jogador de linha no banco; evita terceiro goleiro).
+ * @param {string} id
+ */
+export function elencoSelecaoCom12Reservas(id) {
+  const { titulares, reservas } = elencoDaSelecao(id);
+  if (reservas.length >= 12) return { titulares, reservas };
+  const benchField = reservas.filter((j) => j.posicao !== P.GOLEIRO);
+  const base =
+    benchField.length > 0
+      ? benchField.reduce((a, b) =>
+          a.ataque + a.defesa <= b.ataque + b.defesa ? a : b,
+        )
+      : reservas[reservas.length - 1];
+  const extra = criarJogadorFixo(
+    `${base.nome} (banco+)`,
+    base.posicao,
+    base.ataque,
+    base.defesa,
+  );
+  return { titulares, reservas: [...reservas, extra] };
+}
