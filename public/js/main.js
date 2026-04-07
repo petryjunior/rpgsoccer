@@ -78,7 +78,7 @@ import {
   substituirSaveCopa,
 } from "./copa-storage.js";
 import { ordenarPorPosicao } from "./squadSort.js";
-import { validarElenco, escalaçãoInicialDeConvocados23 } from "./squad.js";
+import { validarElenco, escalaçãoInicialDeConvocados23 } from "./squad.js?v=2";
 import {
   getDificuldadeSessao,
   setDificuldadeSessao,
@@ -482,7 +482,7 @@ function aplicarRestricoesCopaNoElencoHumano() {
         ];
         const v = validarElenco(timeJogador.titulares, timeJogador.reservas, {
           ...opcoesValidarElencoHumano(),
-          durantePartida: partidaAtiva,
+          durantePartida: elencoPermiteRelaxarReservasPorPosicao(),
         });
         if (!v.ok) {
           [timeJogador.titulares[i], timeJogador.reservas[r]] = [
@@ -645,7 +645,7 @@ function substituirLesionadosTitularCpu() {
       [timeCpu.titulares[ti], timeCpu.reservas[ri]] = [timeCpu.reservas[ri], timeCpu.titulares[ti]];
       const v = validarElenco(timeCpu.titulares, timeCpu.reservas, {
         ...opcoesValidarElencoCpu(),
-        durantePartida: partidaAtiva,
+        durantePartida: elencoPermiteRelaxarReservasPorPosicao(),
       });
       if (v.ok) {
         jogadoresSubstituidosForaIds.add(tit.id);
@@ -1040,6 +1040,18 @@ function opcoesValidarElencoHumano() {
 
 function opcoesValidarElencoCpu() {
   return { numReservas: 12 };
+}
+
+/**
+ * Regra “1 reserva de cada posição” vale só antes do apito / fora de jogo em curso.
+ * Usa também pausa + minuto/placar para não depender só de `partidaAtiva` (cache ou estados raros).
+ */
+function elencoPermiteRelaxarReservasPorPosicao() {
+  if (partidaAtiva || aguardandoSegundoTempo) return true;
+  if (jogoPausado && (estadoGlobal.minuto > 0 || golsJogador > 0 || golsCpu > 0)) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -1942,7 +1954,7 @@ function tentarSubstituicaoCpu() {
     [timeCpu.titulares[ti], timeCpu.reservas[ri]] = [timeCpu.reservas[ri], timeCpu.titulares[ti]];
     const v = validarElenco(timeCpu.titulares, timeCpu.reservas, {
       ...opcoesValidarElencoCpu(),
-      durantePartida: partidaAtiva,
+      durantePartida: elencoPermiteRelaxarReservasPorPosicao(),
     });
     if (v.ok) {
       jogadoresSubstituidosForaIds.add(tit.id);
@@ -2147,7 +2159,7 @@ function ligarCliquesSubstituicao() {
 
       const v = validarElenco(timeJogador.titulares, timeJogador.reservas, {
         ...opcoesValidarElencoHumano(),
-        durantePartida: partidaAtiva,
+        durantePartida: elencoPermiteRelaxarReservasPorPosicao(),
       });
       if (!v.ok) {
         [timeJogador.titulares[ti], timeJogador.reservas[ri]] = [timeJogador.reservas[ri], timeJogador.titulares[ti]];
@@ -3893,6 +3905,7 @@ function entrarNoJogoCopaVersus(cpuId) {
     aguardandoSegundoTempo = false;
     resolveSegundoTempo = null;
     esconderUiIntervalo();
+    estadoGlobal = { minuto: 0, posseJogador: true, proximaZona: null };
     renderEscalacoes(null);
     atualizarPlacar();
     atualizarSubsHud();
@@ -5289,6 +5302,7 @@ function entrarNoJogoCampanhaProximoEvento() {
     golsPorJogadorNaPartida.clear();
     fluxoForaDePartida = "pre_jogo";
     partidaAtiva = false;
+    estadoGlobal = { minuto: 0, posseJogador: true, proximaZona: null };
     renderEscalacoes(null);
     atualizarPlacar();
     atualizarSubsHud();
@@ -5473,6 +5487,7 @@ function entrarNoJogoComSelecoes() {
     aguardandoSegundoTempo = false;
     resolveSegundoTempo = null;
     esconderUiIntervalo();
+    estadoGlobal = { minuto: 0, posseJogador: true, proximaZona: null };
     renderEscalacoes(null);
     atualizarPlacar();
     atualizarSubsHud();
