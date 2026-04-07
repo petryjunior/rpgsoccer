@@ -297,7 +297,7 @@ export function gerarTime() {
 /**
  * @param {ReturnType<typeof criarJogador>[]} titulares
  * @param {ReturnType<typeof criarJogador>[]} reservas
- * @param {{ numReservas?: number }} [opcoes] padrão 12 reservas.
+ * @param {{ numReservas?: number, durantePartida?: boolean }} [opcoes] padrão 12 reservas. Com `durantePartida: true`, não exige pelo menos um reserva por posição (regra só antes do apito).
  */
 export function validarElenco(titulares, reservas, opcoes) {
   const count = (arr, pos) => arr.filter((j) => j.posicao === pos).length;
@@ -338,9 +338,11 @@ export function validarElenco(titulares, reservas, opcoes) {
   if (na > 4) {
     return { ok: false, msg: "Titulares: no máximo 4 atacantes." };
   }
-  for (const pos of Object.values(POSITIONS)) {
-    if (count(r, pos) < 1) {
-      return { ok: false, msg: `Reservas: pelo menos 1 jogador na posição ${pos}.` };
+  if (!opcoes?.durantePartida) {
+    for (const pos of Object.values(POSITIONS)) {
+      if (count(r, pos) < 1) {
+        return { ok: false, msg: `Reservas: pelo menos 1 jogador na posição ${pos}.` };
+      }
     }
   }
   if (count(r, POSITIONS.GOLEIRO) > 2) {

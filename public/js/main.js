@@ -480,11 +480,10 @@ function aplicarRestricoesCopaNoElencoHumano() {
           timeJogador.reservas[r],
           timeJogador.titulares[i],
         ];
-        const v = validarElenco(
-          timeJogador.titulares,
-          timeJogador.reservas,
-          opcoesValidarElencoHumano(),
-        );
+        const v = validarElenco(timeJogador.titulares, timeJogador.reservas, {
+          ...opcoesValidarElencoHumano(),
+          durantePartida: partidaAtiva,
+        });
         if (!v.ok) {
           [timeJogador.titulares[i], timeJogador.reservas[r]] = [
             timeJogador.reservas[r],
@@ -644,7 +643,10 @@ function substituirLesionadosTitularCpu() {
       const res = timeCpu.reservas[ri];
       if (jogadorJaSubstituidoNaoPodeVoltar(res.id)) continue;
       [timeCpu.titulares[ti], timeCpu.reservas[ri]] = [timeCpu.reservas[ri], timeCpu.titulares[ti]];
-      const v = validarElenco(timeCpu.titulares, timeCpu.reservas, opcoesValidarElencoCpu());
+      const v = validarElenco(timeCpu.titulares, timeCpu.reservas, {
+        ...opcoesValidarElencoCpu(),
+        durantePartida: partidaAtiva,
+      });
       if (v.ok) {
         jogadoresSubstituidosForaIds.add(tit.id);
         appendLog(
@@ -1938,7 +1940,10 @@ function tentarSubstituicaoCpu() {
     const res = timeCpu.reservas[ri];
     if (jogadorJaSubstituidoNaoPodeVoltar(res.id)) continue;
     [timeCpu.titulares[ti], timeCpu.reservas[ri]] = [timeCpu.reservas[ri], timeCpu.titulares[ti]];
-    const v = validarElenco(timeCpu.titulares, timeCpu.reservas, opcoesValidarElencoCpu());
+    const v = validarElenco(timeCpu.titulares, timeCpu.reservas, {
+      ...opcoesValidarElencoCpu(),
+      durantePartida: partidaAtiva,
+    });
     if (v.ok) {
       jogadoresSubstituidosForaIds.add(tit.id);
       substituicoesCpuUsadas++;
@@ -2140,11 +2145,10 @@ function ligarCliquesSubstituicao() {
 
       [timeJogador.titulares[ti], timeJogador.reservas[ri]] = [timeJogador.reservas[ri], timeJogador.titulares[ti]];
 
-      const v = validarElenco(
-        timeJogador.titulares,
-        timeJogador.reservas,
-        opcoesValidarElencoHumano(),
-      );
+      const v = validarElenco(timeJogador.titulares, timeJogador.reservas, {
+        ...opcoesValidarElencoHumano(),
+        durantePartida: partidaAtiva,
+      });
       if (!v.ok) {
         [timeJogador.titulares[ti], timeJogador.reservas[ri]] = [timeJogador.reservas[ri], timeJogador.titulares[ti]];
         alert(v.msg);
