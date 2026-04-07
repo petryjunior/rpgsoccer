@@ -224,4 +224,148 @@ export const TABELAS_EXTRA_SELECOES = {
     "Yazan|Baha'|Anas|Ihsan|Musa|Yousef|Ali|Ahmed|Mohammed|Omar|Khalid|Tariq|Hamza|Ibrahim|Mahmoud|Salem|Youssef|Abdullah|Fadi|Hassan|Jamal|Karim|Nasser|Rami|Salim|Zaid|Adnan|Bilal|Firas|Hakim|Issa|Khaled|Maher|Nabil|Omar|Saeed|Waleed|Yahya|Amjad|Bassam|Emad|Fadi|Hani|Ibrahim|Kareem",
     "Al-Naimat|Al-Taamari|Al-Rawashdeh|Al-Mardi|Al-Dmeiri|Al-Bashir|Al-Eissa|Al-Fakhouri|Al-Haddad|Al-Jamal|Al-Khatib|Al-Maharmeh|Al-Nsour|Al-Rashdan|Al-Saudi|Al-Zoubi|Abu Hweij|Bani Atieh|Dahoud|Eid|Halabi|Jaber|Khatib|Mansour|Naber|Obeid|Qawasmi|Rousan|Salem|Zureikat|Abdel|Badr|Dajani|Fakhouri|Haddad|Jarrar|Kilani|Mashal|Nazzal|Odeh|Rifai|Sabbagh|Tarawneh|Zahran",
   ),
+  fij: mk(
+    "Jone|Jale|Remueru|Kavaia|Dave|Setareki|Josaia|Sairusi|Tevita|Malakai|Vilimoni|Akuila|Penioni|Lekima|Inoke|Samuela|Niko|Merrill|Etonia|Christopher|Iosefo|Apisai|Viliame|Ilaitia|Kelepi|Manasa|Nasoni|Ratu|Seru|Timoci|Ulaiasi|Waisele|Alifereti|Epeli|Josua|Kitione|Laisenia|Mosese|Netani|Osea|Peni|Ropate|Semi|Vili|Waisea",
+    "Rabonu|Dreloa|Tekiate|Rawaqa|Radrigai|Hughes|Bolatoga|Nalaubu|Waranaivalu|Rakula|Delai|Mateisuva|Nigau|Gonerau|Turagalailai|Kautoga|Baleiloa|Nand|Dogalau|Wasasala|Verevou|Smith|Bainivalu|Cakacaka|Drodrolagi|Koroi|Lalabalavu|Nabenu|Qarau|Rabuka|Saukuru|Tuidraki|Vakatawa|Waqanisau|Yalayala|Baledrokadroka|Cagilaba|Dakuliga|Koroilagilagi|Nakacawa|Rokotuisolo|Tuisue|Vosanibola|Waqa|Yalayalai",
+  ),
+  png: mk(
+    "Wari|Levi|Kori|Koriak|David|Ati|Wanimo|Nigel|Tommy|Daniel|Kolu|Isaac|Jordan|Joshua|Jacob|Michael|Kensley|Emmanuel|Yagi|Patrick|Stahl|Kurt|Allan|Bernard|Collin|Dennis|Francis|Gideon|Henry|Ian|Joseph|Kila|Liam|Max|Nelson|Oliver|Paul|Quentin|Robert|Steven|Terry|Vincent|Warren|Xavier|Zachary",
+    "Kama|Biau|Biau|Wemin|Muta|Kepo|Kiriwi|Malagian|Semmy|Joe|Joseph|Tobem|Talau|Sabua|Foster|Pelagio|Simon|Yasasa|Aisa|Gubag|Jordan|Abu|Bai|Dabing|Gari|Kaupa|Kila|Lohia|Maino|Oa|Rumints|Tau|Ume|Waine|Yalo|Aisi|Bemu|Doura|Gavera|Koiri|Laufa|Mambu|Ongugo|Rarua|Tawi|Umba|Wemin",
+  ),
+  tah: mk(
+    "Teave|Heimano|Taumihau|Stéphane|Alvin|Lorenzo|Tehani|Terai|Keanu|Raimana|Fred|Matai|Vehaka|Rainui|Vincent|Patrick|Eddy|Jonathan|Henri|Marama|Manuarii|Rooarii|Atea|Hiriata|Keani|Mana|Narii|Orama|Poe|Raiarii|Tamatoa|Urii|Vaiarii|Heiarii|Iotua|Kainoa|Manaureva|Nohoarii|Poerani|Rereata|Tauiha|Vairaaroa|Heimanu|Ioane|Kahaia|Manaurii",
+    "Teamotuaitau|Bourebare|Tiatia|Faatiarau|Poroi|Arapai|Bremond|Vernaudon|Li Fung Kuee|Tissot|Jaquin|Tuohey|Tze-Yu|Simon|Tepa|Etaeta|Aitamai|Caroine|Tauihi|Shan|Roo|Bordes|Caruana|Drollet|Faaeva|Gay|Hauata|Iti|Jourdain|Lam|Morel|Nunue|Opuh|Paia|Pater|Raimo|Salmon|Teriierooiterai|Vanaa|Wong|Ariimoana|Culioli|Darius|Enoka|Fiu|Haumani|Iorangi|Kauvai|Lenoir|Mare",
+  ),
+  isl: mk(
+    "Bjarni|Einar|Garðar|Hákon|Ingvar|Jón|Kári|Leifur|Magnús|Ólafur|Ragnar|Stefán|Viktor|Ásgeir|Friðrik|Helgi|Andri|Daníel|Elías|Gunnar|Hilmar|Ívar|Kristján|Ólafur|Þór|Valur|Arnar|Birkir|Finnur|Gísli|Halldór|Jóhann|Kolbeinn|Logi|Marteinn|Njáll|Örn|Páll|Rúnar|Skúli|Tómas|Úlfar|Viggó|Þorsteinn|Ægir",
+    "Haraldsson|Kristjánsson|Magnússon|Ólafsson|Stefánsson|Þórsson|Valsson|Arnason|Guðmundsson|Jónsson|Helgason|Pálsson|Björnsson|Davíðsson|Karlsson|Sigurðsson|Þórisson|Vidarsson|Axelsson|Breki|Örn|Guðjónsson|Einarsson|Finnsson|Gunnarsson|Hjálmarsson|Ingólfsson|Jóhannsson|Kjartansson|Leifsson|Magnússon|Óskarsson|Pétursson|Ragnarsson|Steinsson|Tómasson|Valdimarsson",
+  ),
+  rou: mk(
+    "Andrei|Bogdan|Cătălin|Dragoș|Florin|Gabriel|Horațiu|Ion|Lucian|Mihai|Nicu|Octavian|Paul|Rareș|Sorin|Teodor|Valentin|Ștefan|Adrian|Cristian|Doru|Emil|Vasile|Constantin|Dumitru|Eugen|Gheorghe|Ionel|Liviu|Marian|Nicolae|Petre|Radu|Sebastian|Tudor|Vlad|Alexandru|Bogdan|Cosmin|Dan|Filip|George|Ilie|Mircea|Răzvan",
+    "Popescu|Ionescu|Marinescu|Radu|Stanciu|Munteanu|Dobre|Vasilescu|Enache|Florescu|Tănase|Preda|Andrei|Coman|Lupu|Neagu|Crăciun|Moldovan|Pavel|Rotaru|Săvulescu|Zăgan|Dinu|Georgescu|Stan|Năstase|Diaconu|Florea|Grigore|Lazar|Oprea|Păun|Șerban|Toma|Ungureanu|Voicu",
+  ),
+  srb: mk(
+    "Filip|Goran|Ivan|Jovan|Luka|Marko|Nemanja|Ognjen|Pavle|Rade|Stefan|Uroš|Vladan|Zoran|Aleksa|Bojan|Dušan|Emil|Goran|Igor|Janko|Kosta|Lazar|Miloš|Nenad|Obrad|Predrag|Strahinja|Tomislav|Uroš|Veljko|Žarko|Branko|Čedomir|Darko|Emin|Filip|Gavrilo|Josif|Kirilo|Miodrag|Radovan|Siniša|Tihomir|Vuk",
+    "Jovanović|Nikolić|Petrović|Stanković|Tomić|Vučković|Živković|Đorđević|Kostić|Milošević|Pavlović|Radović|Simić|Todorović|Marković|Ilić|Kovačević|Lazić|Matić|Nedeljković|Obrenović|Ristić|Babić|Đukić|Jović|Knežević|Lekić|Mijušković|Nikolić|Perović|Stojanović|Vuković|Živković",
+  ),
+  fin: mk(
+    "Akseli|Eero|Henrik|Jussi|Kalle|Lauri|Mikko|Otto|Pekka|Riku|Sami|Teemu|Ville|Antti|Elias|Ilkka|Juho|Kai|Matias|Niko|Onni|Panu|Eemeli|Joona|Kasper|Leevi|Noa|Oskari|Perttu|Roope|Santtu|Tuukka|Veeti|Aatos|Eino|Helmi|Iivari|Joel|Lenni|Mio|Nuuti|Oiva|Pyry|Santeri|Taisto",
+    "Virtanen|Korhonen|Laine|Mäkinen|Nieminen|Salo|Toivonen|Väisänen|Aaltonen|Hämäläinen|Järvinen|Kallio|Lehtonen|Moilanen|Partanen|Rantanen|Seppälä|Tamminen|Uusitalo|Westerholm|Ylitalo|Öberg|Ahonen|Heikkinen|Koskinen|Laaksonen|Manninen|Nurmi|Peltola|Ruotsalainen",
+  ),
+  alb: mk(
+    "Arben|Besnik|Dritan|Elton|Fatos|Genci|Ilir|Klodian|Luan|Mentor|Ndue|Orges|Pandi|Qemal|Rexhep|Sokol|Taulant|Valon|Xhevat|Ylber|Zef|Ardian|Bledar|Dardan|Erjon|Fatmir|Gent|Klodian|Leonard|Orgest|Skender|Trim|Vullnet|Xhavit|Ylli|Zamir|Agron|Bujar|Dorjan|Ermal|Genci|Kastriot|Luan|Mirton|Skënder",
+    "Hoxha|Krasniqi|Shehu|Brahimi|Dervishi|Meta|Rama|Spahiu|Toska|Xhafa|Zeneli|Bajrami|Ceka|Duka|Gjoni|Hysa|Kola|Leka|Mema|Ndreu|Osmani|Prifti|Beqiri|Dervishi|Gjoka|Hoxha|Krasniqi|Lleshi|Muça|Shehu|Topalli",
+  ),
+  svn: mk(
+    "Aleš|Blaž|Črt|Dejan|Enej|Filip|Gregor|Jaka|Klemen|Luka|Matic|Nejc|Rok|Simon|Tine|Urban|Vid|Žan|Aljaž|Bine|Cene|Domen|Anže|Boštjan|Darko|Erik|Gašper|Jan|Klemen|Luka|Matevž|Nejc|Peter|Rok|Tilen|Urban|Žiga",
+    "Horvat|Kolar|Novak|Kobe|Perko|Rozman|Turk|Urbančič|Vidmar|Zupan|Žnidar|Bizjak|Cvetko|Dolenc|Eržen|Furlan|Golič|Hribar|Jelen|Kosi|Leban|Mrak|Bergant|Ceh|Dolinar|Erjavec|Furlan|Golob|Hribar|Kobal|Krajnc",
+  ),
+  bul: mk(
+    "Borislav|Dimitar|Emil|Georgi|Hristo|Ivan|Kaloyan|Lyubomir|Martin|Nikolay|Petar|Radoslav|Stoyan|Todor|Vasil|Yordan|Zahari|Asen|Blagovest|Chavdar|Deyan|Evgeni|Plamen|Rosen|Svetoslav|Tsvetan|Vladislav|Yavor|Zdravko|Angel|Bogdan|Dobrin|Emil|Georgi|Hristo|Ivo|Kalin|Lyuben|Milcho|Nedyalko",
+    "Dimitrov|Georgiev|Iliev|Kostadinov|Lazarov|Mihaylov|Nedelchev|Petrov|Radev|Stoyanov|Todorov|Uzunov|Valchev|Yankov|Zhelev|Angelov|Borisov|Chakarov|Donev|Enchev|Filipov|Gatev|Kolev|Minev|Popov|Stanev|Tanev|Vasilev",
+  ),
+  mne: mk(
+    "Andrija|Bojan|Darko|Filip|Goran|Igor|Janko|Luka|Miloš|Nemanja|Oliver|Petar|Rade|Stefan|Tomislav|Uroš|Vasilije|Žarko|Aleksandar|Branko|Čedomir|Duško|Filip|Goran|Lazar|Marko|Nemanja|Predrag|Stefan|Vladimir|Žarko|Blažo|Danilo|Jovan|Milun|Radule|Strahinja",
+    "Jovićević|Krivokapić|Milić|Marković|Nikčević|Obradović|Pavlović|Radunović|Simić|Vukotić|Vučinić|Zorić|Ćalasan|Đukić|Erceg|Gogić|Jović|Knežević|Lekić|Mijušković|Nikolić|Perović|Popović|Radović|Stanković|Tomić|Vukčević",
+  ),
+  est: mk(
+    "Andero|Bert|Erki|Hannes|Indrek|Jaan|Karl|Lauri|Marten|Ott|Peeter|Ragnar|Siim|Tõnu|Uku|Veiko|Anti|Danel|Egert|Fred|Gert|Henno|Jüri|Kalev|Madis|Ott|Peeter|Rasmus|Sander|Tarmo|Uku|Vallo|Aivar|Eerik|Indrek|Kaarel|Lembit|Mart|Märt|Olev|Riho|Siim|Taavi|Ülo",
+    "Kask|Tamm|Saar|Mägi|Pärn|Koppel|Oja|Rand|Sepp|Turi|Vaino|Wõlu|Allik|Birk|Ehasalu|Jõgi|Kask|Lepp|Moor|Nurk|Paju|Raid|Koppel|Laas|Luik|Mänd|Oja|Pärn|Rebane|Saks|Tamm|Vaher",
+  ),
+  kaz: mk(
+    "Aibar|Bekzat|Daniyar|Erlan|Galymzhan|Ilyas|Kanat|Marat|Nurlan|Olzhas|Rinat|Serik|Timur|Yerlan|Zhanibek|Arman|Bauyrzhan|Dias|Erbol|Farkhat|Gabit|Islam|Nurzhan|Oral|Samat|Temir|Yerbol|Zhandos|Aidos|Beksultan|Daniyar|Ersain|Galym|Ilyas|Kanat|Marat",
+    "Nurgaliyev|Suleimenov|Tulegenov|Umarov|Yesenov|Abdrakhmanov|Bekmuratov|Dossayev|Zhumabekov|Kairatov|Musabekov|Nurpeisov|Omarov|Sadykov|Talgatov|Utepov|Valiev|Yeleussinov|Zhanatov|Aimbetov|Bekturov|Dauletov|Iskakov|Kenzheev|Ospanov",
+  ),
+  egy: mk(
+    "Karim|Mahmoud|Omar|Tarek|Youssef|Amr|Bassel|Diaa|Ehab|Fadi|Hany|Ibrahim|Jad|Khaled|Loay|Mido|Nader|Osama|Pierre|Rami|Sherif|Tamer|Ahmed|Hassan|Khaled|Mohamed|Nabil|Omar|Salah|Tarek|Walid|Yassin|Ziad|Adel|Emad|Fouad|Hany|Karim|Mostafa|Nour|Ossama|Ramzi|Sherif|Tamer|Youssef",
+    "Abdelrahman|El-Sayed|Fathy|Gamal|Halim|Khaled|Magdy|Nasser|Osman|Ragab|Salama|Tawfik|Youssef|Zaki|Ashour|Barakat|Dawoud|Fahim|Ghaly|Hafez|Kamal|Lotfy|Abdel|El Masry|Farouk|Hassan|Ibrahim|Khalil|Mansour|Nasser|Omar|Saleh",
+  ),
+  tun: mk(
+    "Aymen|Bilel|Firas|Hedi|Jamel|Kais|Mehdi|Nabil|Oussama|Rami|Sofiane|Taha|Wassim|Yassine|Zied|Anis|Badr|Chokri|Dhia|Elyes|Farouk|Ghazi|Karim|Mehrez|Nidhal|Omar|Rafik|Sami|Tarek|Walid|Youssef|Zied|Adnen|Bilel|Chadi|Fathi|Hichem|Jilani",
+    "Ben Ammar|Chaabane|Dridi|Guesmi|Hamdi|Jebali|Khelifi|Laabidi|Mansour|Mezzi|Naït|Oueslati|Riahi|Sassi|Trabelsi|Yahia|Zouari|Amri|Ben Youssef|Cherif|Dhaouadi|Elloumi|Hamrouni|Jlassi|Khelil|Mansouri|Naceur|Ouali|Riahi|Slimani",
+  ),
+  alg: mk(
+    "Adel|Bilal|Djamel|Farid|Hocine|Ismail|Karim|Lotfi|Mourad|Nadir|Omar|Rachid|Sofiane|Tarek|Walid|Yacine|Zinedine|Amine|Brahim|Chafik|Djamel|Elias|Fouzi|Hakim|Idir|Jamil|Khaled|Lyes|Mehdi|Nabil|Oussama|Rafik|Sofiane|Tarek|Yanis|Zakaria",
+    "Benyahia|Cherif|Hamzaoui|Kaci|Larbi|Mansouri|Nedjari|Ouali|Rahmani|Saadi|Tahar|Zerrouki|Amrani|Boudiaf|Cheriet|Djemaa|Ferrache|Ghezal|Haddad|Imed|Khaled|Mokhtar|Belkacem|Bouazza|Chaoui|Derradji|Hamidi|Khelifa|Messaoudi",
+  ),
+  civ: mk(
+    "Amadou|Brou|Cédric|Didier|Emmanuel|Franck|Guy|Hervé|Ibrahim|Jean-Baptiste|Kouassi|Lassina|Mamadou|N'Guessan|Oumar|Pacôme|Quentin|Romaric|Serge|Thierry|Ulrich|Vincent|Wilfried|Yao|Zadi|Adama|Bakary|Cheick|Drissa|Fousseyni|Ibrahim|Kalifa|Lassana|Mohamed|Oumar|Sékou",
+    "Diarrassouba|Koffi|Kouadio|Yao|Koné|Ouattara|Sow|Traoré|Zadi|Amani|Bamba|Diabaté|Fofana|Gnabro|Kamara|Loua|Mobio|N'Guessan|Okou|Pehi|Soro|Touré|Bamba|Coulibaly|Diarra|Koné|Ouattara|Touré|Yao|Zoro",
+  ),
+  rsa: mk(
+    "Andile|Bongani|Caleb|David|Ethan|Fikile|Gift|Hope|Jabu|Kagiso|Lethabo|Mandla|Nkululeko|Oscar|Pieter|Quinton|Ruan|Sipho|Thabo|Vuyo|Willem|Xolani|Yusuf|Zola|Bongani|Dumisani|Lungile|Mandla|Sibusiso|Themba|Zweli|Ayanda|Bafana|Luvo|Mpho|Siya|Tshepo",
+    "Dlamini|Khumalo|Mokoena|Nkosi|Pillay|Radebe|Sithole|Themba|Van Wyk|Williams|Zulu|Adams|Botha|Coetzee|Du Preez|Engelbrecht|Fourie|Govender|Hendricks|Jacobs|Kgatle|Langa|Mbatha|Ndlovu|Nxumalo|Petersen|Radebe|Sithole",
+  ),
+  cpv: mk(
+    "Bruno|Carlos|Daniel|Eduardo|Fábio|Gil|Hélio|Ivo|João|Kevin|Leandro|Mário|Nelson|Orlando|Paulo|Rui|Sérgio|Tiago|Ulisses|Vasco|Wilson|Xande|Yuri|Zeca|Adilson|Beto|César|Dário|Emanuel|Fábio|Gonçalo|Hugo|Ivan|Jorge|Luís|Mário|Nuno|Orlando",
+    "Andrade|Barbosa|Correia|Fernandes|Gomes|Lopes|Monteiro|Ramos|Semedo|Tavares|Varela|Xavier|Almeida|Brito|Carvalho|Duarte|Evora|Fortes|Graça|Henriques|Inácio|Jorge|Lopes|Monteiro|Neves|Oliveira|Pires|Ramos",
+  ),
+  zam: mk(
+    "Brian|Chanda|Darius|Emmanuel|Felix|Godfrey|Henry|Isaac|Jacob|Kelvin|Lubinda|Martin|Nathan|Oscar|Peter|Quincy|Robert|Simon|Thomas|Victor|William|Yoram|Aaron|Bernard|Charles|Dominic|Elias|Francis|George|Harrison|Isaac|Joseph|Lawrence|Michael|Patrick",
+    "Banda|Chileshe|Kabwe|Lungu|Mwansa|Nkhata|Phiri|Sichone|Tembo|Zimba|Zulu|Bwalya|Chella|Daka|Hamonga|Kalumba|Lupiya|Mwape|Njobvu|Sakala|Sinkala|Banda|Chanda|Chilufya|Kunda|Mulenga|Mwila|Phiri",
+  ),
+  gab: mk(
+    "Armel|Brice|Cédric|Dylan|Evrard|Fabrice|Gaël|Hugo|Igor|Jules|Kevin|Lionel|Martial|Noël|Olivier|Patrick|Quentin|Rodrigue|Steve|Thierry|Ulrich|Vincent|Wilfried|Yannick|Zacharie|Audrey|Boris|Cédric|Dylan|Esteban|Florent|Gabin|Hervé",
+    "Bouassa|Ebanega|Moussounda|Obiang|Poko|Romuald|Sibanga|Tsanga|Ovono|Meye|Nguema|Obame|Pambo|Rogombé|Sambou|Tchen|Wora|Yala|Zita|Aba|Biyoghe|Eyi|Mounguengui|Nguema|Obame|Ondo|Pambo",
+  ),
+  chn: mk(
+    "Chen|Ding|Fang|Gao|Han|Jiang|Li|Liu|Ma|Sun|Wang|Wu|Xu|Yan|Zhang|Zhou|He|Jin|Lin|Qian|Ren|Tang|Yang|Zhao|Hao|Lei|Ming|Peng|Wei|Xin|Bo|Chao|Feng|Hui|Jie|Kai|Long|Nan|Ping|Rui|Tao|Xin|Yong|Zhi",
+    "Wei|Hao|Lei|Yang|Jun|Tao|Ming|Peng|Bin|Feng|Qiang|Lin|Kai|Bo|Hui|Zhi|Yu|Dong|Xin|Chen|Yang|Wang|Liu|Zhang|Zhou|Huang|Zhao|Wu|Xu|Ma|Sun|Guo|He|Gao|Luo|Song|Tang|Han|Cao|Yuan|Deng|Xie|Feng",
+  ),
+  tha: mk(
+    "Anuwat|Boonchai|Chaiwat|Danai|Ekkachai|Fahmi|Kittisak|Manop|Nattapong|Phichet|Rattana|Sakda|Thawat|Udom|Vinai|Wichai|Yongyut|Adisak|Bancha|Chanon|Decha|Ekkapan|Prasert|Somsak|Thanakit|Wichai|Apichat|Boontham|Chalerm|Det|Ekachai",
+    "Chaiprakob|Kaewkla|Phonsri|Srisawat|Thongdee|Wichai|Yodsang|Zheng|Aroon|Boonmee|Chaiyong|Dusit|Eiam|Fah|Hong|Inthara|Jinda|Klang|Lek|Mee|Nok|Om|Phon|Ruang|Suk|Tawee|Udom|Wong|Yim",
+  ),
+  vie: mk(
+    "Anh Dũng|Bảo Long|Công Minh|Đức Thắng|Gia Huy|Hải Nam|Khôi Vũ|Minh Tuấn|Quốc Anh|Tuấn Kiệt|Việt Hùng|Xuân Tài|Yên Bái|Ánh Dương|Bình An|Chiến Thắng|Đình Phong|Hữu Nghĩa|Kỳ Nam|Lâm Viên|Mạnh Dũng|Ngọc Sơn|Đức Anh|Hữu Phước|Minh Khang|Quang Huy|Thanh Tùng|Tuấn Anh|Văn Hải|Xuân Phú|Bảo Nam|Đình Lộc|Gia Bảo|Hoàng Long|Kiên Định|Phúc Thịnh|Sơn Hà|Trọng Hiếu|Vĩnh Toàn|An Khang|Bình Minh|Đại Dương",
+    "Phạm|Trần|Lê|Nguyễn|Võ|Hoàng|Đặng|Bùi|Đỗ|Lý|Phan|Trương|Hồ|Mai|Tô|La|Cao|Kim|Chu|Tăng|Ninh|Quách|Đinh|Vũ|Bùi|Phùng|Đào|Lâm|Triệu|Đặng|Vương|Hồ|Mạc|Tôn|Châu|Ngô|Đinh|Võ|Lưu|Tạ|Hà|Đoàn|Vũ",
+  ),
+  uae: mk(
+    "Ahmed|Fahad|Hamdan|Khalid|Mansour|Omar|Rashid|Saeed|Tariq|Yousef|Zayed|Abdulla|Badr|Faisal|Hassan|Ibrahim|Jassem|Khalil|Mahmoud|Nabil|Othman|Salim|Sultan|Walid|Yahya|Ali|Mohammed|Nasser|Salem|Tamer|Youssef|Zaid|Adnan|Emad|Hakim|Karim",
+    "Al-Mazrouei|Al-Nuaimi|Al-Rashid|Al-Suwaidi|Al-Zaabi|Buhendi|Darwish|El-Hassan|Juma|Khamis|Murad|Nasser|Obeid|Qasimi|Rahma|Salem|Taleb|Umran|Wali|Yasin|Zaid|Barakat|Al Ketbi|Al Mansoori|Al Nuaimi|Bo Saeed",
+  ),
+  oma: mk(
+    "Ali|Badr|Fahad|Hamza|Issa|Khalan|Mazin|Nasser|Salim|Talal|Waleed|Yahya|Zahir|Harib|Ilyas|Jamil|Karim|Luay|Majid|Nabil|Omar|Pasha|Rashid|Salem|Tariq|Yaqoob|Zadjali|Ahmed|Hamed|Khalid|Mohsin|Nasser|Omar|Said|Tariq",
+    "Al-Balushi|Al-Hinai|Al-Kharusi|Al-Maskari|Al-Riyami|Al-Saadi|Al-Wahaibi|Busaidi|Darwish|Habsi|Juma|Khamis|Mubarak|Nasser|Omar|Qasim|Rashid|Salem|Tariq|Wahaibi|Yaqoob|Zadjali|Al Habsi|Al Rawahi|Al Sinani",
+  ),
+  lbn: mk(
+    "Antoine|Bassel|Charbel|Dany|Elie|Fadi|Georges|Habib|Jad|Karim|Marc|Naji|Omar|Pierre|Rami|Sami|Tony|Wassim|Ziad|Adel|Bilal|Cyril|Elias|Fares|Gabriel|Hadi|Jean|Kamal|Maroun|Nader|Paul|Rony|Serge|Tony|Wissam",
+    "El-Khoury|Haddad|Maalouf|Nassar|Rahal|Saad|Tannous|Wakim|Yazbek|Zgheib|Aoun|Barakat|Chidiac|Daher|Fadel|Gerges|Hayek|Issa|Jabbour|Karam|Lahoud|Moutran|Najjar|Obeid|Saliba|Tannous|Yared|Zouein",
+  ),
+  hon: mk(
+    "Carlos|Diego|Eduardo|Fernando|Gabriel|Héctor|Iván|Javier|Kevin|Luis|Marco|Nelson|Oscar|Pedro|Ricardo|Sergio|Tomás|Ulises|Víctor|William|Xavier|Yonathan|Alex|Bryan|César|Daniel|Ever|Francisco|Gerardo|Hugo|Isaac|José|Luis|Mario|Óscar",
+    "Aguilar|Benítez|Castillo|Díaz|Escobar|Fuentes|Gutiérrez|Herrera|López|Medina|Núñez|Orellana|Pineda|Quiroz|Rivera|Soto|Uclés|Valdez|Wade|Xatruch|Yanes|Zelaya|Acosta|Benedetti|Chávez|Duarte|Estrada|Flores|García",
+  ),
+  slv: mk(
+    "Andrés|Bryan|César|Daniel|Erick|Francisco|Gerson|Hugo|Isaac|Josué|Kevin|Luis|Mario|Nelson|Óscar|Paolo|Rafael|Sergio|Tomás|Ulises|Víctor|Walter|Alex|Brayan|Cristian|Darwin|Edwin|Fabián|Gerardo|Héctor|Javier|Miguel|Néstor|Orlando|Ricardo",
+    "Argueta|Calderón|Domínguez|Flores|Gómez|Henríquez|Iraheta|Joya|Lemus|Martínez|Melgar|Navarro|Orellana|Portillo|Quintanilla|Renderos|Saravia|Tobar|Umaña|Ventura|Villalta|Zavala|Alvarenga|Bonilla|Cerna|Díaz|Escobar",
+  ),
+  gua: mk(
+    "Ángel|Brayan|Cristian|Darwin|Edwin|Fabián|Gerardo|Henry|Irving|Jorge|Kevin|Luis|Marco|Nelson|Otto|Pablo|Ricardo|Samuel|Tomás|Uriel|Víctor|Wilson|Alex|Boris|Carlos|Diego|Esteban|Fernando|Gustavo|Héctor|Iván|José|Luis|Miguel|Néstor",
+    "Archila|Contreras|Estrada|Fuentes|Galindo|Hernández|Ibarra|Juárez|López|Morales|Navas|Orantes|Paniagua|Quevedo|Rosales|Samayoa|Tello|Urrutia|Valenzuela|Woltke|Xitumul|Yoc|Zamora|Aguilar|Benítez|Castillo",
+  ),
+  nca: mk(
+    "Alejandro|Boris|César|Darío|Ernesto|Felix|Gustavo|Héctor|Isaac|Javier|Kevin|Luis|Manuel|Nelson|Óscar|Pedro|Rafael|Sergio|Tomás|Ulises|Víctor|William|Adán|Benjamín|Carlos|Daniel|Efraín|Francisco|Gabriel|Hugo|Ignacio|Jorge|Luis|Mario",
+    "Balmaceda|Corea|Duarte|Espinoza|Fonseca|Gámez|Hernández|Iraheta|Jerez|Lacayo|Munguía|Narváez|Orozco|Palacios|Quintero|Rizo|Salazar|Téllez|Ubeda|Vega|Webster|Zapata|Altamirano|Blandón|Chavarría",
+  ),
+  sur: mk(
+    "Andre|Brian|Clifton|Denzel|Elton|Fabian|Giovanni|Humphrey|Ivan|Jair|Kevin|Lorenzo|Mitchell|Nigel|Orlando|Patrick|Quincy|Roland|Stefano|Tyrone|Urby|Virgil|Wesley|Xavier|Yuri|Zander|Arnold|Bryan|Clyde|Dwayne|Ethan",
+    "Abena|Brunswijk|Cronie|Damfer|Entingh|Fraenk|Guno|Hooi|Isaacs|Jansen|Klaver|Lieveld|Malone|Nibte|Pinas|Redan|Rigters|Sastro|Valies|Wijdenbosch|Winter|Zijler|Abaisa|Belfor|Cairo|Damsey",
+  ),
+  dom: mk(
+    "Alberto|Brayan|Carlos|Darío|Edwin|Felix|Gerson|Henry|Isaac|Joel|Kelvin|Luis|Manuel|Nelson|Óscar|Pedro|Rafael|Sergio|Tomás|Ulises|Víctor|Wilson|Yefri|Ángel|Bienvenido|César|Danilo|Eddy|Francisco|Gregorio|Héctor|José|Luis|Miguel",
+    "Acosta|Báez|Cedeño|De Los Santos|Estévez|Fernández|García|Guzmán|Jiménez|Martínez|Nuñez|Ogando|Peña|Quezada|Rosario|Sánchez|Tejada|Ureña|Valdez|Villar|Wences|Ynfante|Almonte|Bautista|Cruz|De León",
+  ),
+  ltu: mk(
+    "Arnas|Darius|Edvinas|Giedrius|Justas|Karolis|Lukas|Mantas|Mindaugas|Nojus|Paulius|Rokas|Simonas|Tomas|Ugnius|Vilius|Žygimantas|Adomas|Domantas|Eimantas|Gabrielius|Ignas|Jurgis|Kęstutis|Laurynas|Marius|Nedas|Ovidijus|Povilas|Rytis|Tadas|Vaidas|Aurimas|Benas|Deividas|Edgaras|Gintaras|Jokūbas|Kajus|Linas|Martynas|Naglis|Osvaldas|Rimgaudas",
+    "Jankauskas|Kavaliauskas|Petrauskas|Stankevičius|Urbonas|Žukauskas|Grigas|Šėrys|Navickas|Rimkus|Sinkevičius|Balčiūnas|Čepulis|Gudaitis|Janušauskas|Kazlauskas|Laurinaitis|Butkus|Mačiulis|Paulauskas|Sabonis|Vasiliauskas|Blaževičius|Drąsutis|Gedminas|Janulis|Kairys|Lukšė|Macijauskas|Narbutas|Paškevičius|Radzevičius|Šapoka|Urbelis|Vaitkus|Zabolis|Alekna|Bagdonas|Čėsna|Dapkūnas|Eidukonis|Gailius|Jasinskas|Klimavičius|Lapinskas",
+  ),
+  ind: mk(
+    "Arjun|Dev|Harsh|Kabir|Manish|Nikhil|Pranav|Rahul|Rohan|Siddharth|Vikram|Yash|Aarav|Bhavesh|Chirag|Dhruv|Eshan|Farhan|Gaurav|Hitesh|Ishaan|Jayesh|Karan|Lakshya|Mihir|Neel|Omkar|Parth|Raj|Shaurya|Tanmay|Uday|Varun|Aditya|Bharat|Chaitanya|Darsh|Eshaan|Girish|Hemant|Ishan|Jai|Kunal|Luv",
+    "Kapoor|Patel|Verma|Reddy|Sharma|Singh|Kumar|Iyer|Nair|Joshi|Mehta|Agarwal|Bansal|Choudhury|Desai|Ghosh|Khanna|Malik|Pillai|Saxena|Tiwari|Varma|Bhatia|Chopra|Dutta|Gandhi|Gupta|Khatri|Lal|Mishra|Pandey|Rao|Shetty|Thakur|Venkat|Yadav|Ahuja|Bose|Chakraborty|Dubey|Gokhale|Hegde|Iyengar|Kohli|Menon",
+  ),
+  bfa: mk(
+    "Abdoul|Boubacar|Cédric|Drissa|Emmanuel|Florent|Guillaume|Hervé|Issa|Jérémy|Kalifa|Lassina|Mamadou|Nicolas|Oumar|Pascal|Quentin|Romaric|Seydou|Théodore|Ulrich|Vincent|Adama|Bertrand|Charles|Daouda|Étienne|François|Gilbert|Hamed|Ibrahim|Jean|Kader|Ladji|Moussa|Norbert|Ousmane|Pierre|Rasmané|Souleymane|Tanguy|Valentin|Wendlassida|Yacouba|Zinba",
+    "Tapsoba|Koné|Ouédraogo|Compaoré|Sawadogo|Zongo|Bambara|Yago|Sanou|Traoré|Diallo|Kié|Nikiéma|Ouattara|Kaboré|Zoungrana|Ilboudo|Belemtougri|Guigma|Nagalo|Bancé|Ganame|Kabore|Ouedraogo|Yameogo|Zongo|Barro|Coulibaly|Diabaté|Kaboré|Ouoba|Sorgho|Zagré|Bazié|Dramé|Kiemtore|Nacoulma|Somé|Tiendrebeogo|Yonli|Zoungrana|Boly|Dah|Koffi|Nikiema|Rouamba",
+  ),
 };

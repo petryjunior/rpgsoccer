@@ -52,6 +52,17 @@ const ID_PARA_CONFED = {
   gre: "UEFA",
   tur: "UEFA",
   geo: "UEFA",
+  isl: "UEFA",
+  rou: "UEFA",
+  srb: "UEFA",
+  fin: "UEFA",
+  alb: "UEFA",
+  svn: "UEFA",
+  bul: "UEFA",
+  mne: "UEFA",
+  est: "UEFA",
+  kaz: "UEFA",
+  ltu: "UEFA",
   // CAF
   nga: "CAF",
   cmr: "CAF",
@@ -60,6 +71,15 @@ const ID_PARA_CONFED = {
   cod: "CAF",
   sen: "CAF",
   mli: "CAF",
+  egy: "CAF",
+  tun: "CAF",
+  alg: "CAF",
+  civ: "CAF",
+  rsa: "CAF",
+  cpv: "CAF",
+  zam: "CAF",
+  gab: "CAF",
+  bfa: "CAF",
   // CONCACAF
   mex: "CONCACAF",
   usa: "CONCACAF",
@@ -70,6 +90,12 @@ const ID_PARA_CONFED = {
   cuw: "CONCACAF",
   hti: "CONCACAF",
   can: "CONCACAF",
+  hon: "CONCACAF",
+  slv: "CONCACAF",
+  gua: "CONCACAF",
+  nca: "CONCACAF",
+  sur: "CONCACAF",
+  dom: "CONCACAF",
   // AFC
   jpn: "AFC",
   kor: "AFC",
@@ -79,9 +105,19 @@ const ID_PARA_CONFED = {
   qat: "AFC",
   irq: "AFC",
   jor: "AFC",
+  aus: "AFC",
+  chn: "AFC",
+  tha: "AFC",
+  vie: "AFC",
+  uae: "AFC",
+  oma: "AFC",
+  lbn: "AFC",
+  ind: "AFC",
   // OFC
-  aus: "OFC",
   nzl: "OFC",
+  fij: "OFC",
+  png: "OFC",
+  tah: "OFC",
 };
 
 /** @type {Record<ConfedKey, { nomeTorneio: string }>} */
@@ -201,6 +237,14 @@ export function anoComEdicaoContinental(confKey, ano) {
  */
 export function mesmaConfederacao(a, b) {
   return confederacaoId(a) === confederacaoId(b);
+}
+
+/**
+ * Nome do torneio continental (ex.: Eurocopa) para uma confederação.
+ * @param {ConfedKey} confKey
+ */
+export function nomeCompeticaoContinentalConfed(confKey) {
+  return INFO_CONFED[confKey]?.nomeTorneio ?? confKey;
 }
 
 for (const { id } of SELECOES) {

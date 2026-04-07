@@ -115,15 +115,15 @@ function janelasFifaWcqParaCopa(anoCopa) {
 }
 
 /**
- * Vagas aproximadas por confederação (total 32).
+ * Vagas por confederação no formato de 48 equipas (próximo do alvo FIFA 2026; total 48).
  * @type {Record<import('./campaign-confederation.js').ConfedKey, number>}
  */
 export const VAGAS_COPA_POR_CONFEDERACAO = {
-  UEFA: 13,
-  CONMEBOL: 5,
-  CONCACAF: 4,
-  CAF: 5,
-  AFC: 4,
+  UEFA: 16,
+  CONMEBOL: 7,
+  CONCACAF: 7,
+  CAF: 9,
+  AFC: 8,
   OFC: 1,
 };
 
@@ -375,9 +375,9 @@ export function garantirCicloEliminatoriasInicializado(estado, idsTodos) {
   estado.wcqAgendaHumano = agenda;
 }
 
-/** Lista fixa para o texto do hub (32 vagas). */
+/** Lista fixa para o texto do hub (48 vagas). */
 const TEXTO_VAGAS_POR_CONFEDERACAO =
-  "UEFA 13, CONMEBOL 5, CAF 5, CONCACAF 4, AFC 4, OFC 1";
+  "UEFA 16, CONMEBOL 7, CAF 9, CONCACAF 7, AFC 8, OFC 1";
 
 /**
  * Regras e quotas das eliminatórias no hub.
@@ -393,7 +393,7 @@ export function textoRegrasEliminatoriasCopaCampanha(T, estado) {
       : "UEFA";
   const vagasZona = VAGAS_COPA_POR_CONFEDERACAO[conf];
   const textoGrupos =
-    `Ao todo são 32 vagas na Copa ${alvo}; na zona ${conf} há ${vagasZona} vagas. ` +
+    `Ao todo são 48 vagas na Copa ${alvo}; na zona ${conf} há ${vagasZona} vagas. ` +
     `Distribuição geral: ${TEXTO_VAGAS_POR_CONFEDERACAO}. ` +
     `Conta só a classificação final de cada grupo após todas as rodadas (pontos, saldo e desempates como na tabela do hub). ` +
     `Classificam primeiro os 1.º colocados de cada grupo; depois entram os melhores entre os restantes colocados (2.º, 3.º, etc., na ordem necessária) até completar as ${vagasZona} vagas — ` +
@@ -403,10 +403,10 @@ export function textoRegrasEliminatoriasCopaCampanha(T, estado) {
 
   if (conf === "OFC") {
     return (
-      `Ao todo são 32 vagas na Copa ${alvo}; na OFC há ${vagasZona} vaga. ` +
+      `Ao todo são 48 vagas na Copa ${alvo}; na OFC há ${vagasZona} vaga. ` +
       `Distribuição geral: ${TEXTO_VAGAS_POR_CONFEDERACAO}. ` +
-      `Só há duas seleções: não há fase de grupos — a vaga é do vencedor do confronto em ida e volta (agregado; gols fora; critérios de desempate no jogo). ` +
-      `Cada ciclo de Copa repete esse formato entre as duas.`
+      `Quatro seleções disputam um grupo único (todos contra todos); a vaga é do 1.º colocado na tabela (pontos, saldo, gols marcados e desempates como no hub). ` +
+      `Se no futuro a zona tiver só duas seleções, o jogo usa final em ida e volta entre elas.`
     );
   }
   return textoGrupos;
@@ -546,7 +546,7 @@ function linhaGrupoMelhorQue(a, b) {
 /**
  * Classificados à Copa na zona do jogador a partir do estado das eliminatórias no save:
  * tabela final de cada grupo (1.º, depois 2.º, 3.º… por “degrau” até encher as vagas) ou,
- * na OFC, vencedor da final ida/volta entre as duas seleções.
+ * na OFC com duas seleções, vencedor da final ida/volta; com quatro, 1.º do grupo único.
  *
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
  * @param {string[]} idsTodos
@@ -660,7 +660,7 @@ export function classificadosUefaCopaPorTabelaFinalGrupos(estado, idsTodos, rng)
 }
 
 /**
- * Define os 32 classificados (quotas por confederação + ranking dentro de cada pool).
+ * Define os 48 classificados (quotas por confederação + ranking dentro de cada pool).
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
  * @param {string[]} idsTodos
  * @param {() => number} rng
@@ -699,7 +699,7 @@ export function finalizarClassificadosCopaMundial(estado, idsTodos, rng, anoCopa
       classificados.push(sorted[i]);
     }
   }
-  estado.classificadosCopa2030 = classificados.slice(0, 32);
+  estado.classificadosCopa2030 = classificados.slice(0, 48);
   estado.copaClassificadosAno = anoCopa;
   estado.copa2030Concluida = false;
 }
@@ -716,7 +716,11 @@ export function finalizarClassificadosCopa2030(estado, idsTodos, rng) {
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
  */
 export function inferirMetadadosCiclosCopaCampanha(estado) {
-  if (estado.copaClassificadosAno == null && Array.isArray(estado.classificadosCopa2030) && estado.classificadosCopa2030.length === 32) {
+  if (
+    estado.copaClassificadosAno == null &&
+    Array.isArray(estado.classificadosCopa2030) &&
+    (estado.classificadosCopa2030.length === 48 || estado.classificadosCopa2030.length === 32)
+  ) {
     estado.copaClassificadosAno = ANO_COPA_MUNDO_CAMPANHA;
   }
   if (

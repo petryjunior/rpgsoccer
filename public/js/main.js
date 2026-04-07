@@ -30,6 +30,7 @@ import {
   SELECOES,
   elencoDaSelecao,
   elencoSelecaoCom12Reservas,
+  jogadoresNacionaisParaPoolCampanha,
   selecaoPorId,
   urlBandeira,
 } from "./national-teams.js";
@@ -43,7 +44,10 @@ import {
   embaralhar,
   forcaMediaSelecao,
   montarFinal,
-  montarOitavas,
+  construirEliminatoriaCopa48,
+  COPA_TOTAL_EQUIPES,
+  jogadorQualificaParaMataMata48,
+  montarOitavasDezesseisAvos,
   montarQuartasFifa,
   montarSemiFifa,
   ordenarGrupoFifa,
@@ -51,6 +55,7 @@ import {
   ROTULO_FINAL_FIFA,
   ROTULOS_OITAVAS_FIFA,
   ROTULOS_QUARTAS_FIFA,
+  ROTULOS_R32_FIFA_2026,
   ROTULOS_SEMI_FIFA,
   simularPlacar,
   simularPlacarCopaMundial,
@@ -59,8 +64,9 @@ import {
   simularRodadaGruposExcetoJogoHumano,
   simularRodadaGruposCopaTodasAsPartidas,
   sortearGrupos,
-  sortear32IdsCopa,
-  montarEstadoCopaCom32Ids,
+  sortear48IdsCopa,
+  completarIdsCopaAte48,
+  montarEstadoCopaCom48Ids,
 } from "./world-cup.js";
 import {
   carregarEstadoDoSave,
@@ -101,6 +107,7 @@ import {
   aplicarOscilacaoPreCompeticao,
   aplicarOscilacaoMensalCampanha,
   incrementarIdadeElencoCampanha,
+  processarAposentadoriaERegeneracaoCampanha,
   snapshotReferenciasTemporadaCampanha,
   aplicarResultadoPartidaTorneioCampanha,
   placarDisplayJogadorVsAdversario,
@@ -117,8 +124,12 @@ import {
   copaAlvoEliminatoriasDoAno,
   anoEhCopaMundialCampanha,
   ANO_COPA_MUNDO_CAMPANHA,
+  VAGAS_COPA_POR_CONFEDERACAO,
   textoRegrasEliminatoriasCopaCampanha,
   tituloEliminatoriasCopaMundial,
+  registrarCampeaoCopaMundialCampanha,
+  registrarCampeoesContinentaisAnoCampanha,
+  listarCampeoesCampanhaOrdenados,
 } from "./campaign.js";
 
 const els = {
@@ -277,6 +288,7 @@ const els = {
   btnCampanhaRefazerConvocacao: document.getElementById("btn-campanha-refazer-convocacao"),
   btnCampanhaHubVoltarMenu: document.getElementById("btn-campanha-hub-voltar-menu"),
   btnCampanhaCopa2030: document.getElementById("btn-campanha-copa-2030"),
+  campanhaHubCampeoesHistorico: document.getElementById("campanha-hub-campeoes-historico"),
 };
 
 const CANSACO_DUELO = 4;
@@ -933,12 +945,13 @@ function opcoesValidarElencoCpu() {
  *   _snapCopaInicioPartida?: { jogosSuspensao: Record<string, number>, lesoesHumano: Record<string, { partidasFora: number }> },
  *   ultimaRodadaResultados?: { numero: number, partidas: { L: string, homeId: string, awayId: string, gh: number, ga: number }[] },
  *   eliminatoria?: null | {
- *     oitavas: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[],
+ *     r32: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[] | null,
+ *     oitavas: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[] | null,
  *     quartas: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[] | null,
  *     semi: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[] | null,
  *     final: { fase: string, homeId: string, awayId: string, winnerId: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }[] | null,
  *   },
- *   detalheEliminacaoCopa?: null | "grupos" | "oitavas" | "quartas" | "semi" | "final",
+ *   detalheEliminacaoCopa?: null | "grupos" | "r32" | "oitavas" | "quartas" | "semi" | "final",
  * }}
  */
 let copaEstado = null;
@@ -2281,6 +2294,7 @@ function formatarDataSaveCopa(iso) {
 function nomeFaseCopaCurta(f) {
   const m = {
     grupos: "Grupos",
+    r32: "16-avos",
     oitavas: "Oitavas",
     quartas: "Quartas",
     semi: "Semis",
@@ -2543,7 +2557,7 @@ function restaurarUiCopaCarregada() {
     if (els.copaGruposGrid) els.copaGruposGrid.hidden = false;
     if (els.copaGruposIntro) {
       const sn = SELECOES.find((x) => x.id === copaEstado.playerTeamId)?.nome ?? "";
-      els.copaGruposIntro.textContent = `Você comanda ${sn}, no grupo ${copaEstado.grupoPlayer}. Há 8 grupos (A–H) com 4 seleções.`;
+      els.copaGruposIntro.textContent = `Você comanda ${sn}, no grupo ${copaEstado.grupoPlayer}. Há 12 grupos (A–L) com 4 seleções; classificam os 2 primeiros de cada grupo e os 8 melhores terceiros.`;
       els.copaGruposIntro.hidden = false;
     }
   } else {
@@ -2552,11 +2566,17 @@ function restaurarUiCopaCarregada() {
   }
   if (f === "grupos") {
     mostrarTelaCopaHubAposJogoGrupo();
-  } else if (f === "oitavas" || f === "quartas" || f === "semi" || f === "final") {
+  } else if (f === "r32" || f === "oitavas" || f === "quartas" || f === "semi" || f === "final") {
     mostrarTelaCopaHubMataMata();
   } else if (f === "eliminado") {
-    if (!copaEstado.eliminatoria?.oitavas) mostrarTelaCopaNaoClassificou();
-    else mostrarTelaCopaEliminado();
+    const temChaveMataMata = Boolean(
+      copaEstado.eliminatoria?.r32?.length || copaEstado.eliminatoria?.oitavas?.length,
+    );
+    if (copaEstado.detalheEliminacaoCopa === "grupos" && !temChaveMataMata) {
+      mostrarTelaCopaNaoClassificou();
+    } else {
+      mostrarTelaCopaEliminado();
+    }
   } else if (f === "campeao") {
     mostrarTelaCopaCampeao();
   } else {
@@ -2570,7 +2590,7 @@ function ocultarChaveamentoCopa() {
   if (els.copaChave) els.copaChave.replaceChildren();
 }
 
-const FASE_CHAVE_ORDER = /** @type {const} */ (["oitavas", "quartas", "semi", "final"]);
+const FASE_CHAVE_ORDER = /** @type {const} */ (["r32", "oitavas", "quartas", "semi", "final"]);
 
 /**
  * Enquanto o seu jogo da fase atual ainda não tem resultado, não destacamos vencedor
@@ -2687,18 +2707,19 @@ function criarColunaRodadaChave(titulo, cards) {
 }
 
 function pintarChaveamentoCopa() {
-  if (!els.copaChave || !els.copaChaveWrap || !copaEstado?.eliminatoria?.oitavas?.length) {
+  if (!els.copaChave || !els.copaChaveWrap || !copaEstado?.eliminatoria) {
     ocultarChaveamentoCopa();
     return;
   }
   const pid = copaEstado.playerTeamId;
   const e = copaEstado.eliminatoria;
-  const oit = e.oitavas;
+  const hasR32 = e.r32?.length === 16;
+  const hasOit = e.oitavas?.length === 8;
+  if (!hasR32 && !hasOit) {
+    ocultarChaveamentoCopa();
+    return;
+  }
   els.copaChave.replaceChildren();
-
-  const empOit = enfatizarResultadosColunaChave("oitavas", oit);
-  const mkOit = (/** @type {number} */ idx) =>
-    criarCardJogoChave(oit[idx], ROTULOS_OITAVAS_FIFA[idx], pid, empOit);
 
   const bracket = document.createElement("div");
   bracket.className = "copa-chave-bracket";
@@ -2711,12 +2732,56 @@ function pintarChaveamentoCopa() {
   const centro = document.createElement("div");
   centro.className = "copa-chave-centro";
 
-  ladoEsq.appendChild(
-    criarColunaRodadaChave("Oitavas", [mkOit(0), mkOit(1), mkOit(2), mkOit(3)]),
-  );
-  ladoDir.appendChild(
-    criarColunaRodadaChave("Oitavas", [mkOit(4), mkOit(5), mkOit(6), mkOit(7)]),
-  );
+  if (hasR32) {
+    const r32 = e.r32;
+    const empR = enfatizarResultadosColunaChave("r32", r32);
+    const mkR32 = (/** @type {number} */ idx) =>
+      criarCardJogoChave(r32[idx], ROTULOS_R32_FIFA_2026[idx], pid, empR);
+    ladoEsq.appendChild(
+      criarColunaRodadaChave("Rodada de 32", [
+        mkR32(0),
+        mkR32(1),
+        mkR32(2),
+        mkR32(3),
+        mkR32(4),
+        mkR32(5),
+        mkR32(6),
+        mkR32(7),
+      ]),
+    );
+  }
+
+  if (hasOit) {
+    const oit = e.oitavas;
+    const empOit = enfatizarResultadosColunaChave("oitavas", oit);
+    const mkOit = (/** @type {number} */ idx) =>
+      criarCardJogoChave(oit[idx], ROTULOS_OITAVAS_FIFA[idx], pid, empOit);
+    ladoEsq.appendChild(
+      criarColunaRodadaChave("Oitavas", [mkOit(0), mkOit(1), mkOit(2), mkOit(3)]),
+    );
+    ladoDir.appendChild(
+      criarColunaRodadaChave("Oitavas", [mkOit(4), mkOit(5), mkOit(6), mkOit(7)]),
+    );
+  }
+
+  if (hasR32) {
+    const r32 = e.r32;
+    const empR = enfatizarResultadosColunaChave("r32", r32);
+    const mkR32 = (/** @type {number} */ idx) =>
+      criarCardJogoChave(r32[idx], ROTULOS_R32_FIFA_2026[idx], pid, empR);
+    const colR32D = criarColunaRodadaChave("Rodada de 32", [
+      mkR32(8),
+      mkR32(9),
+      mkR32(10),
+      mkR32(11),
+      mkR32(12),
+      mkR32(13),
+      mkR32(14),
+      mkR32(15),
+    ]);
+    /* ladoDir usa flex-start: 1.º filho = coluna junto à final. Oitavas antes, R32 à direita (espelho do lado esquerdo). */
+    ladoDir.appendChild(colR32D);
+  }
 
   if (e.quartas?.length === 4) {
     const empQ = enfatizarResultadosColunaChave("quartas", e.quartas);
@@ -2802,17 +2867,16 @@ function pintarResultadosRodadaCopa() {
 
 function finalizarGruposCopa() {
   if (!copaEstado) return;
-  const ordem = {};
-  for (const L of Object.keys(copaEstado.grupos)) {
-    const ids = copaEstado.grupos[L];
-    const partidas = copaEstado.partidasPorGrupo[L].filter((x) => x.gh >= 0);
-    ordem[L] = ordenarGrupoFifa(ids, partidas, copaEstado.rng);
-  }
-  copaEstado.ordemGrupos = ordem;
-  const oit = montarOitavas(ordem);
-  copaEstado.eliminatoria = { oitavas: oit, quartas: null, semi: null, final: null };
-  copaEstado.jogosEliminatorios = oit;
-  copaEstado.faseCopa = "oitavas";
+  const { ordemGrupos, r32 } = construirEliminatoriaCopa48(
+    copaEstado.grupos,
+    copaEstado.partidasPorGrupo,
+    copaEstado.rng,
+    forcaSelecaoId,
+  );
+  copaEstado.ordemGrupos = ordemGrupos;
+  copaEstado.eliminatoria = { r32, oitavas: null, quartas: null, semi: null, final: null };
+  copaEstado.jogosEliminatorios = r32;
+  copaEstado.faseCopa = "r32";
   simularJogosCpuSemHumanoNaRodada();
   copaEstado.idxJogoEliminatorio = copaEstado.jogosEliminatorios.findIndex(
     (j) =>
@@ -2824,7 +2888,7 @@ function finalizarGruposCopa() {
 
 /**
  * Completa jogos de grupo em aberto, monta o mata-mata e simula até o campeão (CPU×CPU).
- * Útil na campanha: não classificado entre os 32, ou eliminado na fase de grupos mas ainda
+ * Útil na campanha: não classificado para o mata-mata, ou eliminado na fase de grupos mas ainda
  * quer ver o restante da Copa.
  */
 function simularRestanteCopaDoEstadoAtualAteCampeao() {
@@ -2844,13 +2908,23 @@ function simularRestanteCopaDoEstadoAtualAteCampeao() {
     );
   }
   finalizarGruposCopa();
-  for (let guard = 0; guard < 24; guard++) {
+  for (let guard = 0; guard < 40; guard++) {
     const lista = copaEstado.jogosEliminatorios;
     if (!lista?.length) break;
     for (const j of lista) {
       if (!j.winnerId) j.winnerId = simularJogoCpuVsCpu(j);
     }
     const fase = copaEstado.faseCopa;
+    if (fase === "r32") {
+      if (lista.some((j) => !j.winnerId)) continue;
+      const v = lista.map((x) => x.winnerId).filter(Boolean);
+      if (v.length !== 16) break;
+      const oit = montarOitavasDezesseisAvos(v);
+      if (copaEstado.eliminatoria) copaEstado.eliminatoria.oitavas = oit;
+      copaEstado.jogosEliminatorios = oit;
+      copaEstado.faseCopa = "oitavas";
+      continue;
+    }
     if (fase === "oitavas") {
       if (lista.some((j) => !j.winnerId)) continue;
       const v = lista.map((x) => x.winnerId).filter(Boolean);
@@ -2893,7 +2967,7 @@ function simularRestanteCopaDoEstadoAtualAteCampeao() {
 }
 
 /**
- * Campanha: seleção não estava entre as 32 classificadas — simula a Copa inteira só para consulta.
+ * Campanha: seleção não estava entre as 48 classificadas — simula a Copa inteira só para consulta.
  */
 function completarCopaCampanhaModoEspectador() {
   if (!copaEstado?.copaEspectadorCampanha) return;
@@ -2915,22 +2989,31 @@ function ocultarBannersDestaqueCopa() {
 
 /**
  * Fase em que a seleção do jogador foi eliminada (para texto do banner). Saves antigos sem campo: grupos se não há mata-mata; senão texto genérico.
- * @returns {"grupos"|"oitavas"|"quartas"|"semi"|"final"|null}
+ * @returns {"grupos"|"r32"|"oitavas"|"quartas"|"semi"|"final"|null}
  */
 function resolverDetalheEliminacaoCopa() {
   if (!copaEstado) return "grupos";
   const d = copaEstado.detalheEliminacaoCopa;
-  if (d === "grupos" || d === "oitavas" || d === "quartas" || d === "semi" || d === "final") return d;
+  if (
+    d === "grupos" ||
+    d === "r32" ||
+    d === "oitavas" ||
+    d === "quartas" ||
+    d === "semi" ||
+    d === "final"
+  )
+    return d;
   if (copaEstado.faseCopa !== "eliminado") return "grupos";
-  if (!copaEstado.eliminatoria?.oitavas) return "grupos";
+  if (!copaEstado.eliminatoria?.oitavas && !copaEstado.eliminatoria?.r32) return "grupos";
   return null;
 }
 
 /**
- * @param {"grupos"|"oitavas"|"quartas"|"semi"|"final"|null} det
+ * @param {"grupos"|"r32"|"oitavas"|"quartas"|"semi"|"final"|null} det
  */
 function subtituloEliminacaoCopa(det) {
   if (det === "grupos") return "Fora na fase de grupos";
+  if (det === "r32") return "Eliminado na rodada de 32";
   if (det === "oitavas") return "Eliminado nas oitavas de final";
   if (det === "quartas") return "Eliminado nas quartas de final";
   if (det === "semi") return "Eliminado na semifinal";
@@ -2939,13 +3022,16 @@ function subtituloEliminacaoCopa(det) {
 }
 
 /**
- * @param {"grupos"|"oitavas"|"quartas"|"semi"|"final"|null} det
+ * @param {"grupos"|"r32"|"oitavas"|"quartas"|"semi"|"final"|null} det
  */
 function textoParagrafoEliminacaoCopa(det) {
   if (det === "grupos") {
     return copaEstado?.origemCampanha
-      ? "Sua seleção não ficou entre as duas primeiras do grupo. O restante da Copa foi simulado — confira a chave, «Ver tabela» e os artilheiros."
-      : "Sua seleção não ficou entre as duas primeiras do grupo e está eliminada da Copa do Mundo.";
+      ? "Sua seleção não se classificou para o mata-mata (2 primeiros de cada grupo + 8 melhores terceiros). O restante da Copa foi simulado — confira a chave, «Ver tabela» e os artilheiros."
+      : "Sua seleção não se classificou para o mata-mata (2 primeiros de cada grupo + 8 melhores terceiros) e está eliminada da Copa do Mundo.";
+  }
+  if (det === "r32") {
+    return "Sua seleção foi eliminada na rodada de 32 (dezesseis-avos). Abaixo, a chave mostra o caminho até o título.";
   }
   if (det === "oitavas") {
     return "Sua seleção foi eliminada nas oitavas de final. Abaixo, a chave mostra o caminho até o título.";
@@ -2994,7 +3080,7 @@ function mostrarTelaCopaHubAposJogoGrupo() {
     els.copaHubMsg.hidden = false;
     if (copaEstado && copaEstado.idxAdversarioGrupo >= 3) {
       els.copaHubMsg.textContent =
-        "Fase de grupos concluída para você. Os dois primeiros de cada grupo seguem para as oitavas de final.";
+        "Fase de grupos concluída para você. Se estiver classificado (2 primeiros ou entre os 8 melhores terceiros), segue para a rodada de 32 (dezesseis-avos). Use «Ir ao mata-mata» para fechar a fase de grupos nos outros grupos e montar a chave.";
     } else {
       const rest = 3 - (copaEstado?.idxAdversarioGrupo ?? 0);
       els.copaHubMsg.textContent =
@@ -3006,7 +3092,7 @@ function mostrarTelaCopaHubAposJogoGrupo() {
   {
     const prontoOitavas = copaEstado && copaEstado.idxAdversarioGrupo >= 3;
     let txt = "Próximo jogo";
-    if (prontoOitavas) txt = "Ir às oitavas de final";
+    if (prontoOitavas) txt = "Ir ao mata-mata";
     else if (copaEstado && copaEstado.idxAdversarioGrupo < 3) {
       const n = copaEstado.idxAdversarioGrupo + 1;
       txt = `${n}.º jogo do grupo`;
@@ -3063,24 +3149,25 @@ function mostrarTelaCopaEliminado() {
   if (els.copaGruposGrid) els.copaGruposGrid.hidden = true;
   if (els.copaGruposIntro) els.copaGruposIntro.hidden = true;
   mostrarSecaoArtilheirosCopaNoHub();
-  const hubCampanhaComChave =
-    Boolean(copaEstado?.origemCampanha && copaEstado.eliminatoria?.oitavas?.length);
+  const temChaveMataMata = Boolean(
+    copaEstado?.eliminatoria?.r32?.length || copaEstado?.eliminatoria?.oitavas?.length,
+  );
   if (els.copaHubMsg) {
     els.copaHubMsg.hidden = false;
     const nomeCamp =
       copaEstado?.campeaoId != null
         ? SELECOES.find((x) => x.id === copaEstado.campeaoId)?.nome ?? "—"
         : "—";
-    if (hubCampanhaComChave && copaEstado?.detalheEliminacaoCopa === "grupos") {
+    if (temChaveMataMata && copaEstado?.detalheEliminacaoCopa === "grupos") {
       els.copaHubMsg.textContent =
-        `Sua seleção foi eliminada na fase de grupos. Campeão mundial: ${nomeCamp}. A chave abaixo mostra o mata-mata completo; use «Ver tabela» para as classificações dos oito grupos.`;
+        `Sua seleção foi eliminada na fase de grupos. Campeão mundial: ${nomeCamp}. A chave abaixo mostra o mata-mata completo; use «Ver tabela» para as classificações dos 12 grupos.`;
     } else {
       els.copaHubMsg.textContent =
         `Sua seleção foi eliminada. Campeão mundial: ${nomeCamp}. A chave abaixo mostra os resultados até a final. Volte ao menu para uma nova Copa ou um amistoso.`;
     }
   }
   copaHubBotoesJogoOcultar();
-  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = !hubCampanhaComChave;
+  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = !temChaveMataMata;
   if (els.btnCopaVoltarInicioHub) {
     els.btnCopaVoltarInicioHub.hidden = false;
     els.btnCopaVoltarInicioHub.textContent = copaEstado?.origemCampanha
@@ -3115,7 +3202,7 @@ function mostrarTelaCopaCampeao() {
   if (els.copaHubMsg) {
     els.copaHubMsg.hidden = false;
     els.copaHubMsg.textContent = copaEstado?.copaEspectadorCampanha
-      ? "Modo acompanhamento: chave completa e artilheiros. Use «Ver tabela» para as classificações dos oito grupos."
+      ? "Modo acompanhamento: chave completa e artilheiros. Use «Ver tabela» para as classificações dos 12 grupos."
       : "Abaixo: chave completa, artilheiros da campanha e opção de salvar este título no dispositivo.";
   }
   copaHubBotoesJogoOcultar();
@@ -3143,7 +3230,7 @@ function mostrarTelaCopaNaoClassificou() {
   if (els.copaHubMsg) {
     els.copaHubMsg.hidden = false;
     els.copaHubMsg.textContent =
-      "Sua seleção não ficou entre as duas primeiras do grupo. Volte ao menu para tentar outra Copa.";
+      "Sua seleção não se classificou para o mata-mata (2 primeiros + 8 melhores terceiros). Volte ao menu para tentar outra Copa.";
   }
   copaHubBotoesJogoOcultar();
   if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = false;
@@ -3161,26 +3248,25 @@ function mostrarTelaCopaNaoClassificou() {
 
 function tentarAvancarDosGruposCopa() {
   if (!copaEstado || copaEstado.faseCopa !== "grupos") return;
-  const L = copaEstado.grupoPlayer;
-  const ids = copaEstado.grupos[L];
-  const partidas = copaEstado.partidasPorGrupo[L].filter((x) => x.gh >= 0);
-  const ordem = ordenarGrupoFifa(ids, partidas, copaEstado.rng);
-  const pos = ordem.indexOf(copaEstado.playerTeamId);
-  if (pos < 0 || pos > 1) {
-    copaEstado.faseCopa = "eliminado";
+  const qualifica = jogadorQualificaParaMataMata48(
+    copaEstado.grupos,
+    copaEstado.partidasPorGrupo,
+    copaEstado.playerTeamId,
+    copaEstado.grupoPlayer,
+    copaEstado.rng,
+    forcaSelecaoId,
+  );
+  if (!qualifica) {
     copaEstado.detalheEliminacaoCopa = "grupos";
-    if (copaEstado.origemCampanha) {
-      simularRestanteCopaDoEstadoAtualAteCampeao();
-      copaEstado.faseCopa = "eliminado";
-      mostrarTelaCopaEliminado();
-    } else {
-      mostrarTelaCopaNaoClassificou();
-    }
+    simularRestanteCopaDoEstadoAtualAteCampeao();
+    copaEstado.faseCopa = "eliminado";
+    mostrarTelaCopaEliminado();
     return;
   }
   finalizarGruposCopa();
   mostrarTelaCopaHubMataMata();
 }
+
 
 function handleCopaProximoJogo() {
   if (!copaEstado) return;
@@ -3194,6 +3280,7 @@ function handleCopaProximoJogo() {
     return;
   }
   if (
+    copaEstado.faseCopa === "r32" ||
     copaEstado.faseCopa === "oitavas" ||
     copaEstado.faseCopa === "quartas" ||
     copaEstado.faseCopa === "semi" ||
@@ -3234,8 +3321,8 @@ function montarTimeJogadorCopaHumano() {
  */
 function montarTimeAdversarioCopaElencoAmpliado(selecaoId) {
   const ampliado = gerarPoolCampanha(selecaoId);
-  const { titulares, reservas } = elencoDaSelecao(selecaoId);
-  const pool = [...ampliado, ...titulares, ...reservas];
+  const nacionais = jogadoresNacionaisParaPoolCampanha(selecaoId);
+  const pool = [...ampliado, ...nacionais];
   let conv = sugerirConvocacaoAutomatica23(pool);
   let mapSource = pool;
   if (!conv.ok) {
@@ -3278,6 +3365,7 @@ function simularProximoJogoCopaNoHub() {
   if (copaEstado.faseCopa === "grupos") {
     cpuId = copaEstado.adversariosGrupo[copaEstado.idxAdversarioGrupo] ?? null;
   } else if (
+    copaEstado.faseCopa === "r32" ||
     copaEstado.faseCopa === "oitavas" ||
     copaEstado.faseCopa === "quartas" ||
     copaEstado.faseCopa === "semi" ||
@@ -3316,6 +3404,13 @@ function voltarHubCampanhaDesdeCopa2030() {
     );
     if (evCopaSlot) evCopaSlot.concluido = true;
     campanhaEstadoMemoria.copa2030Concluida = true;
+    if (copaEstado?.campeaoId) {
+      registrarCampeaoCopaMundialCampanha(
+        campanhaEstadoMemoria,
+        anoCivil,
+        copaEstado.campeaoId,
+      );
+    }
     const evs = campanhaEstadoMemoria.eventos;
     if (Array.isArray(evs) && evs.length) {
       const ord = [...evs];
@@ -3500,51 +3595,20 @@ function iniciarCopaComSorteio() {
   copaSnapshotConvocadosPreSorteio = null;
   const seed = Date.now() % 2147483647;
   const rng = criarRng(seed);
-  const ids32 = sortear32IdsCopa(SELECOES, idSelecaoCopaEscolhida, rng);
-  const grupos = sortearGrupos(ids32, rng);
-  /** @type {Record<string, import('./world-cup.js').ResultadoPartida[]>} */
-  const partidasPorGrupo = {};
-  for (const L of Object.keys(grupos)) {
-    partidasPorGrupo[L] = partidasDoGrupo(grupos[L]);
-  }
-  let grupoPlayer = "A";
-  for (const L of Object.keys(grupos)) {
-    if (grupos[L].includes(idSelecaoCopaEscolhida)) {
-      grupoPlayer = L;
-      break;
-    }
-  }
-  const quatro = grupos[grupoPlayer];
-  const adversariosGrupo = adversariosNasRodadas(quatro, idSelecaoCopaEscolhida);
-  copaEstado = {
-    rng,
-    seed,
-    grupos,
-    partidasPorGrupo,
-    playerTeamId: idSelecaoCopaEscolhida,
-    grupoPlayer,
-    adversariosGrupo,
-    idxAdversarioGrupo: 0,
-    faseCopa: "grupos",
-    ordemGrupos: {},
-    jogosEliminatorios: [],
-    idxJogoEliminatorio: 0,
-    campeaoId: null,
-    artilheiros: {},
-    lesoesHumano: {},
-    jogosSuspensao: {},
-    amarelosAcumulado: {},
-    eliminatoria: null,
-    detalheEliminacaoCopa: null,
-    convocadosHumanoLista: convList,
-  };
+  const ids48 = sortear48IdsCopa(SELECOES, idSelecaoCopaEscolhida, rng, {
+    vagasPorConfederacao: VAGAS_COPA_POR_CONFEDERACAO,
+    confederacaoDeId: confederacaoId,
+  });
+  copaEstado = montarEstadoCopaCom48Ids(ids48, idSelecaoCopaEscolhida, seed, { rng });
+  copaEstado.convocadosHumanoLista = convList;
+  const grupoPlayer = copaEstado.grupoPlayer;
   mostrarPassoCopa("grupos");
   if (els.copaGruposIntro) {
     const sn = SELECOES.find((x) => x.id === idSelecaoCopaEscolhida)?.nome ?? "";
-    els.copaGruposIntro.textContent = `Você comanda ${sn}, no grupo ${grupoPlayer}. Há 8 grupos (A–H) com 4 seleções.`;
+    els.copaGruposIntro.textContent = `Você comanda ${sn}, no grupo ${grupoPlayer}. Há 12 grupos (A–L) com 4 seleções; classificam os 2 primeiros de cada grupo e os 8 melhores terceiros.`;
   }
   if (els.copaGruposGrid) {
-    preencherGradeGruposCopa(grupos);
+    preencherGradeGruposCopa(copaEstado.grupos);
     els.copaGruposGrid.hidden = false;
   }
   if (els.copaGruposIntro) els.copaGruposIntro.hidden = false;
@@ -3570,12 +3634,16 @@ function iniciarCopaComSorteio() {
 function iniciarCopa2030DaCampanha() {
   if (!campanhaEstadoMemoria) campanhaEstadoMemoria = carregarCampanhaAtiva();
   if (!campanhaEstadoMemoria) return;
-  const ids32 = campanhaEstadoMemoria.classificadosCopa2030;
-  if (!Array.isArray(ids32) || ids32.length !== 32) return;
+  const idsCamp = campanhaEstadoMemoria.classificadosCopa2030;
+  if (!Array.isArray(idsCamp) || (idsCamp.length !== 48 && idsCamp.length !== 32)) return;
   const anoCopa =
     campanhaEstadoMemoria.copaClassificadosAno ?? ANO_COPA_MUNDO_CAMPANHA;
   const seed = (campanhaEstadoMemoria.seedCampanha ^ 0xf1f42630 ^ anoCopa * 0x51ed) >>> 0;
-  copaEstado = montarEstadoCopaCom32Ids(ids32, campanhaEstadoMemoria.selecaoId, seed, {
+  const ids48 =
+    idsCamp.length === 48
+      ? idsCamp
+      : completarIdsCopaAte48([...idsCamp], SELECOES, criarRng((seed ^ 0x48324832) >>> 0));
+  copaEstado = montarEstadoCopaCom48Ids(ids48, campanhaEstadoMemoria.selecaoId, seed, {
     campanhaSelecaoId: campanhaEstadoMemoria.selecaoId,
   });
   copaEstado.origemCampanha = true;
@@ -4218,6 +4286,12 @@ function finalizarCampanhaAposPartida() {
       campanhaEstadoMemoria.anoCalendario ??
       ANO_BASE_CAMPANHA + (campanhaEstadoMemoria.temporada ?? 1) - 1;
     arquivarEventosCalendarioCampanha(campanhaEstadoMemoria, anoQueTermina);
+    registrarCampeoesContinentaisAnoCampanha(
+      campanhaEstadoMemoria,
+      anoQueTermina,
+      SELECOES.map((s) => s.id),
+      (campanhaEstadoMemoria.seedCampanha ^ 0x7e9ec0da ^ anoQueTermina * 127) >>> 0,
+    );
     if (anoComEliminatoriasCopa(anoQueTermina)) {
       const rngWcq = criarRng((campanhaEstadoMemoria.seedCampanha ^ 0x11e17) >>> 0);
       agregarPontosEliminatoriasDoAno(campanhaEstadoMemoria, rngWcq);
@@ -4241,6 +4315,17 @@ function finalizarCampanhaAposPartida() {
       );
     }
     incrementarIdadeElencoCampanha(campanhaEstadoMemoria.jogadores);
+    const temporadaNova = (campanhaEstadoMemoria.temporada ?? 1) + 1;
+    processarAposentadoriaERegeneracaoCampanha(
+      campanhaEstadoMemoria.jogadores,
+      campanhaEstadoMemoria.convocadosIds,
+      campanhaEstadoMemoria.selecaoId,
+      temporadaNova,
+      (campanhaEstadoMemoria.seedCampanha ^
+        temporadaNova * 0x41505452 ^
+        anoQueTermina * 31) >>>
+        0,
+    );
     aplicarProgressaoFimDeJanela(
       campanhaEstadoMemoria.jogadores,
       (campanhaEstadoMemoria.seedCampanha + campanhaEstadoMemoria.temporada * 1009) >>> 0,
@@ -4343,27 +4428,29 @@ function appendCampanhaCalendarioLinhas(ul, eventos, estado, proxEv) {
 }
 
 /**
- * Mensagem verde no hub das eliminatórias: lista à Copa quando as 32 vagas existem; senão as seleções após o KO local.
+ * Mensagem verde no hub das eliminatórias: lista à Copa quando as 48 vagas existem; senão as seleções após o KO local.
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
  * @param {object} We eliminatoriasCopa
  */
 function textoHubEliminatoriasClassificadosCopa(estado, We) {
   const anoCopa = estado.wcqCicloCopaAlvo ?? ANO_COPA_MUNDO_CAMPANHA;
   const confKey = We.confKey ?? dadosTorneioContinental(estado.selecaoId).key;
-  const lista32 = estado.classificadosCopa2030;
+  const listaCls = estado.classificadosCopa2030;
   const anoCls = estado.copaClassificadosAno;
-  if (Array.isArray(lista32) && lista32.length === 32 && anoCls === anoCopa) {
-    const naZona = lista32.filter((id) => confederacaoId(id) === confKey);
+  const nClsOk =
+    Array.isArray(listaCls) && (listaCls.length === 48 || listaCls.length === 32);
+  if (nClsOk && anoCls === anoCopa) {
+    const naZona = listaCls.filter((id) => confederacaoId(id) === confKey);
     const nomes = naZona
       .map((id) => selecaoPorId(id)?.nome ?? id)
-      .sort((a, b) => a.localeCompare(b, "pt"));
+      .sort((a, b) => a.localeCompare(b, "pt-BR"));
     return `Classificados para a Copa ${anoCopa} (${confKey}): ${nomes.join(", ")}.`;
   }
   const koIds = We.wcqClassificadosKoIds;
   if (Array.isArray(koIds) && koIds.length) {
     const nomesKo = [...new Set(koIds)]
       .map((id) => selecaoPorId(id)?.nome ?? id)
-      .sort((a, b) => a.localeCompare(b, "pt"));
+      .sort((a, b) => a.localeCompare(b, "pt-BR"));
     return `Fase eliminatória da zona encerrada — na disputa das vagas à Copa ${anoCopa}: ${nomesKo.join(", ")}.`;
   }
   if (We.campeaoContinentalId) {
@@ -4449,13 +4536,15 @@ function pintarCampanhaHub() {
         ? ` Sem ${infoTor.nomeTorneio} neste ano civil (calendário FIFA); só amistosos.`
         : "";
     const anoCopaMsg = campanhaEstadoMemoria.copaClassificadosAno ?? ANO_COPA_MUNDO_CAMPANHA;
+    const clsCopa = campanhaEstadoMemoria.classificadosCopa2030;
+    const clsCopaOk =
+      Array.isArray(clsCopa) && (clsCopa.length === 48 || clsCopa.length === 32);
     const linhaCopa2030 =
-      Array.isArray(campanhaEstadoMemoria.classificadosCopa2030) &&
-      campanhaEstadoMemoria.classificadosCopa2030.length === 32 &&
+      clsCopaOk &&
       anoEhCopaMundialCampanha(anoHub) &&
       anoCopaMsg === anoHub &&
       !campanhaEstadoMemoria.copa2030Concluida
-        ? ` Copa ${anoHub}: 32 vagas preenchidas por confederação (quotas). O calendário inclui a janela do Mundial (junho ou julho, conforme haja torneio continental no mesmo ano); use “Jogar próximo evento” ou o botão abaixo para disputar ou acompanhar o torneio (continua na campanha após o fim).`
+        ? ` Copa ${anoHub}: 48 vagas preenchidas por confederação (quotas). O calendário inclui a janela do Mundial (junho ou julho, conforme haja torneio continental no mesmo ano); use “Jogar próximo evento” ou o botão abaixo para disputar ou acompanhar o torneio (continua na campanha após o fim).`
         : "";
     els.campanhaHubResumo.textContent = `${nomeSel} — ${dataHub} · temporada ${campanhaEstadoMemoria.temporada}. Elenco ampliado: ${campanhaEstadoMemoria.jogadores.length} jogadores; convocados: ${campanhaEstadoMemoria.convocadosIds.length}/23.${torneioLinha}${elim}${elimWcq}${semContinental}${linhaCopa2030}`;
   }
@@ -4692,6 +4781,42 @@ function pintarCampanhaHub() {
       }
     }
   }
+  if (els.campanhaHubCampeoesHistorico) {
+    els.campanhaHubCampeoesHistorico.replaceChildren();
+    const campeoes = listarCampeoesCampanhaOrdenados(campanhaEstadoMemoria);
+    const det = document.createElement("details");
+    det.className = "campanha-hub-campeoes-details";
+    const sum = document.createElement("summary");
+    sum.textContent =
+      campeoes.length > 0
+        ? `Campeões (Copa do Mundo e continentais) — ${campeoes.length} título(s)`
+        : "Campeões (Copa do Mundo e continentais)";
+    det.appendChild(sum);
+    const intro = document.createElement("p");
+    intro.className = "campanha-hub-calendario-hist-intro tela-menu-sub";
+    intro.textContent =
+      campeoes.length > 0
+        ? "Todos os torneios continentais com edição nesse ano civil e o campeão simulado ou decidido na sua campanha; o Mundial é registado ao terminar o hub da Copa."
+        : "Os títulos aparecem aqui conforme avança a campanha: continentais ao fechar cada ano civil e a Copa do Mundo ao concluir o torneio.";
+    det.appendChild(intro);
+    const ulc = document.createElement("ul");
+    ulc.className = "campanha-hub-campeoes-lista";
+    for (const c of campeoes) {
+      const li = document.createElement("li");
+      const nm = selecaoPorId(c.vencedorId)?.nome ?? c.vencedorId;
+      li.textContent = `${c.ano} — ${c.competicao} — ${nm}`;
+      ulc.appendChild(li);
+    }
+    if (!campeoes.length) {
+      const li0 = document.createElement("li");
+      li0.className = "campanha-hub-campeoes-vazio";
+      li0.textContent = "Nenhum título registado ainda.";
+      ulc.appendChild(li0);
+    }
+    det.appendChild(ulc);
+    els.campanhaHubCampeoesHistorico.appendChild(det);
+    els.campanhaHubCampeoesHistorico.hidden = false;
+  }
   const proxEvPend = proximoEventoPendente(campanhaEstadoMemoria.eventos);
   const podeJogar =
     campanhaEstadoMemoria.convocadosIds.length === 23 &&
@@ -4706,12 +4831,12 @@ function pintarCampanhaHub() {
     els.btnCampanhaSimularProximo.disabled = !podeJogar;
   }
   if (els.btnCampanhaCopa2030) {
-    const ids32 = campanhaEstadoMemoria.classificadosCopa2030;
+    const idsCopaBtn = campanhaEstadoMemoria.classificadosCopa2030;
     const anoCopaEdicao =
       campanhaEstadoMemoria.copaClassificadosAno ?? ANO_COPA_MUNDO_CAMPANHA;
     const classificadosServemEstaCopa =
-      Array.isArray(ids32) &&
-      ids32.length === 32 &&
+      Array.isArray(idsCopaBtn) &&
+      (idsCopaBtn.length === 48 || idsCopaBtn.length === 32) &&
       anoCopaEdicao === anoCalAtual &&
       anoEhCopaMundialCampanha(anoCalAtual);
     const podeCopa =
@@ -4726,8 +4851,8 @@ function pintarCampanhaHub() {
       podeCopa && !calendarioLiberouCopa
         ? "Conclua primeiro todos os jogos do calendário anteriores ao mês da Copa do Mundo."
         : "";
-    if (podeCopa && ids32) {
-      const qual = ids32.includes(campanhaEstadoMemoria.selecaoId);
+    if (podeCopa && idsCopaBtn) {
+      const qual = idsCopaBtn.includes(campanhaEstadoMemoria.selecaoId);
       els.btnCampanhaCopa2030.textContent = qual
         ? `Disputar a Copa do Mundo ${anoCalAtual}`
         : `Acompanhar a Copa do Mundo ${anoCalAtual} (sua seleção não se classificou)`;
@@ -5114,11 +5239,16 @@ els.btnCampanhaVoltarInicio2?.addEventListener("click", () => {
 
 els.btnCampanhaConfirmarSelecao?.addEventListener("click", () => {
   if (!idSelecaoCampanhaPendente) return;
-  campanhaEstadoMemoria = criarEstadoCampanhaNovo(idSelecaoCampanhaPendente, SELECOES.map((s) => s.id));
-  campanhaConvocadosPendentes = new Set();
-  mostrarPassoCampanha("convocacao");
-  if (els.btnCampanhaVoltarHubConvoc) els.btnCampanhaVoltarHubConvoc.hidden = true;
-  pintarCampanhaConvocacaoLista();
+  try {
+    campanhaEstadoMemoria = criarEstadoCampanhaNovo(idSelecaoCampanhaPendente, SELECOES.map((s) => s.id));
+    campanhaConvocadosPendentes = new Set();
+    mostrarPassoCampanha("convocacao");
+    if (els.btnCampanhaVoltarHubConvoc) els.btnCampanhaVoltarHubConvoc.hidden = true;
+    pintarCampanhaConvocacaoLista();
+  } catch (e) {
+    console.error(e);
+    alert(String(e?.message ?? e));
+  }
 });
 
 els.btnCampanhaConvocacaoAuto?.addEventListener("click", () => {
@@ -5301,9 +5431,9 @@ window.__qwertyFootballAbrirTelaCarregarCopa = abrirTelaCarregarCopa;
 els.btnCopaIrConvocacao?.addEventListener("click", () => {
   if (!idSelecaoCopaEscolhida) return;
   try {
-    const { titulares, reservas } = elencoDaSelecao(idSelecaoCopaEscolhida);
     const ampliado = gerarPoolCampanha(idSelecaoCopaEscolhida);
-    copaElencoPool = [...ampliado, ...titulares, ...reservas];
+    const nacionais = jogadoresNacionaisParaPoolCampanha(idSelecaoCopaEscolhida);
+    copaElencoPool = [...ampliado, ...nacionais];
   } catch (e) {
     console.error(e);
     alert("Não foi possível carregar o elenco desta seleção.");
@@ -6193,7 +6323,7 @@ function copaHubBotoesJogoOcultar() {
 
 /**
  * @param {string | undefined} textoProximo texto do botão “Próximo jogo” / “Entrar em campo” / etc.
- * @param {{ mostrarSimular?: boolean }} [opts] após a 3.ª rodada de grupos, “Simular próximo jogo” fica oculto (só “Ir às oitavas” avança a classificação).
+ * @param {{ mostrarSimular?: boolean }} [opts] após a 3.ª rodada de grupos, “Simular próximo jogo” fica oculto (só “Ir ao mata-mata” avança a classificação).
  */
 function copaHubBotoesJogoMostrar(textoProximo, opts) {
   opts = opts ?? {};
@@ -6286,14 +6416,14 @@ function processarFimDeJogoCopa(op) {
   const humanVence = gh > gc;
   const faseAntesEliminacao = copaEstado.faseCopa;
   if (!humanVence) {
-    copaEstado.detalheEliminacaoCopa = /** @type {"oitavas"|"quartas"|"semi"|"final"} */ (
+    copaEstado.detalheEliminacaoCopa = /** @type {"r32"|"oitavas"|"quartas"|"semi"|"final"} */ (
       faseAntesEliminacao
     );
     jogo.winnerId =
       jogo.homeId === copaEstado.playerTeamId ? jogo.awayId : jogo.homeId;
     copaEstado.faseCopa = "eliminado";
     completarEliminatoriaAposEliminacaoHumana(
-      /** @type {"oitavas"|"quartas"|"semi"|"final"} */ (faseAntesEliminacao),
+      /** @type {"r32"|"oitavas"|"quartas"|"semi"|"final"} */ (faseAntesEliminacao),
     );
     irHub(() => mostrarTelaCopaEliminado());
     return;
@@ -6324,7 +6454,7 @@ function registrarResultadoGrupoCopa(est, humanId, advId, gHuman, gAdv) {
 function aplicarPlacarJogoEliminatorioAtualKnockout(placarPenaltis) {
   if (!copaEstado) return;
   const f = copaEstado.faseCopa;
-  if (f !== "oitavas" && f !== "quartas" && f !== "semi" && f !== "final") return;
+  if (f !== "r32" && f !== "oitavas" && f !== "quartas" && f !== "semi" && f !== "final") return;
   const jogo = copaEstado.jogosEliminatorios[copaEstado.idxJogoEliminatorio];
   if (!jogo) return;
   const pid = copaEstado.playerTeamId;
@@ -6342,12 +6472,12 @@ function aplicarPlacarJogoEliminatorioAtualKnockout(placarPenaltis) {
 
 /**
  * Simula todas as fases restantes da Copa (CPU×CPU) após o jogador ser eliminado e define `campeaoId`.
- * @param {"oitavas"|"quartas"|"semi"|"final"} faseInicial
+ * @param {"r32"|"oitavas"|"quartas"|"semi"|"final"} faseInicial
  */
 function completarEliminatoriaAposEliminacaoHumana(faseInicial) {
   if (!copaEstado?.eliminatoria) return;
   let fase = faseInicial;
-  for (let passo = 0; passo < 24; passo++) {
+  for (let passo = 0; passo < 40; passo++) {
     simularJogosCpuSemHumanoNaRodada();
     const lista = copaEstado.jogosEliminatorios;
     if (!lista?.length) break;
@@ -6359,6 +6489,13 @@ function completarEliminatoriaAposEliminacaoHumana(faseInicial) {
     }
 
     const v = lista.map((x) => x.winnerId).filter(Boolean);
+    if (fase === "r32" && v.length === 16) {
+      const oit = montarOitavasDezesseisAvos(/** @type {string[]} */ (v));
+      copaEstado.eliminatoria.oitavas = oit;
+      copaEstado.jogosEliminatorios = oit;
+      fase = "oitavas";
+      continue;
+    }
     if (fase === "oitavas" && v.length === 8) {
       const qua = montarQuartasFifa(/** @type {string[]} */ (v));
       copaEstado.eliminatoria.quartas = qua;
@@ -6417,6 +6554,21 @@ function avancarEliminatoriaCopa(adiarIrParaHub = false) {
   };
   const fase = copaEstado.faseCopa;
   const lista = copaEstado.jogosEliminatorios;
+
+  if (fase === "r32") {
+    const v = lista.map((x) => x.winnerId).filter(Boolean);
+    if (v.length !== 16) return;
+    const oit = montarOitavasDezesseisAvos(v);
+    if (copaEstado.eliminatoria) copaEstado.eliminatoria.oitavas = oit;
+    copaEstado.jogosEliminatorios = oit;
+    copaEstado.faseCopa = "oitavas";
+    simularJogosCpuSemHumanoNaRodada();
+    copaEstado.idxJogoEliminatorio = copaEstado.jogosEliminatorios.findIndex(
+      (j) => j.homeId === copaEstado.playerTeamId || j.awayId === copaEstado.playerTeamId,
+    );
+    ir(() => mostrarTelaCopaHubMataMata());
+    return;
+  }
 
   if (fase === "oitavas") {
     const v = lista.map((x) => x.winnerId).filter(Boolean);
@@ -6516,12 +6668,12 @@ async function tratarFimPartidaCopaKnockout(humGanhouPenaltis) {
   if (humGanhouPenaltis) {
     avancarEliminatoriaCopa(true);
   } else {
-    copaEstado.detalheEliminacaoCopa = /** @type {"oitavas"|"quartas"|"semi"|"final"} */ (
+    copaEstado.detalheEliminacaoCopa = /** @type {"r32"|"oitavas"|"quartas"|"semi"|"final"} */ (
       faseAntesEliminacao
     );
     copaEstado.faseCopa = "eliminado";
     completarEliminatoriaAposEliminacaoHumana(
-      /** @type {"oitavas"|"quartas"|"semi"|"final"} */ (faseAntesEliminacao),
+      /** @type {"r32"|"oitavas"|"quartas"|"semi"|"final"} */ (faseAntesEliminacao),
     );
     agendarTransicaoCopaAposContinuar(() => mostrarTelaCopaEliminado());
   }

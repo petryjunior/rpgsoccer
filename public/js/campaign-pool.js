@@ -10,7 +10,7 @@ import { listasNomesCampanha } from "./campaign-names.js";
 import { elencoDaSelecao } from "./national-teams.js";
 
 /** Incrementar ao mudar lógica de geração (invalida saves antigos só se checagem explícita). */
-export const POOL_DATA_VERSION = 4;
+export const POOL_DATA_VERSION = 9;
 
 /** Média de (ataque+defesa)/2 dos titulares: seleção “média” no jogo (~esta força). */
 const FM_ANCORA_TITULARES = 68;
@@ -69,7 +69,7 @@ function nomesCompletosEmbaralhados(prenomes, sobrenomes, rng) {
  * Força média dos titulares da seleção (mesma métrica da Copa / simulações).
  * @param {string} selecaoId
  */
-function forcaMediaTitularesSelecao(selecaoId) {
+export function forcaMediaTitularesSelecao(selecaoId) {
   const { titulares } = elencoDaSelecao(selecaoId);
   return forcaMediaSelecao({ titulares });
 }
@@ -80,7 +80,7 @@ function forcaMediaTitularesSelecao(selecaoId) {
  * @param {() => number} rng
  * @param {number} forcaMediaTitulares média (ataque+defesa)/2 dos 11 titulares
  */
-function statsPorPosicaoCampanha(pos, rng, forcaMediaTitulares) {
+export function statsPorPosicaoCampanha(pos, rng, forcaMediaTitulares) {
   const shift = Math.round((forcaMediaTitulares - FM_ANCORA_TITULARES) * FM_SHIFT_POR_PONTO);
   const teto = Math.min(99, Math.round(forcaMediaTitulares + FM_TETO_EXTRA_NOS_ATRIBUTOS));
   const roll = (lo, hi) =>

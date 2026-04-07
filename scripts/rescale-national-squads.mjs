@@ -1,6 +1,6 @@
 /**
  * Recalibra ataque/defesa de todos os elencos de seleção:
- * times fracos → primários ~50–60; fortes ~75–95; transição pelo ranking global.
+ * piores → primários ~35–50; elite ~78–95; transição linear por ranking (100 degraus).
  * Uso: node scripts/rescale-national-squads.mjs
  */
 import { readFileSync, writeFileSync } from "node:fs";
@@ -11,8 +11,22 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const jsDir = join(root, "public", "js");
 
-const { SELECOES_CORE } = await import(pathToFileURL(join(jsDir, "national-teams.js")).href);
-const { SELECOES_EXPAND } = await import(pathToFileURL(join(jsDir, "national-teams-expand.js")).href);
+const ntMod = await import(pathToFileURL(join(jsDir, "national-teams.js")).href);
+
+/** @param {{ id: string, nome: string, sigla: string, iso: string, titulares: unknown[], reservas: unknown[] }} t */
+function stripConvocacaoExtra(t) {
+  return {
+    id: t.id,
+    nome: t.nome,
+    sigla: t.sigla,
+    iso: t.iso,
+    titulares: t.titulares,
+    reservas: t.reservas,
+  };
+}
+
+const SELECOES_CORE = ntMod.SELECOES_CORE.map(stripConvocacaoExtra);
+const SELECOES_EXPAND_RAW = ntMod.SELECOES_EXPAND.map(stripConvocacaoExtra);
 
 const PMAP = {
   goleiro: "P.GOLEIRO",
@@ -35,33 +49,33 @@ function roundStat(x) {
   return Math.min(99, Math.max(1, Math.round(x)));
 }
 
-/** Primário: fracos ~50–58, fortes ~75–95 */
+/** Primário (ATA/ZAG defesa / ATA ataque): piores ~35–50, elite ~78–95 */
 function bandaPrimario(tier) {
   const t = clamp01(tier);
-  return { low: 50 + 25 * t, high: 58 + 37 * t };
+  return { low: 35 + 43 * t, high: 50 + 45 * t };
 }
 
 /** Secundário (pior atributo da posição): bem menor nas fracas */
 function bandaSecundario(tier) {
   const t = clamp01(tier);
-  return { low: 28 + 20 * t, high: 46 + 28 * t };
+  return { low: 14 + 24 * t, high: 30 + 42 * t };
 }
 
-/** Meias: faixa intermediária, gradativa */
+/** Meias: faixa intermediária entre “linha” e elite */
 function bandaMeia(tier) {
   const t = clamp01(tier);
-  return { low: 46 + 22 * t, high: 56 + 33 * t };
+  return { low: 32 + 32 * t, high: 46 + 42 * t };
 }
 
 /** Goleiros: defesa como “principal” */
 function bandaGoleiroDef(tier) {
   const t = clamp01(tier);
-  return { low: 56 + 20 * t, high: 66 + 27 * t };
+  return { low: 40 + 32 * t, high: 52 + 40 * t };
 }
 
 function bandaGoleiroAtk(tier) {
   const t = clamp01(tier);
-  return { low: 14 + 4 * t, high: 26 + 10 * t };
+  return { low: 10 + 10 * t, high: 20 + 14 * t };
 }
 
 /**
@@ -224,16 +238,15 @@ ${formatPlayers(team.reservas)}    ],
   }`;
 }
 
-const all = [...SELECOES_CORE, ...SELECOES_EXPAND];
+const all = [...SELECOES_CORE, ...SELECOES_EXPAND_RAW];
 const rankSorted = [...all].sort((a, b) => sumTitulares(b) - sumTitulares(a));
 const rankById = new Map(rankSorted.map((t, i) => [t.id, i]));
 const n = all.length;
 
-/** Eleva um pouco o tier do meio da tabela para grandes seleções ficarem na faixa 75–95. */
+/** Um degrau por posição no ranking (0 = pior, 1 = melhor), sem comprimir o meio. */
 function tierForRank(r) {
   if (n <= 1) return 1;
-  const linear = 1 - r / (n - 1);
-  return clamp01(linear * 1.14 + 0.03);
+  return clamp01(1 - r / (n - 1));
 }
 
 function tierForId(id) {
@@ -243,7 +256,7 @@ function tierForId(id) {
 
 const coreRescaled = SELECOES_CORE.map((t) => {
   const tierTit = tierForId(t.id);
-  const tierRes = clamp01(tierTit - 0.075);
+  const tierRes = clamp01(tierTit - 0.09);
   return {
     ...t,
     titulares: assignTitularesFormation(rescaleRoster(t.titulares, tierTit), t.id),
@@ -251,9 +264,9 @@ const coreRescaled = SELECOES_CORE.map((t) => {
   };
 });
 
-const expandRescaled = SELECOES_EXPAND.map((t) => {
+const expandRescaled = SELECOES_EXPAND_RAW.map((t) => {
   const tierTit = tierForId(t.id);
-  const tierRes = clamp01(tierTit - 0.075);
+  const tierRes = clamp01(tierTit - 0.09);
   return {
     ...t,
     titulares: assignTitularesFormation(rescaleRoster(t.titulares, tierTit), t.id),
@@ -269,11 +282,15 @@ function j(nome, posicao, ataque, defesa) {
 }
 
 /**
- * 32 seleções adicionais ao pool mundial (Copa sorteia 32 com peso por força).
+ * Seleções adicionais ao pool mundial (Copa sorteia 32 com peso por força).
+ * Oceania: Fiji, Papua-Nova Guiné e Tahiti (com NZL no core) = 4 na OFC; Austrália está na AFC.
+ * Segunda leva: UEFA (10), CAF (8), AFC (6), CONCACAF (6) — ver lista no repositório / pedido do autor.
+ * Mais: Lituânia (LTU), Índia (IND), Burkina Faso (BFA) — 100 seleções no total com o core.
  * Chile já existe em \`national-teams.js\` (id chi).
  * @type {import("./national-teams.js").SelecaoDef[]}
+ * \`convocacaoExtra\` é acrescentado em \`national-teams.js\`.
  */
-export const SELECOES_EXPAND = [
+export const SELECOES_EXPAND_RAW = [
 ${expandRescaled.map(formatTeam).join(",\n")}
 ];
 `;
@@ -281,18 +298,22 @@ writeFileSync(expandPath, expandOut, "utf8");
 
 const corePath = join(jsDir, "national-teams.js");
 const coreSrc = readFileSync(corePath, "utf8");
-const coreBody = `export const SELECOES_CORE = [\n${coreRescaled.map(formatTeam).join(",\n")}\n];`;
+const coreBody = `const SELECOES_CORE_BASE = [\n${coreRescaled.map(formatTeam).join(",\n")}\n];`;
 const coreReplaced = coreSrc.replace(
-  /export const SELECOES_CORE = \[[\s\S]*?\n\];(?=\s*\n\/\*\* Todas as seleções)/,
+  /const SELECOES_CORE_BASE = \[[\s\S]*?\n\];(?=\s*\n\/\*\*\n \* Acrescenta)/,
   coreBody,
 );
 if (coreReplaced === coreSrc) {
-  throw new Error("national-teams.js: não achei o bloco SELECOES_CORE para substituir.");
+  throw new Error("national-teams.js: não achei o bloco SELECOES_CORE_BASE para substituir.");
 }
 writeFileSync(corePath, coreReplaced, "utf8");
 
 const bol = expandRescaled.find((t) => t.id === "bol");
-const bra = coreRescaled.find((t) => t.id === "fra");
+const bra = coreRescaled.find((t) => t.id === "bra");
+const fra = coreRescaled.find((t) => t.id === "fra");
+const worstId = rankSorted[n - 1].id;
+const wTeam =
+  expandRescaled.find((t) => t.id === worstId) ?? coreRescaled.find((t) => t.id === worstId);
 console.log(
   "Formações (Z/M/A):",
   coreRescaled.slice(0, 5).map((t) => {
@@ -300,6 +321,8 @@ console.log(
     return `${t.id} ${c("zagueiro")}-${c("meia")}-${c("atacante")}`;
   }),
 );
+console.log("Pior ranking tit primários (ATA atk):", wTeam.id, wTeam.titulares.filter((p) => p.posicao === "atacante").map((p) => p.ataque));
 console.log("Bolívia ATA tit:", bol.titulares.filter((p) => p.posicao === "atacante").map((p) => p.ataque));
-console.log("França ATA tit:", bra.titulares.filter((p) => p.posicao === "atacante").map((p) => p.ataque));
+console.log("Brasil ATA tit:", bra?.titulares.filter((p) => p.posicao === "atacante").map((p) => p.ataque));
+console.log("França ATA tit:", fra?.titulares.filter((p) => p.posicao === "atacante").map((p) => p.ataque));
 console.log("OK: national-teams-expand.js e national-teams.js atualizados.");

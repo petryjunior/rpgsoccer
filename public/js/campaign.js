@@ -5,6 +5,7 @@
 import { POSITIONS } from "./constants.js";
 import { ANO_BASE_CAMPANHA } from "./campaign-dates.js";
 import { gerarPoolCampanha, POOL_DATA_VERSION } from "./campaign-pool.js";
+import { jogadoresNacionaisParaPoolCampanha } from "./national-teams.js";
 import { criarCalendarioTemporada } from "./campaign-calendar.js";
 import { criarRng } from "./world-cup.js";
 import { salvarCampanhaAtiva, carregarCampanhaAtiva, CAMPANHA_FORMAT_VERSION } from "./campaign-storage.js";
@@ -118,7 +119,10 @@ export function sugerirConvocacaoAutomatica23(jogadores) {
  */
 export function criarEstadoCampanhaNovo(selecaoId, todosIdsSelecoes) {
   const seedCampanha = (Date.now() ^ (Math.floor(Math.random() * 0x7fffffff) << 8)) >>> 0;
-  const jogadores = gerarPoolCampanha(selecaoId);
+  const jogadores = [
+    ...gerarPoolCampanha(selecaoId),
+    ...jogadoresNacionaisParaPoolCampanha(selecaoId),
+  ];
   const rng = criarRng(seedCampanha ^ 0xdeadbeef);
   /** @type {import('./campaign-storage.js').CampanhaEstadoPersistido} */
   const estado = {
@@ -142,6 +146,7 @@ export function criarEstadoCampanhaNovo(selecaoId, todosIdsSelecoes) {
     copa2030Concluida: false,
     campanhaUltimoMesOscStats: 3,
     historicoEventosCampanha: [],
+    historicoCampeoes: [],
   };
   const { eventos, torneioContinental, eliminatoriasCopa } = criarCalendarioTemporada(
     selecaoId,
@@ -224,6 +229,7 @@ export {
   ANO_ULTIMA_ELIMINATORIA,
   textoRegrasEliminatoriasCopaCampanha,
   tituloEliminatoriasCopaMundial,
+  VAGAS_COPA_POR_CONFEDERACAO,
 } from "./campaign-wc-qualifiers.js";
 export {
   aplicarEfeitoPosPartidaCampanha,
@@ -232,4 +238,11 @@ export {
   aplicarOscilacaoMensalCampanha,
   incrementarIdadeElencoCampanha,
   snapshotReferenciasTemporadaCampanha,
+  chanceAposentadoriaRegenPorIdade,
+  processarAposentadoriaERegeneracaoCampanha,
 } from "./campaign-progress.js";
+export {
+  registrarCampeaoCopaMundialCampanha,
+  registrarCampeoesContinentaisAnoCampanha,
+  listarCampeoesCampanhaOrdenados,
+} from "./campaign-champions.js";

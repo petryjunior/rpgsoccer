@@ -11,6 +11,6 @@ export function ordenarPorPosicao(jogadores) {
   return [...jogadores].sort((a, b) => {
     const d = idx(a.posicao) - idx(b.posicao);
     if (d !== 0) return d;
-    return (a.nome || "").localeCompare(b.nome || "", "pt");
+    return (a.nome || "").localeCompare(b.nome || "", "pt-BR");
   });
 }

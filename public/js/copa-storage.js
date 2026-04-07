@@ -20,6 +20,10 @@ export function anexarJogosEliminatoriosAoEstado(est) {
     est.jogosEliminatorios = [];
     return;
   }
+  if (f === "r32" && e.r32) {
+    est.jogosEliminatorios = e.r32;
+    return;
+  }
   if (f === "oitavas") {
     est.jogosEliminatorios = e.oitavas;
     return;
@@ -38,8 +42,33 @@ export function anexarJogosEliminatoriosAoEstado(est) {
   }
   if (f === "eliminado") {
     const idx = est.idxJogoEliminatorio ?? 0;
+    const det = est.detalheEliminacaoCopa;
+    if (det === "r32" && e.r32 && idx < e.r32.length) {
+      est.jogosEliminatorios = e.r32;
+      return;
+    }
+    if (det === "oitavas" && e.oitavas && idx < e.oitavas.length) {
+      est.jogosEliminatorios = e.oitavas;
+      return;
+    }
+    if (det === "quartas" && e.quartas && idx < e.quartas.length) {
+      est.jogosEliminatorios = e.quartas;
+      return;
+    }
+    if (det === "semi" && e.semi && idx < e.semi.length) {
+      est.jogosEliminatorios = e.semi;
+      return;
+    }
+    if (det === "final" && e.final?.length) {
+      est.jogosEliminatorios = e.final;
+      return;
+    }
     if (e.oitavas && idx < e.oitavas.length) {
       est.jogosEliminatorios = e.oitavas;
+      return;
+    }
+    if (e.r32 && idx < e.r32.length) {
+      est.jogosEliminatorios = e.r32;
       return;
     }
     if (e.quartas && idx < e.quartas.length) {

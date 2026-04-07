@@ -11,7 +11,7 @@ import {
 } from "./campaign-wc-qualifiers.js";
 
 const STORAGE_KEY = "qwerty-football-campanha-v1";
-export const CAMPANHA_FORMAT_VERSION = 7;
+export const CAMPANHA_FORMAT_VERSION = 8;
 
 /**
  * @typedef {import('./campaign-pool.js').JogadorCampanha} JogadorCampanha
@@ -39,6 +39,7 @@ export const CAMPANHA_FORMAT_VERSION = 7;
  *   copa2030Concluida?: boolean,
  *   campanhaUltimoMesOscStats?: number,
  *   historicoEventosCampanha?: { ano: number, eventos: import('./campaign-calendar.js').EventoCampanha[] }[],
+ *   historicoCampeoes?: { chave: string, ano: number, competicao: string, vencedorId: string }[],
  *   savedAt?: string,
  * }} CampanhaEstadoPersistido
  */
@@ -83,6 +84,12 @@ function migrarCampanhaV6ParaV7(d) {
       }
     }
   }
+}
+
+/** Histórico de campeões (Mundial + continentais). */
+function migrarCampanhaV7ParaV8(d) {
+  d.formatVersion = 8;
+  if (!Array.isArray(d.historicoCampeoes)) d.historicoCampeoes = [];
 }
 
 /**
@@ -158,6 +165,10 @@ export function carregarCampanhaAtiva() {
       migrarCampanhaV6ParaV7(d);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
     }
+    if (d.formatVersion === 7) {
+      migrarCampanhaV7ParaV8(d);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+    }
     if (d.formatVersion !== CAMPANHA_FORMAT_VERSION) return null;
     if (d.anoCalendario == null) {
       d.anoCalendario = ANO_BASE_CAMPANHA + ((d.temporada ?? 1) - 1);
@@ -181,6 +192,9 @@ export function carregarCampanhaAtiva() {
     }
     if (!Array.isArray(d.historicoEventosCampanha)) {
       d.historicoEventosCampanha = [];
+    }
+    if (!Array.isArray(d.historicoCampeoes)) {
+      d.historicoCampeoes = [];
     }
     if (Array.isArray(d.jogadores)) {
       for (const j of d.jogadores) {

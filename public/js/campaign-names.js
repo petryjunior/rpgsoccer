@@ -401,7 +401,7 @@ const TABELAS_BASE = {
   por: {
     prenomes: [
       "André",
-      "António",
+      "Antônio",
       "Bernardo",
       "Bruno",
       "Carlos",

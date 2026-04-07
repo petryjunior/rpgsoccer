@@ -2,7 +2,122 @@
  * Progressão e oscilação de atributos no modo Campanha (v1).
  */
 
+import { listasNomesCampanha } from "./campaign-names.js";
+import { hashStringToSeed, statsPorPosicaoCampanha, forcaMediaTitularesSelecao } from "./campaign-pool.js";
 import { criarRng } from "./world-cup.js";
+
+/**
+ * Probabilidade de aposentadoria + regeneração (filho) ao fim do ano civil, após +1 idade.
+ * @param {number} idade idade atual do jogador (já incrementada para o novo ano).
+ */
+export function chanceAposentadoriaRegenPorIdade(idade) {
+  if (idade < 36) return 0;
+  if (idade >= 42) return 0.99;
+  const t = /** @type {Record<number, number>} */ ({
+    36: 0.25,
+    37: 0.35,
+    38: 0.45,
+    39: 0.55,
+    40: 0.8,
+    41: 0.95,
+  });
+  return t[idade] ?? 0.99;
+}
+
+/**
+ * @param {() => number} rng
+ * @param {number} lo
+ * @param {number} hi
+ */
+function intRngRegen(rng, lo, hi) {
+  return lo + Math.floor(rng() * (hi - lo + 1));
+}
+
+/**
+ * Fim de temporada: jogadores 36+ podem “se aposentar” e voltar no ano seguinte como jovem
+ * (novo prenome, mesmo sobrenome, stats e idade 16–18, novo id). Atualiza `convocadosIds` se preciso.
+ *
+ * @param {import('./campaign-pool.js').JogadorCampanha[]} jogadores
+ * @param {string[]} convocadosIds mutável
+ * @param {string} selecaoId
+ * @param {number} temporadaParaIds temporada **após** o avanço (ex.: temporada + 1 antes do incremento no estado)
+ * @param {number} seedBase
+ */
+export function processarAposentadoriaERegeneracaoCampanha(
+  jogadores,
+  convocadosIds,
+  selecaoId,
+  temporadaParaIds,
+  seedBase,
+) {
+  const existing = new Set(jogadores.map((j) => j.id));
+  const fm = forcaMediaTitularesSelecao(selecaoId);
+  const { prenomes } = listasNomesCampanha(selecaoId);
+  if (!prenomes.length) return;
+
+  let regenSerial = 0;
+
+  for (let i = 0; i < jogadores.length; i++) {
+    const j = jogadores[i];
+    const idade = j.idade ?? 22;
+    const p = chanceAposentadoriaRegenPorIdade(idade);
+    if (p <= 0) continue;
+
+    const rngRoll = criarRng((seedBase ^ hashStringToSeed(j.id)) >>> 0);
+    if (rngRoll() >= p) continue;
+
+    const rng = criarRng((seedBase ^ hashStringToSeed(j.id) ^ 0xbad5eed) >>> 0);
+
+    const parts = String(j.nome || "").trim().split(/\s+/);
+    const oldPrenome = parts[0] || "Jogador";
+    const sobrenomeResto = parts.length > 1 ? parts.slice(1).join(" ") : "";
+
+    let novoPrenome = prenomes[intRngRegen(rng, 0, prenomes.length - 1)];
+    let tent = 0;
+    while (novoPrenome.toLowerCase() === oldPrenome.toLowerCase() && tent < 48) {
+      novoPrenome = prenomes[intRngRegen(rng, 0, prenomes.length - 1)];
+      tent++;
+    }
+
+    const novoNome = sobrenomeResto ? `${novoPrenome} ${sobrenomeResto}` : novoPrenome;
+
+    const novaIdade = intRngRegen(rng, 16, 18);
+    let ataque;
+    let defesa;
+    ({ ataque, defesa } = statsPorPosicaoCampanha(j.posicao, rng, fm));
+    ataque = Math.min(99, Math.max(1, ataque + intRngRegen(rng, -10, 10)));
+    defesa = Math.min(99, Math.max(1, defesa + intRngRegen(rng, -10, 10)));
+
+    const basePot = Math.max(ataque, defesa);
+    const tetoPot = Math.min(
+      99,
+      Math.max(basePot + 5, Math.round(fm + intRngRegen(rng, 6, 22))),
+    );
+    const potencial = intRngRegen(rng, basePot, Math.max(basePot, tetoPot));
+
+    existing.delete(j.id);
+    let novoId;
+    do {
+      novoId = `camp-${selecaoId}-s${temporadaParaIds}-r${String(regenSerial).padStart(5, "0")}`;
+      regenSerial++;
+    } while (existing.has(novoId));
+    existing.add(novoId);
+
+    const ci = convocadosIds.indexOf(j.id);
+    if (ci >= 0) convocadosIds[ci] = novoId;
+
+    jogadores[i] = {
+      id: novoId,
+      nome: novoNome,
+      posicao: j.posicao,
+      ataque,
+      defesa,
+      idade: novaIdade,
+      potencial,
+      forma: 100,
+    };
+  }
+}
 
 /**
  * @param {import('./campaign-pool.js').JogadorCampanha} j

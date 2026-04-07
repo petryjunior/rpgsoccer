@@ -2627,6 +2627,48 @@ body {
   margin-bottom: 0;
 }
 
+.campanha-hub-campeoes-historico {
+  margin: 0.65rem 0 0.75rem;
+  text-align: left;
+}
+
+.campanha-hub-campeoes-details {
+  margin: 0.35rem 0;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem 0.5rem;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.campanha-hub-campeoes-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--texto);
+  padding: 0.2rem 0;
+}
+
+.campanha-hub-campeoes-lista {
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+}
+
+.campanha-hub-campeoes-lista li {
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--borda);
+  font-size: 0.95rem;
+}
+
+.campanha-hub-campeoes-lista li:last-child {
+  border-bottom: none;
+}
+
+.campanha-hub-campeoes-vazio {
+  color: var(--muted);
+  font-style: italic;
+  border-bottom: none;
+}
+
 .tela-configuracoes .config-fieldset {
   margin: 1rem 0 1.25rem;
   padding: 0.75rem 1rem 1rem;

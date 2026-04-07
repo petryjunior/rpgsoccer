@@ -220,10 +220,12 @@ export function criarEventoCopaMundialCampanhaSeClassificado(
 ) {
   if (!estadoCampanha || !anoEhCopaMundialCampanha(anoCalendario)) return null;
   if (estadoCampanha.copa2030Concluida) return null;
-  const ids32 = estadoCampanha.classificadosCopa2030;
+  const idsCopa = estadoCampanha.classificadosCopa2030;
   const anoEd = estadoCampanha.copaClassificadosAno ?? ANO_COPA_MUNDO_CAMPANHA;
-  if (!Array.isArray(ids32) || ids32.length !== 32 || anoEd !== anoCalendario) return null;
-  if (!ids32.includes(estadoCampanha.selecaoId)) return null;
+  const nOk =
+    Array.isArray(idsCopa) && (idsCopa.length === 48 || idsCopa.length === 32);
+  if (!nOk || anoEd !== anoCalendario) return null;
+  if (!idsCopa.includes(estadoCampanha.selecaoId)) return null;
   const m = mesSlot === 7 ? 7 : 6;
   const pre = textoMesAno(m, anoCalendario);
   return {
