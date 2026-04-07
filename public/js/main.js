@@ -167,6 +167,7 @@ const els = {
   copaCelebracao: document.getElementById("copa-celebracao"),
   copaCelebracaoBandeira: document.getElementById("copa-celebracao-bandeira"),
   copaCelebracaoNome: document.getElementById("copa-celebracao-nome"),
+  copaCelebracaoTexto: document.getElementById("copa-celebracao-texto"),
   copaEliminacao: document.getElementById("copa-eliminacao"),
   copaEliminacaoBandeira: document.getElementById("copa-eliminacao-bandeira"),
   copaEliminacaoNome: document.getElementById("copa-eliminacao-nome"),
@@ -818,6 +819,123 @@ function htmlStatCampanhaConvocacao(j, attr) {
   return `${v} <span class="campanha-convocacao-deltas">${parts.join(" · ")}</span>`;
 }
 
+/**
+ * Jogador na lista de convocação (campanha ou Copa).
+ * @typedef {{ nome: string, ataque: number, defesa: number, idade?: number }} ConvocacaoJogadorLike
+ */
+
+/** Opções do select «Ordenar por» em cada posição (campanha / Copa). */
+const CONVOCACAO_ORDENACAO_OPCOES = [
+  { value: "nome-asc", label: "Nome (A–Z)" },
+  { value: "nome-desc", label: "Nome (Z–A)" },
+  { value: "ataque-desc", label: "Ataque (maior primeiro)" },
+  { value: "ataque-asc", label: "Ataque (menor primeiro)" },
+  { value: "defesa-desc", label: "Defesa (maior primeiro)" },
+  { value: "defesa-asc", label: "Defesa (menor primeiro)" },
+  { value: "idade-desc", label: "Idade (mais velho primeiro)" },
+  { value: "idade-asc", label: "Idade (mais novo primeiro)" },
+];
+
+/**
+ * @param {ConvocacaoJogadorLike} j
+ * @returns {number | null}
+ */
+function idadeConvocacaoNum(j) {
+  if (j != null && typeof j === "object" && "idade" in j && Number.isFinite(/** @type {{ idade?: number }} */ (j).idade)) {
+    return /** @type {number} */ (/** @type {{ idade: number }} */ (j).idade);
+  }
+  return null;
+}
+
+/**
+ * @param {ConvocacaoJogadorLike[]} grupo
+ * @param {string} modo valor de CONVOCACAO_ORDENACAO_OPCOES
+ * @returns {ConvocacaoJogadorLike[]}
+ */
+function ordenarGrupoConvocacao(grupo, modo) {
+  const arr = grupo.slice();
+  const nomeCmp = (a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" });
+  switch (modo) {
+    case "nome-desc":
+      return arr.sort((a, b) => nomeCmp(b, a));
+    case "ataque-desc":
+      return arr.sort((a, b) => b.ataque - a.ataque || nomeCmp(a, b));
+    case "ataque-asc":
+      return arr.sort((a, b) => a.ataque - b.ataque || nomeCmp(a, b));
+    case "defesa-desc":
+      return arr.sort((a, b) => b.defesa - a.defesa || nomeCmp(a, b));
+    case "defesa-asc":
+      return arr.sort((a, b) => a.defesa - b.defesa || nomeCmp(a, b));
+    case "idade-desc": {
+      const key = (/** @type {ConvocacaoJogadorLike} */ j) => {
+        const n = idadeConvocacaoNum(j);
+        return n == null ? -1 : n;
+      };
+      return arr.sort((a, b) => key(b) - key(a) || nomeCmp(a, b));
+    }
+    case "idade-asc": {
+      const key = (/** @type {ConvocacaoJogadorLike} */ j) => {
+        const n = idadeConvocacaoNum(j);
+        return n == null ? 999 : n;
+      };
+      return arr.sort((a, b) => key(a) - key(b) || nomeCmp(a, b));
+    }
+    case "nome-asc":
+    default:
+      return arr.sort(nomeCmp);
+  }
+}
+
+/**
+ * Barra «Ordenar por» + lista reordenável (mesma UI na campanha e na Copa).
+ * @param {import('./constants.js').Position} pos
+ * @param {ConvocacaoJogadorLike[]} grupo
+ * @param {string} idPrefix ex.: "camp-conv" | "copa-conv"
+ * @param {(j: ConvocacaoJogadorLike) => HTMLElement} criarLinha
+ */
+function montarSecaoConvocacaoComOrdenacao(pos, grupo, idPrefix, criarLinha) {
+  const sec = document.createElement("section");
+  sec.className = "campanha-convocacao-secao";
+  const h = document.createElement("h3");
+  h.className = "campanha-convocacao-secao-titulo";
+  h.textContent = `${CAMPANHA_POS_SECAO_TITULO[pos]} (${grupo.length})`;
+  sec.appendChild(h);
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "campanha-convocacao-secao-toolbar";
+  const lab = document.createElement("label");
+  lab.className = "campanha-convocacao-toolbar-label";
+  const selId = `${idPrefix}-ord-${pos}`;
+  lab.htmlFor = selId;
+  lab.textContent = "Ordenar por";
+  const sel = document.createElement("select");
+  sel.id = selId;
+  sel.className = "campanha-convocacao-ordenacao";
+  sel.setAttribute("aria-label", `Ordenar lista: ${CAMPANHA_POS_SECAO_TITULO[pos]}`);
+  for (const o of CONVOCACAO_ORDENACAO_OPCOES) {
+    const opt = document.createElement("option");
+    opt.value = o.value;
+    opt.textContent = o.label;
+    sel.appendChild(opt);
+  }
+  toolbar.append(lab, sel);
+
+  const inner = document.createElement("div");
+  inner.className = "campanha-convocacao-secao-lista";
+
+  const preencher = (modo) => {
+    const ord = ordenarGrupoConvocacao(grupo, modo);
+    inner.replaceChildren();
+    for (const j of ord) inner.appendChild(criarLinha(j));
+  };
+
+  preencher(sel.value);
+  sel.addEventListener("change", () => preencher(sel.value));
+
+  sec.append(toolbar, inner);
+  return sec;
+}
+
 /** @type {{ titulares: object[], reservas: object[] }} */
 let timeJogador = { titulares: [], reservas: [] };
 /** @type {{ titulares: object[], reservas: object[] }} */
@@ -955,6 +1073,21 @@ function opcoesValidarElencoCpu() {
  * }}
  */
 let copaEstado = null;
+
+/**
+ * Campanha «acompanhar»: flag explícita ou save antigo (slot técnico ≠ seleção da campanha).
+ * @param {object | null | undefined} est
+ */
+function copaModoEspectadorCampanhaAtivo(est) {
+  if (!est) return false;
+  if (est.copaEspectadorCampanha) return true;
+  return Boolean(
+    est.origemCampanha &&
+      est.selecaoCampanhaOrigem &&
+      est.playerTeamId &&
+      est.playerTeamId !== est.selecaoCampanhaOrigem,
+  );
+}
 
 /** Partida de mata-mata (permite prorrogação se empatar). */
 let copaPartidaKnockout = false;
@@ -3198,15 +3331,21 @@ function mostrarTelaCopaCampeao() {
     els.copaCelebracaoBandeira.src = urlBandeira(sel.iso, 160);
     els.copaCelebracaoBandeira.alt = `Bandeira de ${sel.nome}`;
   }
+  const espectadorCamp = copaModoEspectadorCampanhaAtivo(copaEstado);
+  if (els.copaCelebracaoTexto) {
+    els.copaCelebracaoTexto.textContent = espectadorCamp
+      ? "Modo acompanhamento: a sua seleção na campanha não disputou esta Copa entre as 48 vagas. O resultado acima é só o campeão simulado — não é a sua conquista como técnico."
+      : "Você comandou esta seleção até o topo. A taça é sua — parabéns pela campanha.";
+  }
   if (els.copaCelebracao) els.copaCelebracao.hidden = false;
   if (els.copaHubMsg) {
     els.copaHubMsg.hidden = false;
-    els.copaHubMsg.textContent = copaEstado?.copaEspectadorCampanha
+    els.copaHubMsg.textContent = espectadorCamp
       ? "Modo acompanhamento: chave completa e artilheiros. Use «Ver tabela» para as classificações dos 12 grupos."
       : "Abaixo: chave completa, artilheiros da campanha e opção de salvar este título no dispositivo.";
   }
   copaHubBotoesJogoOcultar();
-  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = !copaEstado?.copaEspectadorCampanha;
+  if (els.btnCopaVerTabela) els.btnCopaVerTabela.hidden = !espectadorCamp;
   if (els.btnCopaVoltarInicioHub) {
     els.btnCopaVoltarInicioHub.hidden = false;
     els.btnCopaVoltarInicioHub.textContent = copaEstado?.origemCampanha
@@ -4892,7 +5031,7 @@ function pintarCampanhaConvocacaoLista() {
     );
     const statsWrap = document.createElement("span");
     statsWrap.className = "campanha-jogador-stats";
-    statsWrap.innerHTML = `${htmlStatCampanhaConvocacao(j, "ataque")}/${htmlStatCampanhaConvocacao(j, "defesa")}`;
+    statsWrap.innerHTML = `<span class="campanha-stat-pair" title="Ataque"><span class="campanha-stat-abbr">Atq</span> ${htmlStatCampanhaConvocacao(j, "ataque")}</span><span class="campanha-stat-sep"> · </span><span class="campanha-stat-pair" title="Defesa"><span class="campanha-stat-abbr">Def</span> ${htmlStatCampanhaConvocacao(j, "defesa")}</span>`;
     meta.appendChild(statsWrap);
     row.append(cb, meta);
     row.addEventListener("click", (ev) => {
@@ -4917,21 +5056,11 @@ function pintarCampanhaConvocacaoLista() {
   };
 
   for (const pos of POSITION_SORT_ORDER) {
-    const grupo = campanhaEstadoMemoria.jogadores
-      .filter((j) => j.posicao === pos)
-      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    const grupo = campanhaEstadoMemoria.jogadores.filter((j) => j.posicao === pos);
     if (!grupo.length) continue;
-    const sec = document.createElement("section");
-    sec.className = "campanha-convocacao-secao";
-    const h = document.createElement("h3");
-    h.className = "campanha-convocacao-secao-titulo";
-    h.textContent = `${CAMPANHA_POS_SECAO_TITULO[pos]} (${grupo.length})`;
-    sec.appendChild(h);
-    const inner = document.createElement("div");
-    inner.className = "campanha-convocacao-secao-lista";
-    for (const j of grupo) inner.appendChild(criarLinha(j));
-    sec.appendChild(inner);
-    els.campanhaConvocacaoLista.appendChild(sec);
+    els.campanhaConvocacaoLista.appendChild(
+      montarSecaoConvocacaoComOrdenacao(pos, grupo, "camp-conv", criarLinha),
+    );
   }
   atualizarUiConvocacaoContador();
 }
@@ -4951,7 +5080,7 @@ function atualizarUiConvocacaoContador() {
 function pintarCopaConvocacaoLista() {
   if (!els.copaConvocacaoLista || !copaElencoPool.length) return;
   els.copaConvocacaoLista.replaceChildren();
-  const criarLinha = (/** @type {{ id: string, nome: string, posicao: import('./constants.js').Position, ataque: number, defesa: number }} */ j) => {
+  const criarLinha = (/** @type {{ id: string, nome: string, posicao: import('./constants.js').Position, ataque: number, defesa: number, idade?: number }} */ j) => {
     const row = document.createElement("label");
     row.className = "campanha-jogador-linha";
     if (copaConvocadosPendentesCopa.has(j.id)) row.classList.add("campanha-jogador-linha--marcado");
@@ -4970,7 +5099,7 @@ function pintarCopaConvocacaoLista() {
     );
     const statsWrap = document.createElement("span");
     statsWrap.className = "campanha-jogador-stats";
-    statsWrap.textContent = `${j.ataque} / ${j.defesa}`;
+    statsWrap.innerHTML = `<span class="campanha-stat-pair" title="Ataque"><span class="campanha-stat-abbr">Atq</span> ${j.ataque}</span><span class="campanha-stat-sep"> · </span><span class="campanha-stat-pair" title="Defesa"><span class="campanha-stat-abbr">Def</span> ${j.defesa}</span>`;
     meta.appendChild(statsWrap);
     row.append(cb, meta);
     row.addEventListener("click", (ev) => {
@@ -4994,21 +5123,11 @@ function pintarCopaConvocacaoLista() {
     return row;
   };
   for (const pos of POSITION_SORT_ORDER) {
-    const grupo = copaElencoPool
-      .filter((j) => j.posicao === pos)
-      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    const grupo = copaElencoPool.filter((j) => j.posicao === pos);
     if (!grupo.length) continue;
-    const sec = document.createElement("section");
-    sec.className = "campanha-convocacao-secao";
-    const h = document.createElement("h3");
-    h.className = "campanha-convocacao-secao-titulo";
-    h.textContent = `${CAMPANHA_POS_SECAO_TITULO[pos]} (${grupo.length})`;
-    sec.appendChild(h);
-    const inner = document.createElement("div");
-    inner.className = "campanha-convocacao-secao-lista";
-    for (const j of grupo) inner.appendChild(criarLinha(j));
-    sec.appendChild(inner);
-    els.copaConvocacaoLista.appendChild(sec);
+    els.copaConvocacaoLista.appendChild(
+      montarSecaoConvocacaoComOrdenacao(pos, grupo, "copa-conv", criarLinha),
+    );
   }
   atualizarUiCopaConvocacaoContador();
 }
@@ -6620,7 +6739,13 @@ function avancarEliminatoriaCopa(adiarIrParaHub = false) {
   }
 
   if (fase === "final") {
-    copaEstado.campeaoId = copaEstado.playerTeamId;
+    const j0 = lista[0];
+    let w = j0?.winnerId;
+    if (!w && j0) {
+      w = simularJogoCpuVsCpu(j0);
+      j0.winnerId = w;
+    }
+    if (w) copaEstado.campeaoId = w;
     copaEstado.faseCopa = "campeao";
     ir(() => mostrarTelaCopaCampeao());
   }

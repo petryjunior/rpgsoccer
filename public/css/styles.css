@@ -2408,6 +2408,50 @@ body {
   letter-spacing: 0.02em;
 }
 
+.campanha-convocacao-secao-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  margin: 0 0 0.4rem;
+  flex-wrap: wrap;
+}
+
+.campanha-convocacao-toolbar-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.campanha-convocacao-ordenacao {
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.28rem 0.5rem;
+  border-radius: 6px;
+  background: var(--fundo, var(--painel));
+  color: var(--texto);
+  border: 1px solid var(--borda);
+  max-width: min(100%, 22rem);
+  cursor: pointer;
+}
+
+.campanha-stat-abbr {
+  font-size: 0.78em;
+  font-weight: 700;
+  color: var(--muted);
+  margin-right: 0.12em;
+  letter-spacing: 0.03em;
+}
+
+.campanha-stat-pair {
+  white-space: nowrap;
+}
+
+.campanha-stat-sep {
+  color: var(--muted);
+  font-weight: 400;
+}
+
 .campanha-convocacao-secao-lista {
   display: flex;
   flex-direction: column;
