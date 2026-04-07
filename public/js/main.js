@@ -60,7 +60,7 @@ import {
   simularPlacar,
   simularPlacarCopaMundial,
   COPA_BONUS_MANDANTE_GRUPO,
-  COPA_BONUS_MANDANTE_KO,
+  forcaEfetivaSimulacaoCopa,
   simularRodadaGruposExcetoJogoHumano,
   simularRodadaGruposCopaTodasAsPartidas,
   sortearGrupos,
@@ -3381,7 +3381,7 @@ function simularProximoJogoCopaNoHub() {
   const fh = forcaSelecaoId(copaEstado.playerTeamId);
   const fa = forcaSelecaoId(cpuId);
   const { gh, ga } = simularPlacarSemEmpate(fh, fa, copaEstado.rng, (fc, ff, r) =>
-    simularPlacarCopaMundial(fc, ff, r, 1.5),
+    simularPlacarCopaMundial(fc, ff, r, 0),
   );
   golsJogador = gh;
   golsCpu = ga;
@@ -6301,7 +6301,7 @@ function forcaSelecaoId(id) {
 }
 
 /**
- * Sem empate no placar final. `placarFn` recebe (fCasa, fFora, rng); use wrapper para Copa com bônus mandante.
+ * Sem empate no placar final. `placarFn` recebe (fCasa, fFora, rng); na Copa use `simularPlacarCopaMundial` com bônus 0 (neutro).
  * @param {(fCasa: number, fFora: number, rng: () => number) => { gh: number, ga: number }} [placarFn]
  */
 function simularPlacarSemEmpate(fHome, fAway, rng, placarFn = simularPlacar) {
@@ -6522,18 +6522,25 @@ function completarEliminatoriaAposEliminacaoHumana(faseInicial) {
 }
 
 function simularJogoCpuVsCpu(
-  /** @type {{ homeId: string, awayId: string, winnerId?: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }} */ jogo,
+  /** @type {{ fase?: string, homeId: string, awayId: string, winnerId?: string | null, gh?: number, ga?: number, penGh?: number, penGa?: number }} */ jogo,
 ) {
   if (!copaEstado) return jogo.homeId;
   const { homeId, awayId } = jogo;
   const fh = forcaSelecaoId(homeId);
   const fa = forcaSelecaoId(awayId);
-  let { gh, ga } = simularPlacarCopaMundial(fh, fa, copaEstado.rng, COPA_BONUS_MANDANTE_KO);
+  let { gh, ga } = simularPlacarCopaMundial(fh, fa, copaEstado.rng, 0);
   const g =
     gh === ga
-      ? copaEstado.rng() < (fh + COPA_BONUS_MANDANTE_KO) / (fh + fa + COPA_BONUS_MANDANTE_KO)
-        ? { gh: gh + 1, ga }
-        : { gh, ga: ga + 1 }
+      ? (() => {
+          const efC = Math.max(0.01, forcaEfetivaSimulacaoCopa(fh));
+          const efF = Math.max(0.01, forcaEfetivaSimulacaoCopa(fa));
+          const wMand = Math.pow(efC, 1.22);
+          const wVis = Math.pow(efF, 1.22);
+          const pMandDecide = wMand / (wMand + wVis);
+          return copaEstado.rng() < pMandDecide
+            ? { gh: gh + 1, ga }
+            : { gh, ga: ga + 1 };
+        })()
       : { gh, ga };
   jogo.gh = g.gh;
   jogo.ga = g.ga;

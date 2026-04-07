@@ -564,24 +564,54 @@ export function simularPlacar(fCasa, fFora, rng) {
   return { gh: poisson(lc, rng), ga: poisson(lv, rng) };
 }
 
-/** Leve vantagem de mandante na fase de grupos da Copa (CPU×CPU). */
-export const COPA_BONUS_MANDANTE_GRUPO = 1.35;
+/** Copa do Mundo: campo neutro — sem bônus ao “mandante” (slot casa só organiza a UI / chave). */
+export const COPA_BONUS_MANDANTE_GRUPO = 0;
 
-/** Vantagem de mandante no mata-mata da Copa. */
-export const COPA_BONUS_MANDANTE_KO = 2.25;
+export const COPA_BONUS_MANDANTE_KO = 0;
+
+export const COPA_BONUS_MANDANTE_FINAL = 0;
 
 /**
- * Copa do Mundo (simulação CPU): lambdas mais sensíveis à diferença de qualidade entre seleções,
- * para zebras raras e favoritos mais consistentes que `simularPlacar` genérico.
- * @param {number} bonusCasa somado à força da casa (mandante)
+ * Abaixo disto a força na simulação = valor linear (seleções mais fracas).
+ * Acima: curva potência para separar melhor médios vs elites sem alterar a média mostrada ao jogador.
+ */
+const COPA_SIM_FORCA_REF = 52;
+
+/** Expoente > 1 amplifica diferenças entre forças acima de `COPA_SIM_FORCA_REF`. */
+const COPA_SIM_FORCA_POW = 1.17;
+
+/**
+ * Força efetiva na fórmula de λ da Copa. Valores menores → mais impacto da diferença (fCasa − fFora).
+ */
+const COPA_SIM_DIVISOR_FORCA = 7.25;
+
+/**
+ * Peso da diferença normalizada nas λ da Copa.
+ */
+const COPA_SIM_K_LAMBDA = 1.14;
+
+/**
+ * Mapeia a média de força do elenco (como em `forcaMediaSelecao`) para o eixo usado nas λ da Copa.
+ * @param {number} f
+ */
+export function forcaEfetivaSimulacaoCopa(f) {
+  if (f <= COPA_SIM_FORCA_REF) return f;
+  return COPA_SIM_FORCA_REF + Math.pow(f - COPA_SIM_FORCA_REF, COPA_SIM_FORCA_POW);
+}
+
+/**
+ * Copa do Mundo (simulação CPU): lambdas (Poisson) com diferença de qualidade bem marcada — mata-mata
+ * em jogo único com λ baixos empurra seleções médias longe demais; base e divisor calibrados para
+ * reduzir “árvores” improváveis sem campo neutro artificial.
+ * @param {number} bonusCasa somado à força do slot “casa” (0 na Copa: neutro)
  */
 export function simularPlacarCopaMundial(fCasa, fFora, rng, bonusCasa = 0) {
-  const fc = fCasa + bonusCasa;
-  const diff = (fc - fFora) / 14.5;
-  const base = 1.02;
-  const k = 0.78;
-  const lc = Math.max(0.14, base + diff * k);
-  const lv = Math.max(0.14, base - diff * k);
+  const fc = forcaEfetivaSimulacaoCopa(fCasa) + bonusCasa;
+  const fa = forcaEfetivaSimulacaoCopa(fFora);
+  const diff = (fc - fa) / COPA_SIM_DIVISOR_FORCA;
+  const base = 1.08;
+  const lc = Math.max(0.14, base + diff * COPA_SIM_K_LAMBDA);
+  const lv = Math.max(0.14, base - diff * COPA_SIM_K_LAMBDA);
   return { gh: poisson(lc, rng), ga: poisson(lv, rng) };
 }
 
