@@ -14,6 +14,7 @@ import { escalaçãoInicialDeConvocados23, podeMontarEscalaçãoCompleta23 } fro
 
 /**
  * Cópia superficial para o motor da partida (evita mutar o save diretamente).
+ * Inclui `idade` para exibição na escalação; o restante do estado de campanha fica só no save.
  * @param {import('./campaign-pool.js').JogadorCampanha} j
  */
 export function jogadorCampanhaParaPartida(j) {
@@ -23,6 +24,7 @@ export function jogadorCampanhaParaPartida(j) {
     posicao: j.posicao,
     ataque: j.ataque,
     defesa: j.defesa,
+    idade: j.idade,
   };
 }
 
@@ -147,6 +149,10 @@ export function criarEstadoCampanhaNovo(selecaoId, todosIdsSelecoes) {
     campanhaUltimoMesOscStats: 3,
     historicoEventosCampanha: [],
     historicoCampeoes: [],
+    campanhaLesoesHumano: {},
+    campanhaJogosSuspensao: {},
+    campanhaAmarelosAcumulado: {},
+    campanhaSuspensaoRelatorioFim: [],
   };
   const { eventos, torneioContinental, eliminatoriasCopa } = criarCalendarioTemporada(
     selecaoId,

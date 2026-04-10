@@ -161,6 +161,18 @@ function randomName() {
   return s2 ? `${base} ${s2}` : base;
 }
 
+/** Idade estável 18–35 para elencos de seleção (mesmo nome+posição → mesma idade). */
+function idadeDeterministicaSelecao(nome, posicao) {
+  let h = 2166136261;
+  for (let i = 0; i < nome.length; i++) {
+    h ^= nome.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  h ^= posicao.charCodeAt(0) + (posicao.length << 8);
+  h >>>= 0;
+  return 18 + (h % 18);
+}
+
 /**
  * @param {import('./constants.js').Position} position
  * @returns {{ ataque: number, defesa: number }}
@@ -188,7 +200,7 @@ function sortearStatsPorPosicao(position) {
 
 /**
  * @param {import('./constants.js').Position} position
- * @returns {{ id: string, nome: string, posicao: import('./constants.js').Position, ataque: number, defesa: number }}
+ * @returns {{ id: string, nome: string, posicao: import('./constants.js').Position, ataque: number, defesa: number, idade: number }}
  */
 export function criarJogador(position) {
   const id = `p${++idSeq}`;
@@ -199,6 +211,7 @@ export function criarJogador(position) {
     posicao: position,
     ataque,
     defesa,
+    idade: randomInt(18, 35),
   };
 }
 
@@ -208,17 +221,23 @@ export function criarJogador(position) {
  * @param {import('./constants.js').Position} posicao
  * @param {number} ataque
  * @param {number} defesa
+ * @param {number} [idadeOpt] se omitido, idade 18–35 determinística por nome+posição
  */
-export function criarJogadorFixo(nome, posicao, ataque, defesa) {
+export function criarJogadorFixo(nome, posicao, ataque, defesa, idadeOpt) {
   const id = `p${++idSeq}`;
   const a = Math.min(99, Math.max(1, Math.round(ataque)));
   const d = Math.min(99, Math.max(1, Math.round(defesa)));
+  const idade =
+    idadeOpt != null && Number.isFinite(Number(idadeOpt))
+      ? Math.min(45, Math.max(16, Math.round(Number(idadeOpt))))
+      : idadeDeterministicaSelecao(nome, posicao);
   return {
     id,
     nome,
     posicao,
     ataque: a,
     defesa: d,
+    idade,
   };
 }
 

@@ -180,33 +180,67 @@ export function incrementarIdadeElencoCampanha(jogadores) {
 
 /**
  * Após uma partida: oscilações maiores no mesmo ano (forma + ruído; viés por idade).
+ * Opcional: `minutosPorJogadorId` — só quem jogou >0 min recebe intensidade extra (jovem sobe mais, veterano desce mais).
+ * Opcional: `idsBonusAttrMaiorInicio` — bónus raro (ex.: atributo acima do snapshot do após duelos fortes).
  * @param {import('./campaign-pool.js').JogadorCampanha[]} todosJogadores
  * @param {Set<string>} idsConvocados
  * @param {number} seed
+ * @param {{
+ *   minutosPorJogadorId?: Map<string, number>,
+ *   idsBonusAttrMaiorInicio?: Set<string>,
+ * }} [opts]
  */
-export function aplicarEfeitoPosPartidaCampanha(todosJogadores, idsConvocados, seed) {
+export function aplicarEfeitoPosPartidaCampanha(todosJogadores, idsConvocados, seed, opts = {}) {
+  const minutosMap = opts.minutosPorJogadorId instanceof Map ? opts.minutosPorJogadorId : null;
+  const bonusAttr = opts.idsBonusAttrMaiorInicio instanceof Set ? opts.idsBonusAttrMaiorInicio : null;
   const rng = criarRng((seed ^ 0x9e3779b9) >>> 0);
   for (const j of todosJogadores) {
     if (!idsConvocados.has(j.id)) continue;
+    const mp = minutosMap?.get(j.id) ?? 0;
+    const temMinutos = mp > 0;
+    const fMin = temMinutos ? Math.min(1, mp / 90) : 0;
+
     const fator = (j.forma - 100) / 200;
     const delta = Math.round((rng() - 0.5) * 10 + fator * 4);
     const sub = fatorTendenciaSubidaIdade(j.idade);
     const queda = fatorTendenciaQuedaIdade(j.idade);
-    const pJovem = 0.1 + sub * 0.32;
-    const pVelho = 0.08 + queda * 0.28;
+    let pJovem = 0.1 + sub * 0.32;
+    let pVelho = 0.08 + queda * 0.28;
+    if (temMinutos) {
+      if (sub > 0) pJovem *= 1 + 0.5 * fMin;
+      if (queda > 0) pVelho *= 1 + 0.45 * fMin;
+      const cap = pJovem + pVelho;
+      if (cap > 0.86) {
+        const t = 0.86 / cap;
+        pJovem *= t;
+        pVelho *= t;
+      }
+    }
     const trip = rng();
-    const magPeq = () => (rng() < 0.55 ? 1 : 2);
+    const magPeq = () => {
+      const base = rng() < 0.55 ? 1 : 2;
+      if (!temMinutos) return base;
+      const extra = fMin >= 0.55 ? 2 : fMin >= 0.22 ? 1 : 0;
+      return base + extra;
+    };
     if (trip < pJovem && rng() < 0.5) {
       if (rng() < 0.5) aplicarDeltaAttr(j, "ataque", magPeq());
       else aplicarDeltaAttr(j, "defesa", magPeq());
     } else if (trip < pJovem + pVelho && rng() < 0.46) {
-      const m = rng() < 0.65 ? 1 : 2;
+      let m = rng() < 0.65 ? 1 : 2;
+      if (temMinutos && queda > 0) {
+        m = Math.max(1, m - (fMin >= 0.5 && rng() < 0.35 ? 1 : 0));
+      }
       if (rng() < 0.5) aplicarDeltaAttr(j, "ataque", -m);
       else aplicarDeltaAttr(j, "defesa", -m);
     } else if (delta !== 0 && rng() < 0.62) {
       const d = Math.max(-4, Math.min(4, delta));
       if (rng() < 0.5) aplicarDeltaAttr(j, "ataque", d);
       else aplicarDeltaAttr(j, "defesa", d);
+    }
+    if (bonusAttr?.has(j.id) && rng() < 0.32) {
+      if (rng() < 0.5) aplicarDeltaAttr(j, "ataque", 1);
+      else aplicarDeltaAttr(j, "defesa", 1);
     }
     clampStatValues(j);
   }

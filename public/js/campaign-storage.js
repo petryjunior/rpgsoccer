@@ -11,7 +11,7 @@ import {
 } from "./campaign-wc-qualifiers.js";
 
 const STORAGE_KEY = "qwerty-football-campanha-v1";
-export const CAMPANHA_FORMAT_VERSION = 8;
+export const CAMPANHA_FORMAT_VERSION = 9;
 
 /**
  * @typedef {import('./campaign-pool.js').JogadorCampanha} JogadorCampanha
@@ -41,6 +41,11 @@ export const CAMPANHA_FORMAT_VERSION = 8;
  *   historicoEventosCampanha?: { ano: number, eventos: import('./campaign-calendar.js').EventoCampanha[] }[],
  *   historicoCampeoes?: { chave: string, ano: number, competicao: string, vencedorId: string }[],
  *   savedAt?: string,
+ *   campanhaLesoesHumano?: Record<string, { partidasFora: number }>,
+ *   campanhaJogosSuspensao?: Record<string, number>,
+ *   campanhaAmarelosAcumulado?: Record<string, number>,
+ *   campanhaSuspensaoRelatorioFim?: { nome: string, motivo: "vermelho" | "dois amarelos" | "tres amarelos" }[],
+ *   _snapCampanhaCompInicioPartida?: { jogosSuspensao: Record<string, number>, lesoesHumano: Record<string, { partidasFora: number }> } | null,
  * }} CampanhaEstadoPersistido
  */
 
@@ -90,6 +95,18 @@ function migrarCampanhaV6ParaV7(d) {
 function migrarCampanhaV7ParaV8(d) {
   d.formatVersion = 8;
   if (!Array.isArray(d.historicoCampeoes)) d.historicoCampeoes = [];
+}
+
+/** Disciplina + lesões persistentes (torneio continental / eliminatórias WCQ na campanha). */
+function migrarCampanhaV8ParaV9(d) {
+  d.formatVersion = 9;
+  if (!d.campanhaLesoesHumano || typeof d.campanhaLesoesHumano !== "object") d.campanhaLesoesHumano = {};
+  if (!d.campanhaJogosSuspensao || typeof d.campanhaJogosSuspensao !== "object") d.campanhaJogosSuspensao = {};
+  if (!d.campanhaAmarelosAcumulado || typeof d.campanhaAmarelosAcumulado !== "object") {
+    d.campanhaAmarelosAcumulado = {};
+  }
+  if (!Array.isArray(d.campanhaSuspensaoRelatorioFim)) d.campanhaSuspensaoRelatorioFim = [];
+  delete d._snapCampanhaCompInicioPartida;
 }
 
 /**
@@ -167,6 +184,10 @@ export function carregarCampanhaAtiva() {
     }
     if (d.formatVersion === 7) {
       migrarCampanhaV7ParaV8(d);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+    }
+    if (d.formatVersion === 8) {
+      migrarCampanhaV8ParaV9(d);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
     }
     if (d.formatVersion !== CAMPANHA_FORMAT_VERSION) return null;

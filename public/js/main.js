@@ -308,6 +308,8 @@ const MIN_JOGADORES_EM_CAMPO = 7;
 const statsBasePartida = new Map();
 /** Stats ao entrar no jogo (amistoso) — restauradas a cada nova partida. */
 const statsElencoLimpo = new Map();
+/** Campanha: minutos em campo como titular (humano) na partida atual. */
+const minutosCampanhaPartidaPorId = new Map();
 /** @type {Map<string, number>} faltas no jogo por id do jogador */
 const faltasPorJogador = new Map();
 /** @type {Map<string, { ataque: number, defesa: number }>} vitórias seguidas por papel (ataque/defesa) */
@@ -391,6 +393,81 @@ function snapshotElencoLimpo() {
   }
 }
 
+function resetMinutosCampanhaPartida() {
+  minutosCampanhaPartidaPorId.clear();
+}
+
+/** Soma `delta` minutos a cada titular atual do humano (só campanha, partida ativa). */
+function creditarMinutosCampanhaHumanoPorDeltaTitulares(delta) {
+  const d = Math.floor(Number(delta));
+  if (tipoModoJogo !== "campanha" || !partidaAtiva || d <= 0) return;
+  for (const j of timeJogador.titulares) {
+    minutosCampanhaPartidaPorId.set(j.id, (minutosCampanhaPartidaPorId.get(j.id) ?? 0) + d);
+  }
+}
+
+/** Bónus raro: algum atributo acima do snapshot do apito (ex.: duelos sem desgaste líquido). */
+function coletarIdsBonusAttrCampanhaHumano() {
+  const out = new Set();
+  if (tipoModoJogo !== "campanha") return out;
+  for (const j of [...timeJogador.titulares, ...timeJogador.reservas]) {
+    const s = statsElencoLimpo.get(j.id);
+    if (!s) continue;
+    if (j.ataque > s.ataque || j.defesa > s.defesa) out.add(j.id);
+  }
+  return out;
+}
+
+/** @returns {import('./campaign-calendar.js').EventoCampanha | null} */
+function campanhaEventoDePartidaAtual() {
+  if (tipoModoJogo !== "campanha" || !campanhaEstadoMemoria || !campanhaEventoAtualId) return null;
+  return campanhaEstadoMemoria.eventos.find((e) => e.id === campanhaEventoAtualId) ?? null;
+}
+
+function campanhaDisciplinaCompeticaoAtiva() {
+  const ev = campanhaEventoDePartidaAtual();
+  return Boolean(ev && (ev.tipo === "torneio_continental" || ev.tipo === "eliminatorias_copa"));
+}
+
+function campanhaDisciplinaEliminatoriasCopa() {
+  const ev = campanhaEventoDePartidaAtual();
+  return Boolean(ev && ev.tipo === "eliminatorias_copa");
+}
+
+function campanhaLesoesPersistentesCompeticao() {
+  const ev = campanhaEventoDePartidaAtual();
+  return Boolean(ev && ev.tipo === "torneio_continental");
+}
+
+function garantirCamposDisciplinaCampanhaNoEstado() {
+  if (!campanhaEstadoMemoria) return;
+  const est = campanhaEstadoMemoria;
+  if (!est.campanhaLesoesHumano || typeof est.campanhaLesoesHumano !== "object") {
+    est.campanhaLesoesHumano = {};
+  }
+  if (!est.campanhaJogosSuspensao || typeof est.campanhaJogosSuspensao !== "object") {
+    est.campanhaJogosSuspensao = {};
+  }
+  if (!est.campanhaAmarelosAcumulado || typeof est.campanhaAmarelosAcumulado !== "object") {
+    est.campanhaAmarelosAcumulado = {};
+  }
+  if (!Array.isArray(est.campanhaSuspensaoRelatorioFim)) est.campanhaSuspensaoRelatorioFim = [];
+}
+
+/** Igual à Copa: snapshot no apito para consumir suspensão/lesão após a partida (jogo real ou simulação no hub). */
+function gravarSnapshotDisciplinaCampanhaCompSeAtiva() {
+  if (tipoModoJogo !== "campanha" || !campanhaEstadoMemoria || !campanhaDisciplinaCompeticaoAtiva()) return;
+  garantirCamposDisciplinaCampanhaNoEstado();
+  const est = campanhaEstadoMemoria;
+  const lh = est.campanhaLesoesHumano ?? {};
+  est._snapCampanhaCompInicioPartida = {
+    jogosSuspensao: { ...(est.campanhaJogosSuspensao ?? {}) },
+    lesoesHumano: Object.fromEntries(
+      Object.keys(lh).map((k) => [k, { partidasFora: lh[k].partidasFora }]),
+    ),
+  };
+}
+
 function restaurarElencoParaNovaPartida() {
   for (const j of [
     ...timeJogador.titulares,
@@ -428,8 +505,15 @@ function timeDoElenco(j) {
   return timeCpu;
 }
 
-/** Titular na Copa: lesão ou suspensão ativa no seu time. */
+/** Titular bloqueado por lesão/suspensão (Copa ou competições de campanha com disciplina). */
 function jogadorHumanoBloqueadoTitularCopa(nome) {
+  if (tipoModoJogo === "campanha" && campanhaDisciplinaCompeticaoAtiva() && campanhaEstadoMemoria && metaSelecaoJogador) {
+    garantirCamposDisciplinaCampanhaNoEstado();
+    const k = chaveArtilheiroCopa(metaSelecaoJogador.id, nome);
+    const les = campanhaEstadoMemoria.campanhaLesoesHumano?.[k]?.partidasFora ?? 0;
+    const sus = campanhaEstadoMemoria.campanhaJogosSuspensao?.[k] ?? 0;
+    return les > 0 || sus > 0;
+  }
   if (tipoModoJogo !== "copa" || !copaEstado || !metaSelecaoJogador) return false;
   const k = chaveArtilheiroCopa(metaSelecaoJogador.id, nome);
   const les = copaEstado.lesoesHumano?.[k]?.partidasFora ?? 0;
@@ -442,8 +526,31 @@ function jogadorHumanoBloqueadoTitularCopa(nome) {
  * @param {"amarelo" | "vermelho"} tipo
  */
 function registrarDisciplinaCopaHumanoAposCartao(j, tipo) {
-  if (tipoModoJogo !== "copa" || !copaEstado || !metaSelecaoJogador) return;
   if (timeDoElenco(j) !== timeJogador) return;
+  if (tipoModoJogo === "campanha" && campanhaDisciplinaCompeticaoAtiva() && campanhaEstadoMemoria && metaSelecaoJogador) {
+    garantirCamposDisciplinaCampanhaNoEstado();
+    const est = campanhaEstadoMemoria;
+    const k = chaveArtilheiroCopa(metaSelecaoJogador.id, j.nome);
+    if (tipo === "vermelho") {
+      est.campanhaAmarelosAcumulado[k] = 0;
+      est.campanhaJogosSuspensao[k] = 1;
+      est.campanhaSuspensaoRelatorioFim.push({ nome: j.nome, motivo: "vermelho" });
+      return;
+    }
+    const limiteAmarelos = campanhaDisciplinaEliminatoriasCopa() ? 3 : 2;
+    const ac = (est.campanhaAmarelosAcumulado[k] ?? 0) + 1;
+    est.campanhaAmarelosAcumulado[k] = ac;
+    if (ac >= limiteAmarelos) {
+      est.campanhaAmarelosAcumulado[k] = 0;
+      est.campanhaJogosSuspensao[k] = 1;
+      est.campanhaSuspensaoRelatorioFim.push({
+        nome: j.nome,
+        motivo: limiteAmarelos === 3 ? "tres amarelos" : "dois amarelos",
+      });
+    }
+    return;
+  }
+  if (tipoModoJogo !== "copa" || !copaEstado || !metaSelecaoJogador) return;
   const k = chaveArtilheiroCopa(metaSelecaoJogador.id, j.nome);
   if (!copaEstado.amarelosAcumulado) copaEstado.amarelosAcumulado = {};
   if (!copaEstado.jogosSuspensao) copaEstado.jogosSuspensao = {};
@@ -464,7 +571,15 @@ function registrarDisciplinaCopaHumanoAposCartao(j, tipo) {
 }
 
 function aplicarRestricoesCopaNoElencoHumano() {
-  if (tipoModoJogo !== "copa" || !copaEstado || !metaSelecaoJogador) return;
+  const campComp =
+    tipoModoJogo === "campanha" &&
+    campanhaDisciplinaCompeticaoAtiva() &&
+    campanhaEstadoMemoria &&
+    metaSelecaoJogador;
+  if (tipoModoJogo !== "copa" && !campComp) return;
+  if (tipoModoJogo === "copa" && (!copaEstado || !metaSelecaoJogador)) return;
+  if (campComp) garantirCamposDisciplinaCampanhaNoEstado();
+  const tagComp = campComp ? "Competição" : "Copa";
   let mudou = true;
   let guarda = 0;
   while (mudou && guarda < 80) {
@@ -492,7 +607,7 @@ function aplicarRestricoesCopaNoElencoHumano() {
           continue;
         }
         appendLog(
-          `<strong>Copa.</strong> ${escapeHtml(res.nome)} assume a titular no lugar de ${escapeHtml(t.nome)} (lesão ou suspensão).`,
+          `<strong>${tagComp}.</strong> ${escapeHtml(res.nome)} assume a titular no lugar de ${escapeHtml(t.nome)} (lesão ou suspensão).`,
         );
         mudou = true;
         break;
@@ -573,6 +688,78 @@ function aplicarEfeitosPosJogoCopaLesaoDisciplina() {
   logSuspensaoRelatorioFimCopa();
 }
 
+function consumirLesaoESuspensaoCampanhaCompAposPartida() {
+  if (!campanhaEstadoMemoria?._snapCampanhaCompInicioPartida) return;
+  garantirCamposDisciplinaCampanhaNoEstado();
+  const est = campanhaEstadoMemoria;
+  const snap = est._snapCampanhaCompInicioPartida;
+  for (const k of Object.keys(snap.jogosSuspensao ?? {})) {
+    if ((est.campanhaJogosSuspensao[k] ?? 0) > 0) {
+      est.campanhaJogosSuspensao[k]--;
+      if (est.campanhaJogosSuspensao[k] <= 0) delete est.campanhaJogosSuspensao[k];
+    }
+  }
+  for (const k of Object.keys(snap.lesoesHumano ?? {})) {
+    const cur = est.campanhaLesoesHumano[k];
+    if (cur && cur.partidasFora > 0) {
+      cur.partidasFora--;
+      if (cur.partidasFora <= 0) delete est.campanhaLesoesHumano[k];
+    }
+  }
+  delete est._snapCampanhaCompInicioPartida;
+}
+
+function processarLesoesFinaisCampanhaCompHumano() {
+  if (!campanhaEstadoMemoria || !metaSelecaoJogador || !campanhaLesoesPersistentesCompeticao()) return;
+  garantirCamposDisciplinaCampanhaNoEstado();
+  const est = campanhaEstadoMemoria;
+  const sid = metaSelecaoJogador.id;
+  const vistos = new Set();
+  for (const j of [...timeJogador.titulares, ...timeJogador.reservas]) {
+    if (!j.lesionado) continue;
+    const k = chaveArtilheiroCopa(sid, j.nome);
+    if (vistos.has(k)) continue;
+    vistos.add(k);
+    let hk = 0;
+    for (let i = 0; i < k.length; i++) hk = (hk * 31 + k.charCodeAt(i)) >>> 0;
+    const n =
+      j.copaLesaoPartidasFora !== undefined
+        ? j.copaLesaoPartidasFora
+        : sortearPartidasForaLesaoCopa(criarRng((est.seedCampanha ^ hk) >>> 0));
+    delete j.copaLesaoPartidasFora;
+    if (n > 0) {
+      est.campanhaLesoesHumano[k] = { partidasFora: n };
+    }
+    const nm = escapeHtml(j.nome);
+    appendLog(`<strong>Competição — lesão.</strong> ${textoPronosticoLesaoCopa(n, nm)}`);
+  }
+}
+
+function logSuspensaoRelatorioFimCampanha() {
+  if (!campanhaEstadoMemoria?.campanhaSuspensaoRelatorioFim?.length) return;
+  for (const x of campanhaEstadoMemoria.campanhaSuspensaoRelatorioFim) {
+    const m =
+      x.motivo === "vermelho"
+        ? "cartão vermelho"
+        : x.motivo === "tres amarelos"
+          ? "terceiro cartão amarelo (acumulado)"
+          : "segundo cartão amarelo (acumulado)";
+    appendLog(
+      `<strong>Competição — disciplina.</strong> ${escapeHtml(x.nome)} cumprirá suspensão no próximo jogo (${m}).`,
+    );
+  }
+  campanhaEstadoMemoria.campanhaSuspensaoRelatorioFim = [];
+}
+
+function aplicarEfeitosPosJogoCampanhaCompeticaoLesaoDisciplina() {
+  if (!campanhaEstadoMemoria || !campanhaDisciplinaCompeticaoAtiva()) return;
+  consumirLesaoESuspensaoCampanhaCompAposPartida();
+  if (campanhaLesoesPersistentesCompeticao()) {
+    processarLesoesFinaisCampanhaCompHumano();
+  }
+  logSuspensaoRelatorioFimCampanha();
+}
+
 /**
  * Registra falta, cartões e expulsão; devolve linhas HTML para o resultado.
  * @param {object} j
@@ -607,6 +794,13 @@ function tentarLesaoJogadorFaltado(vitima) {
   vitima.lesionado = true;
   if (tipoModoJogo === "copa" && copaEstado) {
     vitima.copaLesaoPartidasFora = sortearPartidasForaLesaoCopa(copaEstado.rng);
+  } else if (tipoModoJogo === "campanha" && campanhaLesoesPersistentesCompeticao() && campanhaEstadoMemoria) {
+    let h = 0;
+    const id = String(vitima.id ?? "");
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    vitima.copaLesaoPartidasFora = sortearPartidasForaLesaoCopa(
+      criarRng((campanhaEstadoMemoria.seedCampanha ^ h) >>> 0),
+    );
   }
   return [textoLesaoPorFalta(vitima, spanNomeJogador)];
 }
@@ -1165,13 +1359,19 @@ function htmlParaTextoLog(html) {
   return (d.textContent || "").replace(/\s+/g, " ").trim();
 }
 
-/** @param {{ nome: string }} j */
+/** @param {{ idade?: number } | null | undefined} j */
+function textoIdadeParentesesNome(j) {
+  if (j == null || typeof j !== "object" || !Number.isFinite(j.idade)) return "";
+  return ` (${Math.round(j.idade)})`;
+}
+
+/** @param {{ nome: string, idade?: number }} j */
 function spanNomeJogador(j) {
   const humano =
     timeJogador.titulares.includes(j) ||
     timeJogador.reservas.includes(j);
   const cls = humano ? "nm-time-jogador" : "nm-time-cpu";
-  return `<span class="${cls}">${escapeHtml(j.nome)}</span>`;
+  return `<span class="${cls}">${escapeHtml(j.nome)}${textoIdadeParentesesNome(j)}</span>`;
 }
 
 /**
@@ -1379,13 +1579,43 @@ function tituloTooltipLesaoCopaPartidas(n) {
   return `Fora de ação por mais ${k} jogos na Copa (não pode ser titular).`;
 }
 
+function tituloTooltipLesaoCompCampanha(n) {
+  const k = Number(n);
+  if (!Number.isFinite(k) || k <= 0) {
+    return "Fora de ação só nesta partida; no próximo jogo da competição pode voltar a ser titular.";
+  }
+  if (k === 1) return "Fora de ação por mais 1 jogo na competição (não pode ser titular).";
+  return `Fora de ação por mais ${k} jogos na competição (não pode ser titular).`;
+}
+
 /**
- * Copa: lesão (partidas fora) ou suspensão — ao lado dos atributos, antes e durante a partida.
+ * Copa ou competição de campanha: lesão (partidas fora) ou suspensão — ao lado dos atributos.
  * @param {object} j
  * @param {boolean} listaDoTimeHumano
  */
 function htmlIndicadoresCopaPreJogo(j, listaDoTimeHumano) {
-  if (tipoModoJogo !== "copa" || !copaEstado || !metaSelecaoJogador || !listaDoTimeHumano) return "";
+  if (!listaDoTimeHumano || !metaSelecaoJogador) return "";
+  if (tipoModoJogo === "campanha" && campanhaDisciplinaCompeticaoAtiva() && campanhaEstadoMemoria) {
+    garantirCamposDisciplinaCampanhaNoEstado();
+    const k = chaveArtilheiroCopa(metaSelecaoJogador.id, j.nome);
+    const les = campanhaEstadoMemoria.campanhaLesoesHumano?.[k]?.partidasFora ?? 0;
+    const sus = campanhaEstadoMemoria.campanhaJogosSuspensao?.[k] ?? 0;
+    if (les <= 0 && sus <= 0) return "";
+    const bits = [];
+    if (sus > 0 && !(partidaAtiva && j.expulso)) {
+      bits.push(
+        `<span class="lineup-disc" title="Suspenso — não pode ser titular nesta partida" aria-label="Suspenso"><span class="lineup-cartao lineup-cartao--vermelho"></span></span>`,
+      );
+    }
+    if (les > 0 && !(partidaAtiva && j.lesionado)) {
+      const tip = tituloTooltipLesaoCompCampanha(les);
+      bits.push(
+        `<span class="lineup-disc lineup-lesao-wrap" title="${tip}" aria-label="${tip}"><span class="lineup-lesao">✚</span></span>`,
+      );
+    }
+    return bits.join("");
+  }
+  if (tipoModoJogo !== "copa" || !copaEstado) return "";
   const k = chaveArtilheiroCopa(metaSelecaoJogador.id, j.nome);
   const les = copaEstado.lesoesHumano?.[k]?.partidasFora ?? 0;
   const sus = copaEstado.jogosSuspensao?.[k] ?? 0;
@@ -1416,7 +1646,9 @@ function htmlIndicadoresDisciplina(j) {
     const tip =
       tipoModoJogo === "copa" && copaEstado && j.copaLesaoPartidasFora !== undefined
         ? tituloTooltipLesaoCopaPartidas(j.copaLesaoPartidasFora)
-        : "Lesionado — deve sair.";
+        : campanhaLesoesPersistentesCompeticao() && j.copaLesaoPartidasFora !== undefined
+          ? tituloTooltipLesaoCompCampanha(j.copaLesaoPartidasFora)
+          : "Lesionado — deve sair.";
     bits.push(
       `<span class="lineup-disc lineup-lesao-wrap" title="${tip}" aria-label="${tip}"><span class="lineup-lesao">✚</span></span>`,
     );
@@ -1472,7 +1704,7 @@ function renderLista(ul, jogadores, destaqueId, listaDoTimeHumano, ehListaReserv
     const bolas = htmlBolasGolsNaPartida(j);
     const copaPre = htmlIndicadoresCopaPreJogo(j, listaDoTimeHumano);
     const statsPrefix = [disc, bolas, copaPre].filter(Boolean).join(" ");
-    li.innerHTML = `<span class="sigla">${sigla(j.posicao)}</span> <span class="nome ${clsNome}">${escapeHtml(j.nome)}</span><span class="stats">${statsPrefix ? `${statsPrefix} ` : ""}${stA}/${stD}</span>`;
+    li.innerHTML = `<span class="sigla">${sigla(j.posicao)}</span> <span class="nome ${clsNome}">${escapeHtml(j.nome)}${textoIdadeParentesesNome(j)}</span><span class="stats">${statsPrefix ? `${statsPrefix} ` : ""}${stA}/${stD}</span>`;
     ul.appendChild(li);
   }
 }
@@ -2033,12 +2265,15 @@ async function animarTempoJogo(de, ate) {
       aguardandoInicioEt2 = false;
       tempoAnimando = true;
       atualizarBtnCentroRodada();
+      const mAntesSaltoEt = m;
       m = minutoFimPrimeiroTempoProrrogacao();
+      creditarMinutosCampanhaHumanoPorDeltaTitulares(Math.max(0, m - mAntesSaltoEt));
       els.relogio.textContent = formatMinuto(m);
       els.etapaTempo.textContent = labelEtapa(m);
       continue;
     }
     m++;
+    creditarMinutosCampanhaHumanoPorDeltaTitulares(1);
     els.relogio.textContent = formatMinuto(m);
     els.etapaTempo.textContent = labelEtapa(m);
     await sleepRespeitandoPausa(RELOGIO_MS_POR_MINUTO);
@@ -2138,7 +2373,7 @@ function ligarCliquesSubstituicao() {
 
       const tit = timeJogador.titulares[ti];
       const res = timeJogador.reservas[ri];
-      if (tipoModoJogo === "copa" && jogadorHumanoBloqueadoTitularCopa(res.nome)) {
+      if (jogadorHumanoBloqueadoTitularCopa(res.nome)) {
         limparSelecaoSub();
         alert("Esse jogador está suspenso ou em recuperação de lesão — não pode ser titular nesta partida.");
         return;
@@ -4384,12 +4619,21 @@ function sincronizarPoolCampanhaComElencoPosPartida(
 function finalizarCampanhaAposPartida() {
   if (!campanhaEstadoMemoria) campanhaEstadoMemoria = carregarCampanhaAtiva();
   if (!campanhaEstadoMemoria) return;
+  const idsBonusAttrMaiorInicio = coletarIdsBonusAttrCampanhaHumano();
   sincronizarPoolCampanhaComElencoPosPartida(campanhaEstadoMemoria);
+  if (campanhaDisciplinaCompeticaoAtiva()) {
+    aplicarEfeitosPosJogoCampanhaCompeticaoLesaoDisciplina();
+  }
   aplicarEfeitoPosPartidaCampanha(
     campanhaEstadoMemoria.jogadores,
     new Set(campanhaEstadoMemoria.convocadosIds),
     (campanhaEstadoMemoria.seedCampanha ^ Date.now()) >>> 0,
+    {
+      minutosPorJogadorId: new Map(minutosCampanhaPartidaPorId),
+      idsBonusAttrMaiorInicio: idsBonusAttrMaiorInicio,
+    },
   );
+  resetMinutosCampanhaPartida();
   const ev = campanhaEstadoMemoria.eventos.find((e) => e.id === campanhaEventoAtualId);
   if (
     ev &&
@@ -5250,6 +5494,9 @@ function simularProximoJogoCampanhaHub() {
     tipoModoJogo = "campanha";
     metaSelecaoJogador = selecaoPorId(campanhaEstadoMemoria.selecaoId);
     metaSelecaoCpu = selecaoPorId(prox.adversarioId);
+    resetMinutosCampanhaPartida();
+    snapshotElencoLimpo();
+    gravarSnapshotDisciplinaCampanhaCompSeAtiva();
     finalizarCampanhaAposPartida();
     pintarCampanhaHub();
   } catch (e) {
@@ -5287,6 +5534,9 @@ function entrarNoJogoCampanhaProximoEvento() {
     snapshotElencoLimpo();
     metaSelecaoJogador = selecaoPorId(campanhaEstadoMemoria.selecaoId);
     metaSelecaoCpu = selecaoPorId(prox.adversarioId);
+    if (prox.tipo === "torneio_continental" || prox.tipo === "eliminatorias_copa") {
+      aplicarRestricoesCopaNoElencoHumano();
+    }
     aplicarCabecalhosPainelSelecoes();
     if (els.telaCampanha) {
       els.telaCampanha.setAttribute("hidden", "");
@@ -6894,6 +7144,7 @@ async function iniciarPartida() {
   substituicoesUsadas = 0;
   substituicoesCpuUsadas = 0;
   jogadoresSubstituidosForaIds.clear();
+  if (tipoModoJogo === "campanha") resetMinutosCampanhaPartida();
   copaTransicaoHubPendente = null;
   segundoTempoAutorizado = false;
   aguardandoSegundoTempo = false;
@@ -6912,6 +7163,7 @@ async function iniciarPartida() {
       ),
     };
   }
+  gravarSnapshotDisciplinaCampanhaCompSeAtiva();
   snapshotStatsInicioPartida();
   atualizarPlacar();
   els.log.innerHTML = "";
