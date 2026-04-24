@@ -102,6 +102,7 @@ import {
   remendarConflitosCalendarioCampanhaAoCarregar,
   ANO_BASE_CAMPANHA,
   textoMesAno,
+  textoMesAnoCurto,
   aplicarEfeitoPosPartidaCampanha,
   aplicarProgressaoFimDeJanela,
   aplicarOscilacaoPreCompeticao,
@@ -116,7 +117,6 @@ import {
   repararFaseGruposTorneioCampanha,
   dadosTorneioContinental,
   confederacaoId,
-  anoComEdicaoContinental,
   anoComEliminatoriasCopa,
   agregarPontosEliminatoriasDoAno,
   agregarSimulacaoOutrasConfederacoesWcq,
@@ -278,10 +278,23 @@ const els = {
   btnCampanhaConfirmarConvocacao: document.getElementById("btn-campanha-confirmar-convocacao"),
   btnCampanhaConvocacaoAuto: document.getElementById("btn-campanha-convocacao-auto"),
   btnCampanhaVoltarHubConvoc: document.getElementById("btn-campanha-voltar-hub-convoc"),
-  campanhaHubResumo: document.getElementById("campanha-hub-resumo"),
+  campanhaHubPaneInicio: document.getElementById("campanha-hub-pane-inicio"),
+  campanhaHubPaneCompeticoes: document.getElementById("campanha-hub-pane-competicoes"),
+  campanhaHubPaneCalendario: document.getElementById("campanha-hub-pane-calendario"),
+  campanhaHubPaneCampeoes: document.getElementById("campanha-hub-pane-campeoes"),
+  btnCampanhaVistaInicio: document.getElementById("btn-campanha-vista-inicio"),
+  btnCampanhaVistaCompeticoes: document.getElementById("btn-campanha-vista-competicoes"),
+  btnCampanhaVistaCalendario: document.getElementById("btn-campanha-vista-calendario"),
+  btnCampanhaVistaCampeoes: document.getElementById("btn-campanha-vista-campeoes"),
+  campanhaHubCabecalhoJogador: document.getElementById("campanha-hub-cabecalho-jogador"),
+  campanhaHubProximoJogoConteudo: document.getElementById("campanha-hub-proximo-jogo-conteudo"),
+  campanhaHubTabelasProximo: document.getElementById("campanha-hub-tabelas-proximo"),
+  campanhaHubCalAnoSelect: document.getElementById("campanha-hub-cal-ano-select"),
+  campanhaHubCampeoesAnoSelect: document.getElementById("campanha-hub-campeoes-ano-select"),
+  campanhaHubCampeoesCompSelect: document.getElementById("campanha-hub-campeoes-comp-select"),
+  campanhaHubCampeoesConteudo: document.getElementById("campanha-hub-campeoes-conteudo"),
   campanhaHubEventosTituloAno: document.getElementById("campanha-hub-eventos-titulo-ano"),
   campanhaHubEventos: document.getElementById("campanha-hub-eventos"),
-  campanhaHubEventosHistorico: document.getElementById("campanha-hub-eventos-historico"),
   campanhaHubTorneio: document.getElementById("campanha-hub-torneio"),
   campanhaHubEliminatorias: document.getElementById("campanha-hub-elims"),
   btnCampanhaJogarProximo: document.getElementById("btn-campanha-jogar-proximo"),
@@ -289,7 +302,9 @@ const els = {
   btnCampanhaRefazerConvocacao: document.getElementById("btn-campanha-refazer-convocacao"),
   btnCampanhaHubVoltarMenu: document.getElementById("btn-campanha-hub-voltar-menu"),
   btnCampanhaCopa2030: document.getElementById("btn-campanha-copa-2030"),
-  campanhaHubCampeoesHistorico: document.getElementById("campanha-hub-campeoes-historico"),
+  campanhaSimOverlay: document.getElementById("campanha-sim-resultado-overlay"),
+  campanhaSimResultadoConteudo: document.getElementById("campanha-sim-resultado-conteudo"),
+  btnCampanhaSimResultadoOk: document.getElementById("btn-campanha-sim-resultado-ok"),
 };
 
 const CANSACO_DUELO = 4;
@@ -406,7 +421,7 @@ function creditarMinutosCampanhaHumanoPorDeltaTitulares(delta) {
   }
 }
 
-/** Bónus raro: algum atributo acima do snapshot do apito (ex.: duelos sem desgaste líquido). */
+/** Bônus raro: algum atributo acima do snapshot do apito (ex.: duelos sem desgaste líquido). */
 function coletarIdsBonusAttrCampanhaHumano() {
   const out = new Set();
   if (tipoModoJogo !== "campanha") return out;
@@ -1003,12 +1018,12 @@ function htmlStatCampanhaConvocacao(j, attr) {
   const parts = [];
   if (dAno !== 0) {
     parts.push(
-      `<span class="${cls(dAno)}" title="Desde o início do ano civil (temporada)">${fmt(dAno)} ano</span>`,
+      `<span class="${cls(dAno)}" title="Desde o início do ano (temporada)">${fmt(dAno)} ano</span>`,
     );
   }
   if (dCamp !== 0 && dCamp !== dAno) {
     parts.push(
-      `<span class="${cls(dCamp)}" title="Desde o início da campanha">${fmt(dCamp)} total</span>`,
+      `<span class="${cls(dCamp)}" title="Desde o início da campanha">${fmt(dCamp)}</span>`,
     );
   }
   if (parts.length === 0) return String(v);
@@ -1020,7 +1035,7 @@ function htmlStatCampanhaConvocacao(j, attr) {
  * @typedef {{ nome: string, ataque: number, defesa: number, idade?: number }} ConvocacaoJogadorLike
  */
 
-/** Opções do select «Ordenar por» em cada posição (campanha / Copa). */
+/** Opções do select "Ordenar por" em cada posição (campanha / Copa). */
 const CONVOCACAO_ORDENACAO_OPCOES = [
   { value: "nome-asc", label: "Nome (A–Z)" },
   { value: "nome-desc", label: "Nome (Z–A)" },
@@ -1083,7 +1098,7 @@ function ordenarGrupoConvocacao(grupo, modo) {
 }
 
 /**
- * Barra «Ordenar por» + lista reordenável (mesma UI na campanha e na Copa).
+ * Barra "Ordenar por" + lista reordenável (mesma UI na campanha e na Copa).
  * @param {import('./constants.js').Position} pos
  * @param {ConvocacaoJogadorLike[]} grupo
  * @param {string} idPrefix ex.: "camp-conv" | "copa-conv"
@@ -1228,6 +1243,29 @@ let idSelecaoCampanhaPendente = /** @type {string | null} */ (null);
 /** @type {Set<string>} */
 let campanhaConvocadosPendentes = new Set();
 
+/**
+ * @typedef {{
+ *   golsPorJogadorId: Map<string, number>,
+ *   golsCpuPorNome: Map<string, number>,
+ *   cartoesHumano: { id: string, nome: string, tipo: "amarelo" | "vermelho" }[],
+ *   cartoesCpu: { nome: string, tipo: "amarelo" | "vermelho" }[],
+ *   lesoesHumanoPersist: { id: string, nome: string, partidasFora: number }[],
+ *   lesoesHumanoLeve: { nome: string }[],
+ *   lesoesCpu: { nome: string }[],
+ * }} CampanhaRelatorioSimulacao
+ */
+
+/**
+ * Simulação do hub: aguarda confirmação antes de gravar o resultado.
+ * @type {null | {
+ *   prox: import('./campaign-calendar.js').EventoCampanha,
+ *   gh: number,
+ *   ga: number,
+ *   relatorio: CampanhaRelatorioSimulacao,
+ * }}
+ */
+let campanhaSimulacaoPendenteFinalizar = null;
+
 function opcoesValidarElencoHumano() {
   return { numReservas: 12 };
 }
@@ -1283,7 +1321,7 @@ function elencoPermiteRelaxarReservasPorPosicao() {
 let copaEstado = null;
 
 /**
- * Campanha «acompanhar»: flag explícita ou save antigo (slot técnico ≠ seleção da campanha).
+ * Campanha "acompanhar": flag explícita ou save antigo (slot técnico ≠ seleção da campanha).
  * @param {object | null | undefined} est
  */
 function copaModoEspectadorCampanhaAtivo(est) {
@@ -2459,14 +2497,25 @@ function htmlTabelaClassificacaoGrupoCampanha(T, L, rng, playerTeamId, compact) 
     const s = SELECOES.find((x) => x.id === id);
     const r = agg[id];
     const cls = id === playerTeamId ? ' class="destaque-jogador"' : "";
+    const nomeCel = htmlNomeSelecaoBandeiraCampanhaHtml(id, compact);
     if (compact) {
-      html += `<tr${cls}><td>${i + 1}</td><td>${escapeHtml(s?.nome ?? id)}</td><td>${r.pj}</td><td>${r.pts}</td></tr>`;
+      html += `<tr${cls}><td>${i + 1}</td><td>${nomeCel}</td><td>${r.pj}</td><td>${r.pts}</td></tr>`;
     } else {
-      html += `<tr${cls}><td>${i + 1}</td><td>${escapeHtml(s?.nome ?? id)}</td><td>${r.pj}</td><td>${r.vit}</td><td>${r.emp}</td><td>${r.der}</td><td>${r.gf}</td><td>${r.gc}</td><td>${r.sg}</td><td>${r.pts}</td></tr>`;
+      html += `<tr${cls}><td>${i + 1}</td><td>${nomeCel}</td><td>${r.pj}</td><td>${r.vit}</td><td>${r.emp}</td><td>${r.der}</td><td>${r.gf}</td><td>${r.gc}</td><td>${r.sg}</td><td>${r.pts}</td></tr>`;
     }
   });
   html += "</tbody></table>";
   return html;
+}
+
+/** Nome da seleção com bandeira (HTML escapado) para tabelas da campanha. */
+function htmlNomeSelecaoBandeiraCampanhaHtml(selecaoId, compact) {
+  const s = selecaoPorId(selecaoId);
+  const nome = escapeHtml(s?.nome ?? selecaoId);
+  const iso = s?.iso ?? "xx";
+  const w = compact ? 20 : 28;
+  const h = Math.max(12, Math.round((w * 2) / 3));
+  return `<span class="nome-com-bandeira"><img class="campanha-inline-flag" src="${urlBandeira(iso, w)}" alt="" width="${w}" height="${h}" loading="lazy" />${nome}</span>`;
 }
 
 function htmlTabelaClassificacaoGrupoCopa(L, compact) {
@@ -3411,7 +3460,7 @@ function subtituloEliminacaoCopa(det) {
 function textoParagrafoEliminacaoCopa(det) {
   if (det === "grupos") {
     return copaEstado?.origemCampanha
-      ? "Sua seleção não se classificou para o mata-mata (2 primeiros de cada grupo + 8 melhores terceiros). O restante da Copa foi simulado — confira a chave, «Ver tabela» e os artilheiros."
+      ? "Sua seleção não se classificou para o mata-mata (2 primeiros de cada grupo + 8 melhores terceiros). O restante da Copa foi simulado — confira a chave, \"Ver tabela\" e os artilheiros."
       : "Sua seleção não se classificou para o mata-mata (2 primeiros de cada grupo + 8 melhores terceiros) e está eliminada da Copa do Mundo.";
   }
   if (det === "r32") {
@@ -3464,7 +3513,7 @@ function mostrarTelaCopaHubAposJogoGrupo() {
     els.copaHubMsg.hidden = false;
     if (copaEstado && copaEstado.idxAdversarioGrupo >= 3) {
       els.copaHubMsg.textContent =
-        "Fase de grupos concluída para você. Se estiver classificado (2 primeiros ou entre os 8 melhores terceiros), segue para a rodada de 32 (dezesseis-avos). Use «Ir ao mata-mata» para fechar a fase de grupos nos outros grupos e montar a chave.";
+        "Fase de grupos concluída para você. Se estiver classificado (2 primeiros ou entre os 8 melhores terceiros), segue para a rodada de 32 (dezesseis-avos). Use \"Ir ao mata-mata\" para fechar a fase de grupos nos outros grupos e montar a chave.";
     } else {
       const rest = 3 - (copaEstado?.idxAdversarioGrupo ?? 0);
       els.copaHubMsg.textContent =
@@ -3544,7 +3593,7 @@ function mostrarTelaCopaEliminado() {
         : "—";
     if (temChaveMataMata && copaEstado?.detalheEliminacaoCopa === "grupos") {
       els.copaHubMsg.textContent =
-        `Sua seleção foi eliminada na fase de grupos. Campeão mundial: ${nomeCamp}. A chave abaixo mostra o mata-mata completo; use «Ver tabela» para as classificações dos 12 grupos.`;
+        `Sua seleção foi eliminada na fase de grupos. Campeão mundial: ${nomeCamp}. A chave abaixo mostra o mata-mata completo; use \"Ver tabela\" para as classificações dos 12 grupos.`;
     } else {
       els.copaHubMsg.textContent =
         `Sua seleção foi eliminada. Campeão mundial: ${nomeCamp}. A chave abaixo mostra os resultados até a final. Volte ao menu para uma nova Copa ou um amistoso.`;
@@ -3592,7 +3641,7 @@ function mostrarTelaCopaCampeao() {
   if (els.copaHubMsg) {
     els.copaHubMsg.hidden = false;
     els.copaHubMsg.textContent = espectadorCamp
-      ? "Modo acompanhamento: chave completa e artilheiros. Use «Ver tabela» para as classificações dos 12 grupos."
+      ? "Modo acompanhamento: chave completa e artilheiros. Use \"Ver tabela\" para as classificações dos 12 grupos."
       : "Abaixo: chave completa, artilheiros da campanha e opção de salvar este título no dispositivo.";
   }
   copaHubBotoesJogoOcultar();
@@ -4601,6 +4650,7 @@ function mostrarPassoCampanha(
   if (els.campanhaPassoSelecao) els.campanhaPassoSelecao.hidden = passo !== "selecao";
   if (els.campanhaPassoConvocacao) els.campanhaPassoConvocacao.hidden = passo !== "convocacao";
   if (els.campanhaPassoHub) els.campanhaPassoHub.hidden = passo !== "hub";
+  if (passo === "hub") definirVistaHubCampanha("inicio");
 }
 
 function sincronizarPoolCampanhaComElencoPosPartida(
@@ -4788,20 +4838,53 @@ function voltarAoHubCampanhaDesdeJogo() {
  * @param {import('./campaign-calendar.js').EventoCampanha[]} eventos
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
  * @param {import('./campaign-calendar.js').EventoCampanha | null} proxEv destaca o próximo pendente (só calendário atual)
+ * @param {number} anoCivilLista ano da lista (aba Calendário)
  */
-function appendCampanhaCalendarioLinhas(ul, eventos, estado, proxEv) {
+function appendCampanhaCalendarioLinhas(ul, eventos, estado, proxEv, anoCivilLista) {
+  const anoCalEstado = estado.anoCalendario ?? ANO_BASE_CAMPANHA + (estado.temporada ?? 1) - 1;
   let prevTipo = /** @type {string | null} */ (null);
   for (const e of eventos) {
     const li = document.createElement("li");
-    const base = `${e.rotulo}${e.adversarioId ? ` · vs ${selecaoPorId(e.adversarioId)?.nome ?? e.adversarioId}` : ""}`;
-    li.appendChild(document.createTextNode(base));
+    const anoEv = e.campanhaAno ?? anoCivilLista;
+    const mesEv = e.campanhaMes ?? 3;
+    const dataStr = textoMesAnoCurto(mesEv, anoEv);
+    const comp = rotuloCompeticaoCurtoCampanha(e, anoCalEstado);
+
+    const p = document.createElement("p");
+    p.className = "campanha-hub-proximo-par";
+
+    if (e.tipo === "copa_mundial" || !e.adversarioId) {
+      p.appendChild(document.createTextNode(`${dataStr}: ${comp}`));
+    } else {
+      const pid = estado.selecaoId;
+      const humCasa = humanoJogaEmCasaNoEventoCampanha(e, pid);
+      const sHum = selecaoPorId(pid);
+      const sAdv = selecaoPorId(e.adversarioId);
+      p.appendChild(document.createTextNode(`${dataStr}: `));
+      const wrap = document.createElement("span");
+      wrap.className = "campanha-hub-proximo-confronto";
+      const spCasa = document.createElement("span");
+      const spVisit = document.createElement("span");
+      if (humCasa) {
+        preencherSpanNomeComBandeiraCampanha(spCasa, sHum, pid);
+        preencherSpanNomeComBandeiraCampanha(spVisit, sAdv, e.adversarioId);
+      } else {
+        preencherSpanNomeComBandeiraCampanha(spCasa, sAdv, e.adversarioId);
+        preencherSpanNomeComBandeiraCampanha(spVisit, sHum, pid);
+      }
+      wrap.append(spCasa, document.createTextNode(" × "), spVisit);
+      p.appendChild(wrap);
+      p.appendChild(document.createTextNode(` (${comp})`));
+    }
+
     const placar = e.concluido ? placarDisplayJogadorVsAdversario(estado, e) : null;
     if (placar) {
       const sp = document.createElement("span");
       sp.className = "campanha-ev-placar";
-      sp.textContent = ` — ${placar.voce} × ${placar.adv}`;
-      li.appendChild(sp);
+      sp.textContent = ` \u2013 ${placar.voce} × ${placar.adv}`;
+      p.appendChild(sp);
     }
+    li.appendChild(p);
     if (e.concluido) li.classList.add("campanha-ev-feito");
     if (proxEv && e.id === proxEv.id) li.classList.add("campanha-ev-atual");
     if (e.tipo === "torneio_continental") {
@@ -4861,7 +4944,7 @@ function textoHubEliminatoriasClassificadosCopa(estado, We) {
 }
 
 /**
- * Ano civil da edição (menor `campanhaAno` nos eventos da competição), para títulos no hub.
+ * Ano da edição (menor `campanhaAno` nos eventos da competição), para títulos no hub.
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
  * @param {'torneio_continental' | 'eliminatorias_copa'} tipo
  * @param {string | undefined} nomeTorneio
@@ -4887,6 +4970,468 @@ function anoEdicaoCompeticaoCampanhaNoHub(estado, tipo, nomeTorneio, fallbackAno
   return best ?? fallbackAno;
 }
 
+/**
+ * Ano da edição no hub da campanha **ativa**: só olha o calendário corrente
+ * (`estado.eventos` e, nas eliminatórias, `wcqAgendaHumano`). Assim o rótulo
+ * não fica preso ao menor ano de uma edição já arquivada em
+ * `historicoEventosCampanha` (ex.: título ainda “2027” com o jogo em 2028).
+ * Se não houver eventos atuais desse torneio, cai no critério completo
+ * (`anoEdicaoCompeticaoCampanhaNoHub`).
+ *
+ * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
+ * @param {import('./campaign-calendar.js').EventoCampanha["tipo"]} tipo
+ * @param {string} nomeTorneio
+ * @param {number} fallbackAno
+ */
+function anoEdicaoCompeticaoCalendarioAtualHub(estado, tipo, nomeTorneio, fallbackAno) {
+  if (!nomeTorneio) return fallbackAno;
+  /** @type {number | null} */
+  let best = null;
+  const considerar = (/** @type {import('./campaign-calendar.js').EventoCampanha} */ e) => {
+    if (e.tipo !== tipo || e.torneioNome !== nomeTorneio) return;
+    const a = e.campanhaAno;
+    if (a == null || !Number.isFinite(a)) return;
+    best = best == null ? a : Math.min(best, a);
+  };
+  for (const e of estado.eventos ?? []) considerar(e);
+  if (tipo === "eliminatorias_copa" && Array.isArray(estado.wcqAgendaHumano)) {
+    for (const e of estado.wcqAgendaHumano) considerar(e);
+  }
+  if (best != null) return best;
+  return anoEdicaoCompeticaoCampanhaNoHub(estado, tipo, nomeTorneio, fallbackAno);
+}
+
+/**
+ * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
+ * @param {number} anoAlvo
+ * @returns {{ eventos: import('./campaign-calendar.js').EventoCampanha[], proxEv: import('./campaign-calendar.js').EventoCampanha | null }}
+ */
+function eventosCalendarioCampanhaPorAnoCivil(estado, anoAlvo) {
+  const anoAtualCal =
+    estado.anoCalendario ?? ANO_BASE_CAMPANHA + (estado.temporada ?? 1) - 1;
+  if (anoAlvo === anoAtualCal) {
+    const evs = estado.eventos ?? [];
+    return { eventos: evs, proxEv: proximoEventoPendente(evs) };
+  }
+  const bloco = (estado.historicoEventosCampanha ?? []).find((b) => b.ano === anoAlvo);
+  return { eventos: bloco?.eventos ?? [], proxEv: null };
+}
+
+/**
+ * @param {HTMLElement} root
+ * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
+ * @param {number} anoCalAtual
+ * @param {{ todosGrupos: boolean, detalheMataMata: boolean }} op
+ *   Com `todosGrupos` e `detalheMataMata` falsos (bloco “próximo jogo” na inicial), não explica o regulamento — só a tabela do grupo.
+ */
+function popularCampanhaTorneioContinentalNoEl(root, estado, anoCalAtual, op) {
+  root.replaceChildren();
+  if (!estado.torneioContinental) {
+    root.hidden = true;
+    return;
+  }
+  const T = estado.torneioContinental;
+  const letras = Object.keys(T.grupos ?? {}).sort();
+  const temGruposComJogos = letras.some((L) => (T.grupos[L]?.length ?? 0) >= 2);
+  root.hidden = !temGruposComJogos;
+  if (!temGruposComJogos) return;
+  const rngTab = criarRng((estado.seedCampanha ^ estado.temporada * 31) >>> 0);
+  const pid = estado.selecaoId;
+  const Lplay = T.playerGrupo ?? "A";
+  const anoEdicaoTor = anoEdicaoCompeticaoCalendarioAtualHub(
+    estado,
+    "torneio_continental",
+    T.nomeTorneio,
+    anoCalAtual,
+  );
+  const mostrarRegras = op.todosGrupos || op.detalheMataMata;
+  const regrasTxt = mostrarRegras ? textoRegrasClassificacaoTorneioCampanha(T) : "";
+  if (regrasTxt) {
+    const pRegras = document.createElement("p");
+    pRegras.className = "campanha-torneio-regras";
+    pRegras.textContent = regrasTxt;
+    root.appendChild(pRegras);
+  }
+  const wrapPrincipal = document.createElement("div");
+  wrapPrincipal.className = "campanha-torneio-grupo-jogador";
+  const hPrin = document.createElement("h4");
+  hPrin.className = "copa-subtitulo";
+  hPrin.textContent = `${T.nomeTorneio} ${anoEdicaoTor} — grupo ${Lplay}`;
+  const tabPrin = document.createElement("div");
+  tabPrin.className = "copa-tabela-grupo";
+  tabPrin.innerHTML = htmlTabelaClassificacaoGrupoCampanha(T, Lplay, rngTab, pid, false);
+  wrapPrincipal.append(hPrin, tabPrin);
+  root.appendChild(wrapPrincipal);
+  if (op.todosGrupos) {
+    const outras = letras.filter((L) => L !== Lplay && (T.grupos[L]?.length ?? 0) >= 2);
+    if (outras.length > 0) {
+      const hint = document.createElement("p");
+      hint.className = "campanha-torneio-outros-hint";
+      hint.textContent = "Outros grupos";
+      root.appendChild(hint);
+      const grid = document.createElement("div");
+      grid.className = "copa-tabelas-todos-grupos campanha-torneio-grid-outros";
+      for (const L of outras) {
+        const box = document.createElement("div");
+        box.className = "copa-mini-tabela-grupo";
+        const h = document.createElement("h4");
+        h.textContent = `Grupo ${L}`;
+        const inner = document.createElement("div");
+        inner.innerHTML = htmlTabelaClassificacaoGrupoCampanha(T, L, rngTab, pid, true);
+        box.append(h, inner);
+        grid.appendChild(box);
+      }
+      root.appendChild(grid);
+    }
+  }
+  if (op.detalheMataMata && T.fase === "fim") {
+    const linhasHist = paragrafosHistoricoMataMataCampanha(T);
+    if (linhasHist.length) {
+      const boxHist = document.createElement("div");
+      boxHist.className = "campanha-torneio-historico-ko";
+      for (const linha of linhasHist) {
+        const p = document.createElement("p");
+        p.className = linha.startsWith("  ")
+          ? "campanha-torneio-historico-ko-jogo"
+          : "campanha-torneio-historico-ko-titulo";
+        p.textContent = linha.trimStart();
+        boxHist.appendChild(p);
+      }
+      root.appendChild(boxHist);
+    } else if (T.campeaoContinentalId) {
+      const pLeg = document.createElement("p");
+      pLeg.className = "campanha-torneio-regras";
+      pLeg.textContent =
+        "O título foi decidido no mata-mata após a fase de grupos. Este save não guarda o detalhe dos placares (campanha iniciada antes da atualização).";
+      root.appendChild(pLeg);
+    }
+  }
+  if (T.fase === "fim" && T.campeaoContinentalId) {
+    const pCamp = document.createElement("p");
+    pCamp.className = "campanha-torneio-campeao";
+    const prefix = `Campeão — ${T.nomeTorneio} ${anoEdicaoTor}: `;
+    pCamp.append(document.createTextNode(prefix));
+    const sp = document.createElement("span");
+    sp.innerHTML = htmlNomeSelecaoBandeiraCampanhaHtml(T.campeaoContinentalId, false);
+    pCamp.appendChild(sp);
+    pCamp.append(document.createTextNode("."));
+    root.appendChild(pCamp);
+  }
+}
+
+/**
+ * @param {HTMLElement} root
+ * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
+ * @param {number} anoCalAtual
+ * @param {{ todosGrupos: boolean, detalheMataMata: boolean }} op
+ *   Com `todosGrupos` e `detalheMataMata` falsos (bloco “próximo jogo” na inicial), não explica o regulamento — só a tabela do grupo.
+ */
+function popularCampanhaEliminatoriasNoEl(root, estado, anoCalAtual, op) {
+  root.replaceChildren();
+  if (!estado.eliminatoriasCopa) {
+    root.hidden = true;
+    return;
+  }
+  const We = estado.eliminatoriasCopa;
+  const letrasW = Object.keys(We.grupos ?? {}).sort();
+  const temW = letrasW.some((L) => (We.grupos[L]?.length ?? 0) >= 2);
+  root.hidden = !temW;
+  if (!temW) return;
+  const rngW = criarRng((estado.seedCampanha ^ estado.temporada * 97) >>> 0);
+  const pidW = estado.selecaoId;
+  const Lw = We.playerGrupo ?? "A";
+  const tituloWcq = tituloEliminatoriasCopaMundial(
+    We.confKey,
+    estado.wcqCicloCopaAlvo ?? ANO_COPA_MUNDO_CAMPANHA,
+  );
+  const anoEdicaoWcq = anoEdicaoCompeticaoCalendarioAtualHub(
+    estado,
+    "eliminatorias_copa",
+    We.nomeTorneio,
+    anoCalAtual,
+  );
+  const mostrarRegrasW = op.todosGrupos || op.detalheMataMata;
+  if (mostrarRegrasW) {
+    const pRegrasW = document.createElement("p");
+    pRegrasW.className = "campanha-torneio-regras";
+    pRegrasW.textContent = textoRegrasEliminatoriasCopaCampanha(We, estado);
+    root.appendChild(pRegrasW);
+  }
+  const wrapW = document.createElement("div");
+  wrapW.className = "campanha-torneio-grupo-jogador campanha-elims-wrap";
+  const hW = document.createElement("h4");
+  hW.className = "copa-subtitulo";
+  hW.textContent = `${tituloWcq} ${anoEdicaoWcq} — grupo ${Lw}`;
+  const tabW = document.createElement("div");
+  tabW.className = "copa-tabela-grupo";
+  tabW.innerHTML = htmlTabelaClassificacaoGrupoCampanha(We, Lw, rngW, pidW, false);
+  wrapW.append(hW, tabW);
+  root.appendChild(wrapW);
+  if (op.todosGrupos) {
+    const outW = letrasW.filter((L) => L !== Lw && (We.grupos[L]?.length ?? 0) >= 2);
+    if (outW.length > 0) {
+      const hintW = document.createElement("p");
+      hintW.className = "campanha-torneio-outros-hint";
+      hintW.textContent = "Outros grupos (eliminatórias)";
+      root.appendChild(hintW);
+      const gridW = document.createElement("div");
+      gridW.className = "copa-tabelas-todos-grupos campanha-torneio-grid-outros";
+      for (const L of outW) {
+        const box = document.createElement("div");
+        box.className = "copa-mini-tabela-grupo";
+        const h = document.createElement("h4");
+        h.textContent = `Grupo ${L}`;
+        const inner = document.createElement("div");
+        inner.innerHTML = htmlTabelaClassificacaoGrupoCampanha(We, L, rngW, pidW, true);
+        box.append(h, inner);
+        gridW.appendChild(box);
+      }
+      root.appendChild(gridW);
+    }
+  }
+  if (op.detalheMataMata && We.fase === "fim") {
+    const linhasHistW = paragrafosHistoricoMataMataCampanha(We);
+    if (linhasHistW.length) {
+      const boxHistW = document.createElement("div");
+      boxHistW.className = "campanha-torneio-historico-ko";
+      for (const linha of linhasHistW) {
+        const p = document.createElement("p");
+        p.className = linha.startsWith("  ")
+          ? "campanha-torneio-historico-ko-jogo"
+          : "campanha-torneio-historico-ko-titulo";
+        p.textContent = linha.trimStart();
+        boxHistW.appendChild(p);
+      }
+      root.appendChild(boxHistW);
+    } else if (We.wcqClassificadosKoIds?.length || We.campeaoContinentalId) {
+      const pLegW = document.createElement("p");
+      pLegW.className = "campanha-torneio-regras";
+      pLegW.textContent =
+        "A fase eliminatória foi simulada após os grupos. Este save não guarda o detalhe dos placares (campanha iniciada antes da atualização).";
+      root.appendChild(pLegW);
+    }
+  }
+  if (We.fase === "fim") {
+    const txtCls = textoHubEliminatoriasClassificadosCopa(estado, We);
+    if (txtCls) {
+      const pCampW = document.createElement("p");
+      pCampW.className = "campanha-torneio-campeao";
+      pCampW.textContent = txtCls;
+      root.appendChild(pCampW);
+    }
+  }
+}
+
+function pintarCampanhaHubCalendarioPane() {
+  if (!campanhaEstadoMemoria || !els.campanhaHubEventos || !els.campanhaHubEventosTituloAno) return;
+  const est = campanhaEstadoMemoria;
+  const anoCalAtual = est.anoCalendario ?? ANO_BASE_CAMPANHA + (est.temporada ?? 1) - 1;
+  const anosHist = [...new Set((est.historicoEventosCampanha ?? []).map((b) => b.ano))].sort(
+    (a, b) => b - a,
+  );
+  const anosDispon = [anoCalAtual, ...anosHist.filter((a) => a !== anoCalAtual)];
+  const sel = els.campanhaHubCalAnoSelect;
+  if (sel) {
+    const prev = sel.value;
+    sel.replaceChildren();
+    for (const a of anosDispon) {
+      const o = document.createElement("option");
+      o.value = String(a);
+      o.textContent = String(a);
+      sel.appendChild(o);
+    }
+    const pick = anosDispon.includes(Number(prev)) ? Number(prev) : anoCalAtual;
+    sel.value = String(pick);
+  }
+  const anoVer = sel?.value ? Number(sel.value) : anoCalAtual;
+  const { eventos, proxEv } = eventosCalendarioCampanhaPorAnoCivil(est, anoVer);
+  els.campanhaHubEventosTituloAno.textContent = `Calendário — ano ${anoVer}`;
+  els.campanhaHubEventos.replaceChildren();
+  if (!eventos.length) {
+    const li = document.createElement("li");
+    li.className = "tela-menu-sub";
+    li.style.listStyle = "none";
+    li.textContent = "Nenhum evento registrado para este ano.";
+    els.campanhaHubEventos.appendChild(li);
+    return;
+  }
+  appendCampanhaCalendarioLinhas(els.campanhaHubEventos, eventos, est, proxEv, anoVer);
+}
+
+/**
+ * Remove o sufixo " YYYY" do nome da competição quando é o mesmo ano do registro.
+ * @param {string} competicao
+ * @param {number} ano
+ */
+function nomeCompeticaoCampeaoSemAnoRepetido(competicao, ano) {
+  const s = String(competicao).trim();
+  const ys = String(ano);
+  if (s.endsWith(` ${ys}`)) return s.slice(0, s.length - ys.length - 1).trimEnd();
+  return s;
+}
+
+function pintarCampanhaHubCampeoesPane() {
+  if (!campanhaEstadoMemoria || !els.campanhaHubCampeoesConteudo) return;
+  const est = campanhaEstadoMemoria;
+  const todos = listarCampeoesCampanhaOrdenados(est);
+  const chaveCompeticaoCampeao = (/** @type {{ competicao: string, ano: number }} */ c) =>
+    nomeCompeticaoCampeaoSemAnoRepetido(c.competicao, c.ano);
+  const selA = els.campanhaHubCampeoesAnoSelect;
+  const selC = els.campanhaHubCampeoesCompSelect;
+  const anosUniq = [...new Set(todos.map((c) => c.ano))].sort((a, b) => b - a);
+  if (selA) {
+    const prev = selA.value;
+    selA.replaceChildren();
+    const o0 = document.createElement("option");
+    o0.value = "";
+    o0.textContent = "Todos os anos";
+    selA.appendChild(o0);
+    for (const a of anosUniq) {
+      const o = document.createElement("option");
+      o.value = String(a);
+      o.textContent = String(a);
+      selA.appendChild(o);
+    }
+    if (prev === "" || anosUniq.includes(Number(prev))) selA.value = prev;
+    else selA.value = "";
+  }
+  const compsUniq = [...new Set(todos.map(chaveCompeticaoCampeao))].sort((a, b) =>
+    String(a).localeCompare(String(b), "pt-BR"),
+  );
+  if (selC) {
+    const prevC = selC.value;
+    selC.replaceChildren();
+    const o0c = document.createElement("option");
+    o0c.value = "";
+    o0c.textContent = "Todas as competições";
+    selC.appendChild(o0c);
+    for (const nome of compsUniq) {
+      const o = document.createElement("option");
+      o.value = nome;
+      o.textContent = nome;
+      selC.appendChild(o);
+    }
+    let valorComp = "";
+    if (prevC) {
+      const registroValorAntigo = todos.find((x) => x.competicao === prevC);
+      if (registroValorAntigo) valorComp = chaveCompeticaoCampeao(registroValorAntigo);
+      else if (compsUniq.includes(prevC)) valorComp = prevC;
+    }
+    selC.value = valorComp === "" || compsUniq.includes(valorComp) ? valorComp : "";
+  }
+  const filtroAno = selA?.value === "" || selA?.value == null ? null : Number(selA.value);
+  const filtroComp = selC?.value === "" || selC?.value == null ? null : selC.value;
+  const lista = todos.filter(
+    (c) =>
+      (filtroAno == null || c.ano === filtroAno) &&
+      (filtroComp == null || chaveCompeticaoCampeao(c) === filtroComp),
+  );
+  els.campanhaHubCampeoesConteudo.replaceChildren();
+  const ulc = document.createElement("ul");
+  ulc.className = "campanha-hub-campeoes-lista";
+  for (const c of lista) {
+    const li = document.createElement("li");
+    const compCurto = nomeCompeticaoCampeaoSemAnoRepetido(c.competicao, c.ano);
+    const pre = document.createElement("span");
+    pre.className = "campanha-hub-campeoes-linha-pre";
+    pre.textContent = `${c.ano}: ${compCurto} \u2013 `;
+    const sp = document.createElement("span");
+    sp.className = "nome-com-bandeira";
+    const img = document.createElement("img");
+    img.className = "campanha-inline-flag";
+    const advS = selecaoPorId(c.vencedorId);
+    img.src = urlBandeira(advS?.iso ?? "xx", 24);
+    img.alt = "";
+    img.width = 24;
+    img.height = 16;
+    img.loading = "lazy";
+    sp.append(img, document.createTextNode(` ${advS?.nome ?? c.vencedorId}`));
+    li.append(pre, sp);
+    ulc.appendChild(li);
+  }
+  if (!lista.length) {
+    const li0 = document.createElement("li");
+    li0.className = "campanha-hub-campeoes-vazio";
+    let vazioMsg = "Nenhum título registrado ainda.";
+    if (filtroAno != null && filtroComp != null) vazioMsg = "Nenhum campeão com esses filtros.";
+    else if (filtroAno != null) vazioMsg = `Nenhum título em ${filtroAno}.`;
+    else if (filtroComp != null) vazioMsg = "Nenhum título nesta competição.";
+    li0.textContent = vazioMsg;
+    ulc.appendChild(li0);
+  }
+  els.campanhaHubCampeoesConteudo.appendChild(ulc);
+}
+
+/** @param {"inicio"|"competicoes"|"calendario"|"campeoes"} vista */
+function definirVistaHubCampanha(vista) {
+  const panes = {
+    inicio: els.campanhaHubPaneInicio,
+    competicoes: els.campanhaHubPaneCompeticoes,
+    calendario: els.campanhaHubPaneCalendario,
+    campeoes: els.campanhaHubPaneCampeoes,
+  };
+  for (const [k, el] of Object.entries(panes)) {
+    if (el) el.hidden = k !== vista;
+  }
+  const botoes = [
+    els.btnCampanhaVistaInicio,
+    els.btnCampanhaVistaCompeticoes,
+    els.btnCampanhaVistaCalendario,
+    els.btnCampanhaVistaCampeoes,
+  ];
+  for (const b of botoes) {
+    if (!b?.dataset.campanhaHubVista) continue;
+    const ativo = b.dataset.campanhaHubVista === vista;
+    b.classList.toggle("campanha-hub-tab--ativo", ativo);
+    b.setAttribute("aria-selected", ativo ? "true" : "false");
+  }
+}
+
+/**
+ * @param {import('./campaign-calendar.js').EventoCampanha} ev
+ * @param {string} selecaoHumanoId
+ */
+function humanoJogaEmCasaNoEventoCampanha(ev, selecaoHumanoId) {
+  if (ev.campanhaHumanoCasa === true) return true;
+  if (ev.campanhaHumanoCasa === false) return false;
+  if (ev.campanhaParHome) return ev.campanhaParHome === selecaoHumanoId;
+  return true;
+}
+
+/**
+ * Só o nome da competição (sem data, sem calendário de rodadas).
+ * @param {import('./campaign-calendar.js').EventoCampanha} ev
+ * @param {number} anoCalFallback
+ */
+function rotuloCompeticaoCurtoCampanha(ev, anoCalFallback) {
+  if (ev.tipo === "copa_mundial") {
+    return `Copa do Mundo ${ev.campanhaAno ?? anoCalFallback}`;
+  }
+  if (ev.tipo === "amistoso") return "Amistoso FIFA";
+  if (ev.torneioNome) return ev.torneioNome;
+  if (ev.tipo === "torneio_continental") return "Torneio continental";
+  return "Eliminatórias";
+}
+
+/**
+ * @param {HTMLSpanElement} sp
+ * @param {{ nome?: string, iso?: string } | null | undefined} meta
+ * @param {string} fallbackNome
+ */
+function preencherSpanNomeComBandeiraCampanha(sp, meta, fallbackNome) {
+  sp.className = "nome-com-bandeira";
+  const nome = meta?.nome ?? fallbackNome;
+  const iso = meta?.iso ?? "xx";
+  const img = document.createElement("img");
+  img.className = "campanha-inline-flag";
+  img.src = urlBandeira(iso, 24);
+  img.alt = "";
+  img.width = 24;
+  img.height = 16;
+  img.loading = "lazy";
+  sp.append(img, document.createTextNode(` ${nome}`));
+}
+
 function pintarCampanhaHub() {
   if (!campanhaEstadoMemoria) return;
   const rngReparo = criarRng(
@@ -4905,318 +5450,113 @@ function pintarCampanhaHub() {
   const sel = selecaoPorId(campanhaEstadoMemoria.selecaoId);
   const nomeSel = sel?.nome ?? campanhaEstadoMemoria.selecaoId;
   const proxEv = proximoEventoPendente(campanhaEstadoMemoria.eventos);
-  if (els.campanhaHubResumo) {
-    const torneioLinha =
-      proxEv?.torneioNome &&
-      (proxEv.tipo === "torneio_continental" || proxEv.tipo === "eliminatorias_copa")
-        ? ` Próximo: ${proxEv.torneioNome}${
-            proxEv.faseContinental && proxEv.faseContinental !== "grupos"
-              ? ` (${proxEv.faseContinental})`
-              : ""
-          }.`
-        : "";
-    const Tcur = campanhaEstadoMemoria.torneioContinental;
-    const nomCampTor =
-      Tcur?.campeaoContinentalId != null
-        ? selecaoPorId(Tcur.campeaoContinentalId)?.nome ?? Tcur.campeaoContinentalId
-        : "";
-    const elim =
-      Tcur?.eliminado
-        ? ` Eliminado do ${Tcur.nomeTorneio ?? "torneio continental"} em ${
-            campanhaEstadoMemoria.anoCalendario ?? ANO_BASE_CAMPANHA + campanhaEstadoMemoria.temporada - 1
-          }.${nomCampTor ? ` Campeão: ${nomCampTor}.` : ""}`
-        : "";
-    const elimWcq = "";
-    const anoHub = anoCalAtual;
+
+  if (els.campanhaHubCabecalhoJogador) {
     const mesHub = proxEv?.campanhaMes ?? campanhaEstadoMemoria.mesAtual ?? 3;
-    const dataHub = textoMesAno(mesHub, anoHub);
-    const infoTor = dadosTorneioContinental(campanhaEstadoMemoria.selecaoId);
-    const semContinental =
-      !campanhaEstadoMemoria.torneioContinental && !anoComEdicaoContinental(infoTor.key, anoHub)
-        ? ` Sem ${infoTor.nomeTorneio} neste ano civil (calendário FIFA); só amistosos.`
-        : "";
-    const anoCopaMsg = campanhaEstadoMemoria.copaClassificadosAno ?? ANO_COPA_MUNDO_CAMPANHA;
-    const clsCopa = campanhaEstadoMemoria.classificadosCopa2030;
-    const clsCopaOk =
-      Array.isArray(clsCopa) && (clsCopa.length === 48 || clsCopa.length === 32);
-    const linhaCopa2030 =
-      clsCopaOk &&
-      anoEhCopaMundialCampanha(anoHub) &&
-      anoCopaMsg === anoHub &&
-      !campanhaEstadoMemoria.copa2030Concluida
-        ? ` Copa ${anoHub}: 48 vagas preenchidas por confederação (quotas). O calendário inclui a janela do Mundial (junho ou julho, conforme haja torneio continental no mesmo ano); use “Jogar próximo evento” ou o botão abaixo para disputar ou acompanhar o torneio (continua na campanha após o fim).`
-        : "";
-    els.campanhaHubResumo.textContent = `${nomeSel} — ${dataHub} · temporada ${campanhaEstadoMemoria.temporada}. Elenco ampliado: ${campanhaEstadoMemoria.jogadores.length} jogadores; convocados: ${campanhaEstadoMemoria.convocadosIds.length}/23.${torneioLinha}${elim}${elimWcq}${semContinental}${linhaCopa2030}`;
-  }
-  if (els.campanhaHubTorneio && campanhaEstadoMemoria.torneioContinental) {
-    const T = campanhaEstadoMemoria.torneioContinental;
-    const letras = Object.keys(T.grupos ?? {}).sort();
-    const temGruposComJogos = letras.some((L) => (T.grupos[L]?.length ?? 0) >= 2);
-    els.campanhaHubTorneio.replaceChildren();
-    els.campanhaHubTorneio.hidden = !temGruposComJogos;
-    if (temGruposComJogos) {
-      const rngTab = criarRng(
-        (campanhaEstadoMemoria.seedCampanha ^ campanhaEstadoMemoria.temporada * 31) >>> 0,
-      );
-      const pid = campanhaEstadoMemoria.selecaoId;
-      const Lplay = T.playerGrupo ?? "A";
-      const anoEdicaoTor = anoEdicaoCompeticaoCampanhaNoHub(
-        campanhaEstadoMemoria,
-        "torneio_continental",
-        T.nomeTorneio,
-        anoCalAtual,
-      );
-
-      const regrasTxt = textoRegrasClassificacaoTorneioCampanha(T);
-      if (regrasTxt) {
-        const pRegras = document.createElement("p");
-        pRegras.className = "campanha-torneio-regras";
-        pRegras.textContent = regrasTxt;
-        els.campanhaHubTorneio.appendChild(pRegras);
-      }
-
-      const wrapPrincipal = document.createElement("div");
-      wrapPrincipal.className = "campanha-torneio-grupo-jogador";
-      const hPrin = document.createElement("h4");
-      hPrin.className = "copa-subtitulo";
-      hPrin.textContent = `${T.nomeTorneio} ${anoEdicaoTor} — grupo ${Lplay}`;
-      const tabPrin = document.createElement("div");
-      tabPrin.className = "copa-tabela-grupo";
-      tabPrin.innerHTML = htmlTabelaClassificacaoGrupoCampanha(T, Lplay, rngTab, pid, false);
-      wrapPrincipal.append(hPrin, tabPrin);
-      els.campanhaHubTorneio.appendChild(wrapPrincipal);
-
-      const outras = letras.filter((L) => L !== Lplay && (T.grupos[L]?.length ?? 0) >= 2);
-      if (outras.length > 0) {
-        const hint = document.createElement("p");
-        hint.className = "campanha-torneio-outros-hint";
-        hint.textContent = "Outros grupos";
-        els.campanhaHubTorneio.appendChild(hint);
-        const grid = document.createElement("div");
-        grid.className = "copa-tabelas-todos-grupos campanha-torneio-grid-outros";
-        for (const L of outras) {
-          const box = document.createElement("div");
-          box.className = "copa-mini-tabela-grupo";
-          const h = document.createElement("h4");
-          h.textContent = `Grupo ${L}`;
-          const inner = document.createElement("div");
-          inner.innerHTML = htmlTabelaClassificacaoGrupoCampanha(T, L, rngTab, pid, true);
-          box.append(h, inner);
-          grid.appendChild(box);
-        }
-        els.campanhaHubTorneio.appendChild(grid);
-      }
-
-      if (T.fase === "fim") {
-        const linhasHist = paragrafosHistoricoMataMataCampanha(T);
-        if (linhasHist.length) {
-          const boxHist = document.createElement("div");
-          boxHist.className = "campanha-torneio-historico-ko";
-          for (const linha of linhasHist) {
-            const p = document.createElement("p");
-            p.className = linha.startsWith("  ")
-              ? "campanha-torneio-historico-ko-jogo"
-              : "campanha-torneio-historico-ko-titulo";
-            p.textContent = linha.trimStart();
-            boxHist.appendChild(p);
-          }
-          els.campanhaHubTorneio.appendChild(boxHist);
-        } else if (T.campeaoContinentalId) {
-          const pLeg = document.createElement("p");
-          pLeg.className = "campanha-torneio-regras";
-          pLeg.textContent =
-            "O título foi decidido no mata-mata após a fase de grupos. Este save não guarda o detalhe dos placares (campanha iniciada antes da atualização).";
-          els.campanhaHubTorneio.appendChild(pLeg);
-        }
-      }
-
-      if (T.fase === "fim" && T.campeaoContinentalId) {
-        const pCamp = document.createElement("p");
-        pCamp.className = "campanha-torneio-campeao";
-        const nm = selecaoPorId(T.campeaoContinentalId)?.nome ?? T.campeaoContinentalId;
-        pCamp.textContent = `Campeão — ${T.nomeTorneio} ${anoEdicaoTor}: ${nm}.`;
-        els.campanhaHubTorneio.appendChild(pCamp);
-      }
-    }
-  } else if (els.campanhaHubTorneio) {
-    els.campanhaHubTorneio.replaceChildren();
-    els.campanhaHubTorneio.hidden = true;
+    const dataHub = textoMesAno(mesHub, anoCalAtual);
+    const iso = sel?.iso ?? "xx";
+    els.campanhaHubCabecalhoJogador.innerHTML = `<div class="campanha-hub-cabecalho-inner">
+      <img class="campanha-hub-cab-flag" src="${urlBandeira(iso, 56)}" alt="" width="56" height="42" loading="lazy" />
+      <div class="campanha-hub-cabecalho-texto">
+        <p class="campanha-hub-cabecalho-nome">${escapeHtml(nomeSel)}</p>
+        <p class="campanha-hub-cabecalho-data tela-menu-sub">${escapeHtml(dataHub)} · temporada ${campanhaEstadoMemoria.temporada ?? 1}</p>
+      </div>
+    </div>`;
   }
 
-  if (els.campanhaHubEliminatorias && campanhaEstadoMemoria.eliminatoriasCopa) {
-    const We = campanhaEstadoMemoria.eliminatoriasCopa;
-    const letrasW = Object.keys(We.grupos ?? {}).sort();
-    const temW = letrasW.some((L) => (We.grupos[L]?.length ?? 0) >= 2);
-    els.campanhaHubEliminatorias.replaceChildren();
-    els.campanhaHubEliminatorias.hidden = !temW;
-    if (temW) {
-      const rngW = criarRng(
-        (campanhaEstadoMemoria.seedCampanha ^ campanhaEstadoMemoria.temporada * 97) >>> 0,
-      );
-      const pidW = campanhaEstadoMemoria.selecaoId;
-      const Lw = We.playerGrupo ?? "A";
-      const tituloWcq = tituloEliminatoriasCopaMundial(
-        We.confKey,
-        campanhaEstadoMemoria.wcqCicloCopaAlvo ?? ANO_COPA_MUNDO_CAMPANHA,
-      );
-      const anoEdicaoWcq = anoEdicaoCompeticaoCampanhaNoHub(
-        campanhaEstadoMemoria,
-        "eliminatorias_copa",
-        We.nomeTorneio,
-        anoCalAtual,
-      );
-      const pRegrasW = document.createElement("p");
-      pRegrasW.className = "campanha-torneio-regras";
-      pRegrasW.textContent = textoRegrasEliminatoriasCopaCampanha(
-        We,
-        campanhaEstadoMemoria,
-      );
-      els.campanhaHubEliminatorias.appendChild(pRegrasW);
-      const wrapW = document.createElement("div");
-      wrapW.className = "campanha-torneio-grupo-jogador campanha-elims-wrap";
-      const hW = document.createElement("h4");
-      hW.className = "copa-subtitulo";
-      hW.textContent = `${tituloWcq} ${anoEdicaoWcq} — grupo ${Lw}`;
-      const tabW = document.createElement("div");
-      tabW.className = "copa-tabela-grupo";
-      tabW.innerHTML = htmlTabelaClassificacaoGrupoCampanha(We, Lw, rngW, pidW, false);
-      wrapW.append(hW, tabW);
-      els.campanhaHubEliminatorias.appendChild(wrapW);
-      const outW = letrasW.filter((L) => L !== Lw && (We.grupos[L]?.length ?? 0) >= 2);
-      if (outW.length > 0) {
-        const hintW = document.createElement("p");
-        hintW.className = "campanha-torneio-outros-hint";
-        hintW.textContent = "Outros grupos (eliminatórias)";
-        els.campanhaHubEliminatorias.appendChild(hintW);
-        const gridW = document.createElement("div");
-        gridW.className = "copa-tabelas-todos-grupos campanha-torneio-grid-outros";
-        for (const L of outW) {
-          const box = document.createElement("div");
-          box.className = "copa-mini-tabela-grupo";
-          const h = document.createElement("h4");
-          h.textContent = `Grupo ${L}`;
-          const inner = document.createElement("div");
-          inner.innerHTML = htmlTabelaClassificacaoGrupoCampanha(We, L, rngW, pidW, true);
-          box.append(h, inner);
-          gridW.appendChild(box);
-        }
-        els.campanhaHubEliminatorias.appendChild(gridW);
-      }
-
-      if (We.fase === "fim") {
-        const linhasHistW = paragrafosHistoricoMataMataCampanha(We);
-        if (linhasHistW.length) {
-          const boxHistW = document.createElement("div");
-          boxHistW.className = "campanha-torneio-historico-ko";
-          for (const linha of linhasHistW) {
-            const p = document.createElement("p");
-            p.className = linha.startsWith("  ")
-              ? "campanha-torneio-historico-ko-jogo"
-              : "campanha-torneio-historico-ko-titulo";
-            p.textContent = linha.trimStart();
-            boxHistW.appendChild(p);
-          }
-          els.campanhaHubEliminatorias.appendChild(boxHistW);
-        } else if (We.wcqClassificadosKoIds?.length || We.campeaoContinentalId) {
-          const pLegW = document.createElement("p");
-          pLegW.className = "campanha-torneio-regras";
-          pLegW.textContent =
-            "A fase eliminatória foi simulada após os grupos. Este save não guarda o detalhe dos placares (campanha iniciada antes da atualização).";
-          els.campanhaHubEliminatorias.appendChild(pLegW);
-        }
-      }
-
-      if (We.fase === "fim") {
-        const txtCls = textoHubEliminatoriasClassificadosCopa(campanhaEstadoMemoria, We);
-        if (txtCls) {
-          const pCampW = document.createElement("p");
-          pCampW.className = "campanha-torneio-campeao";
-          pCampW.textContent = txtCls;
-          els.campanhaHubEliminatorias.appendChild(pCampW);
-        }
-      }
-    }
-  } else if (els.campanhaHubEliminatorias) {
-    els.campanhaHubEliminatorias.replaceChildren();
-    els.campanhaHubEliminatorias.hidden = true;
-  }
-
-  if (els.campanhaHubEventosTituloAno) {
-    els.campanhaHubEventosTituloAno.textContent = `Calendário ${anoCalAtual}`;
-    els.campanhaHubEventosTituloAno.hidden = false;
-  }
-  if (els.campanhaHubEventos) {
-    els.campanhaHubEventos.replaceChildren();
-    appendCampanhaCalendarioLinhas(
-      els.campanhaHubEventos,
-      campanhaEstadoMemoria.eventos,
-      campanhaEstadoMemoria,
-      proxEv,
-    );
-  }
-  if (els.campanhaHubEventosHistorico) {
-    els.campanhaHubEventosHistorico.replaceChildren();
-    const hist = campanhaEstadoMemoria.historicoEventosCampanha ?? [];
-    if (!hist.length) {
-      els.campanhaHubEventosHistorico.hidden = true;
+  if (els.campanhaHubProximoJogoConteudo) {
+    const box = els.campanhaHubProximoJogoConteudo;
+    box.replaceChildren();
+    if (!proxEv) {
+      box.appendChild(document.createTextNode("Não há mais eventos no calendário desta temporada."));
     } else {
-      els.campanhaHubEventosHistorico.hidden = false;
-      const intro = document.createElement("p");
-      intro.className = "campanha-hub-calendario-hist-intro tela-menu-sub";
-      intro.textContent =
-        "Anos anteriores: expanda cada ano para ver o calendário completo e os seus resultados.";
-      els.campanhaHubEventosHistorico.appendChild(intro);
-      for (const bloco of hist) {
-        const nConc = bloco.eventos.filter((x) => x.concluido).length;
-        const det = document.createElement("details");
-        det.className = "campanha-hub-calendario-details";
-        const sum = document.createElement("summary");
-        sum.textContent = `Ano civil ${bloco.ano} (${nConc}/${bloco.eventos.length} jogos)`;
-        det.appendChild(sum);
-        const ulh = document.createElement("ul");
-        ulh.className = "campanha-hub-eventos campanha-hub-eventos--historico";
-        appendCampanhaCalendarioLinhas(ulh, bloco.eventos, campanhaEstadoMemoria, null);
-        det.appendChild(ulh);
-        els.campanhaHubEventosHistorico.appendChild(det);
+      const mes = proxEv.campanhaMes ?? campanhaEstadoMemoria.mesAtual ?? 3;
+      const anoEv = proxEv.campanhaAno ?? anoCalAtual;
+      const dataStr = textoMesAnoCurto(mes, anoEv);
+      const comp = rotuloCompeticaoCurtoCampanha(proxEv, anoCalAtual);
+      const p = document.createElement("p");
+      p.className = "campanha-hub-proximo-par";
+      if (proxEv.tipo === "copa_mundial" || !proxEv.adversarioId) {
+        const t = document.createElement("span");
+        t.textContent = `${dataStr}: ${comp}`;
+        p.appendChild(t);
+      } else {
+        const pid = campanhaEstadoMemoria.selecaoId;
+        const humCasa = humanoJogaEmCasaNoEventoCampanha(proxEv, pid);
+        const sHum = selecaoPorId(pid);
+        const sAdv = selecaoPorId(proxEv.adversarioId);
+        const head = document.createElement("span");
+        head.textContent = `${dataStr}: `;
+        p.appendChild(head);
+        const wrap = document.createElement("span");
+        wrap.className = "campanha-hub-proximo-confronto";
+        const spCasa = document.createElement("span");
+        const spVisit = document.createElement("span");
+        if (humCasa) {
+          preencherSpanNomeComBandeiraCampanha(spCasa, sHum, pid);
+          preencherSpanNomeComBandeiraCampanha(spVisit, sAdv, proxEv.adversarioId);
+        } else {
+          preencherSpanNomeComBandeiraCampanha(spCasa, sAdv, proxEv.adversarioId);
+          preencherSpanNomeComBandeiraCampanha(spVisit, sHum, pid);
+        }
+        wrap.append(spCasa, document.createTextNode(" × "), spVisit);
+        p.appendChild(wrap);
+        const tail = document.createElement("span");
+        tail.textContent = ` (${comp})`;
+        p.appendChild(tail);
       }
+      box.appendChild(p);
     }
   }
-  if (els.campanhaHubCampeoesHistorico) {
-    els.campanhaHubCampeoesHistorico.replaceChildren();
-    const campeoes = listarCampeoesCampanhaOrdenados(campanhaEstadoMemoria);
-    const det = document.createElement("details");
-    det.className = "campanha-hub-campeoes-details";
-    const sum = document.createElement("summary");
-    sum.textContent =
-      campeoes.length > 0
-        ? `Campeões (Copa do Mundo e continentais) — ${campeoes.length} título(s)`
-        : "Campeões (Copa do Mundo e continentais)";
-    det.appendChild(sum);
-    const intro = document.createElement("p");
-    intro.className = "campanha-hub-calendario-hist-intro tela-menu-sub";
-    intro.textContent =
-      campeoes.length > 0
-        ? "Todos os torneios continentais com edição nesse ano civil e o campeão simulado ou decidido na sua campanha; o Mundial é registado ao terminar o hub da Copa."
-        : "Os títulos aparecem aqui conforme avança a campanha: continentais ao fechar cada ano civil e a Copa do Mundo ao concluir o torneio.";
-    det.appendChild(intro);
-    const ulc = document.createElement("ul");
-    ulc.className = "campanha-hub-campeoes-lista";
-    for (const c of campeoes) {
-      const li = document.createElement("li");
-      const nm = selecaoPorId(c.vencedorId)?.nome ?? c.vencedorId;
-      li.textContent = `${c.ano} — ${c.competicao} — ${nm}`;
-      ulc.appendChild(li);
+
+  if (els.campanhaHubTabelasProximo) {
+    const tp = els.campanhaHubTabelasProximo;
+    tp.replaceChildren();
+    const mostrarTab =
+      proxEv &&
+      (proxEv.tipo === "torneio_continental" || proxEv.tipo === "eliminatorias_copa");
+    if (!mostrarTab) {
+      tp.hidden = true;
+    } else if (proxEv.tipo === "torneio_continental" && campanhaEstadoMemoria.torneioContinental) {
+      popularCampanhaTorneioContinentalNoEl(tp, campanhaEstadoMemoria, anoCalAtual, {
+        todosGrupos: false,
+        detalheMataMata: false,
+      });
+    } else if (proxEv.tipo === "eliminatorias_copa" && campanhaEstadoMemoria.eliminatoriasCopa) {
+      popularCampanhaEliminatoriasNoEl(tp, campanhaEstadoMemoria, anoCalAtual, {
+        todosGrupos: false,
+        detalheMataMata: false,
+      });
+    } else {
+      tp.hidden = true;
     }
-    if (!campeoes.length) {
-      const li0 = document.createElement("li");
-      li0.className = "campanha-hub-campeoes-vazio";
-      li0.textContent = "Nenhum título registado ainda.";
-      ulc.appendChild(li0);
-    }
-    det.appendChild(ulc);
-    els.campanhaHubCampeoesHistorico.appendChild(det);
-    els.campanhaHubCampeoesHistorico.hidden = false;
   }
+
+  if (els.campanhaHubTorneio) {
+    if (campanhaEstadoMemoria.torneioContinental) {
+      popularCampanhaTorneioContinentalNoEl(els.campanhaHubTorneio, campanhaEstadoMemoria, anoCalAtual, {
+        todosGrupos: true,
+        detalheMataMata: true,
+      });
+    } else {
+      els.campanhaHubTorneio.replaceChildren();
+      els.campanhaHubTorneio.hidden = true;
+    }
+  }
+  if (els.campanhaHubEliminatorias) {
+    if (campanhaEstadoMemoria.eliminatoriasCopa) {
+      popularCampanhaEliminatoriasNoEl(els.campanhaHubEliminatorias, campanhaEstadoMemoria, anoCalAtual, {
+        todosGrupos: true,
+        detalheMataMata: true,
+      });
+    } else {
+      els.campanhaHubEliminatorias.replaceChildren();
+      els.campanhaHubEliminatorias.hidden = true;
+    }
+  }
+
+  pintarCampanhaHubCalendarioPane();
+  pintarCampanhaHubCampeoesPane();
   const proxEvPend = proximoEventoPendente(campanhaEstadoMemoria.eventos);
   const podeJogar =
     campanhaEstadoMemoria.convocadosIds.length === 23 &&
@@ -5225,10 +5565,12 @@ function pintarCampanhaHub() {
         (proxEvPend.tipo === "copa_mundial" || Boolean(proxEvPend.adversarioId)),
     );
   if (els.btnCampanhaJogarProximo) {
-    els.btnCampanhaJogarProximo.disabled = !podeJogar;
+    els.btnCampanhaJogarProximo.disabled =
+      !podeJogar || Boolean(campanhaSimulacaoPendenteFinalizar);
   }
   if (els.btnCampanhaSimularProximo) {
-    els.btnCampanhaSimularProximo.disabled = !podeJogar;
+    els.btnCampanhaSimularProximo.disabled =
+      !podeJogar || Boolean(campanhaSimulacaoPendenteFinalizar);
   }
   if (els.btnCampanhaCopa2030) {
     const idsCopaBtn = campanhaEstadoMemoria.classificadosCopa2030;
@@ -5287,7 +5629,9 @@ function pintarCampanhaConvocacaoLista() {
     meta.className = "campanha-jogador-meta campanha-jogador-meta--stats";
     meta.append(
       document.createTextNode(
-        `${j.nome} · ${POSITION_LABEL[j.posicao]} · ${j.idade}a · `,
+        j.posicao === POSITIONS.GOLEIRO
+          ? `${j.nome} · ${j.idade}a · `
+          : `${j.nome} · ${POSITION_LABEL[j.posicao]} · ${j.idade}a · `,
       ),
     );
     const statsWrap = document.createElement("span");
@@ -5356,7 +5700,11 @@ function pintarCopaConvocacaoLista() {
         ? `${/** @type {{ idade: number }} */ (j).idade}a · `
         : "";
     meta.append(
-      document.createTextNode(`${j.nome} · ${POSITION_LABEL[j.posicao]} · ${idadeTxt}`),
+      document.createTextNode(
+        j.posicao === POSITIONS.GOLEIRO
+          ? `${j.nome} · ${idadeTxt}`
+          : `${j.nome} · ${POSITION_LABEL[j.posicao]} · ${idadeTxt}`,
+      ),
     );
     const statsWrap = document.createElement("span");
     statsWrap.className = "campanha-jogador-stats";
@@ -5443,6 +5791,8 @@ function montarCardsSelecaoCampanha() {
 }
 
 function abrirTelaCampanhaMenuInicial() {
+  campanhaSimulacaoPendenteFinalizar = null;
+  esconderOverlayResultadoSimulacaoCampanha();
   esconderTodasTelasMenu();
   if (els.telaCampanha) {
     els.telaCampanha.removeAttribute("hidden");
@@ -5464,7 +5814,349 @@ function forcaMediaTitularesCampanha() {
   return s / t.length;
 }
 
+/**
+ * Autor de gol simulado na campanha (titulares + reservas da partida).
+ * @param {object[]} titulares
+ * @param {object[]} reservas
+ * @param {() => number} rng
+ * @returns {string | null}
+ */
+function sortearNomeAutorGolElencoCampanha(titulares, reservas, rng) {
+  const titOut = titulares.filter((p) => p.posicao !== POSITIONS.GOLEIRO);
+  const resOut = reservas.filter((p) => p.posicao !== POSITIONS.GOLEIRO);
+  if (titOut.length === 0 && resOut.length === 0) return null;
+  const u = rng();
+  const setor =
+    u < 0.6 ? POSITIONS.ATACANTE : u < 0.9 ? POSITIONS.MEIA : POSITIONS.ZAGUEIRO;
+  let poolTit = titOut.filter((p) => p.posicao === setor);
+  let poolRes = resOut.filter((p) => p.posicao === setor);
+  if (poolTit.length === 0 && poolRes.length === 0) {
+    poolTit = titOut;
+    poolRes = resOut;
+  }
+  let pool;
+  if (poolTit.length === 0) pool = poolRes;
+  else if (poolRes.length === 0) pool = poolTit;
+  else pool = rng() < 0.8 ? poolTit : poolRes;
+  return pickWeightedByAtaque(pool, rng);
+}
+
+function pickTitularOuReservaCampoPreferTit(titulares, reservas, rng) {
+  const titF = titulares.filter((p) => p.posicao !== POSITIONS.GOLEIRO);
+  const resF = reservas.filter((p) => p.posicao !== POSITIONS.GOLEIRO);
+  const pool =
+    rng() < 0.88 && titF.length ? titF : resF.length ? resF : titF.length ? titF : resF;
+  if (!pool.length) {
+    const all = [...titulares, ...reservas];
+    return all.length ? all[Math.floor(rng() * all.length)] : null;
+  }
+  return pool[Math.floor(rng() * pool.length)];
+}
+
+/**
+ * @param {() => number} rng
+ * @param {string | undefined} proxTipo
+ * @param {number} gh
+ * @param {number} ga
+ * @returns {CampanhaRelatorioSimulacao}
+ */
+function gerarRelatorioSimulacaoCampanhaHub(rng, proxTipo, gh, ga) {
+  /** @type {Map<string, number>} */
+  const golsPorJogadorId = new Map();
+  for (let i = 0; i < gh; i++) {
+    const nome = sortearNomeAutorGolElencoCampanha(
+      timeJogador.titulares,
+      timeJogador.reservas,
+      rng,
+    );
+    if (!nome) continue;
+    const j = [...timeJogador.titulares, ...timeJogador.reservas].find((x) => x.nome === nome);
+    if (!j) continue;
+    golsPorJogadorId.set(j.id, (golsPorJogadorId.get(j.id) ?? 0) + 1);
+  }
+  /** @type {Map<string, number>} */
+  const golsCpuPorNome = new Map();
+  for (let i = 0; i < ga; i++) {
+    const nome = sortearNomeAutorGolElencoCampanha(timeCpu.titulares, timeCpu.reservas, rng);
+    if (!nome) continue;
+    golsCpuPorNome.set(nome, (golsCpuPorNome.get(nome) ?? 0) + 1);
+  }
+
+  /** @type {{ id: string, nome: string, tipo: "amarelo" | "vermelho" }[]} */
+  const cartoesHumano = [];
+  /** @type {{ nome: string, tipo: "amarelo" | "vermelho" }[]} */
+  const cartoesCpu = [];
+  const idsComCartaoHum = new Set();
+  const nYellowH = rng() < 0.62 ? 0 : rng() < 0.74 ? 1 : rng() < 0.9 ? 2 : 3;
+  for (let i = 0; i < nYellowH; i++) {
+    const j = pickTitularOuReservaCampoPreferTit(timeJogador.titulares, timeJogador.reservas, rng);
+    if (!j || idsComCartaoHum.has(j.id)) continue;
+    idsComCartaoHum.add(j.id);
+    cartoesHumano.push({ id: j.id, nome: j.nome, tipo: "amarelo" });
+  }
+  if (rng() < 0.042) {
+    const j = pickTitularOuReservaCampoPreferTit(timeJogador.titulares, timeJogador.reservas, rng);
+    if (j) {
+      const ix = cartoesHumano.findIndex((c) => c.id === j.id && c.tipo === "amarelo");
+      if (ix >= 0) cartoesHumano.splice(ix, 1);
+      if (!cartoesHumano.some((c) => c.id === j.id && c.tipo === "vermelho")) {
+        cartoesHumano.push({ id: j.id, nome: j.nome, tipo: "vermelho" });
+        idsComCartaoHum.add(j.id);
+      }
+    }
+  }
+  const nYellowC = rng() < 0.68 ? 0 : rng() < 0.9 ? 1 : 2;
+  const nomesCartCpu = new Set();
+  for (let i = 0; i < nYellowC; i++) {
+    const j = pickTitularOuReservaCampoPreferTit(timeCpu.titulares, timeCpu.reservas, rng);
+    if (!j || nomesCartCpu.has(j.nome)) continue;
+    nomesCartCpu.add(j.nome);
+    cartoesCpu.push({ nome: j.nome, tipo: "amarelo" });
+  }
+  if (rng() < 0.045) {
+    const j = pickTitularOuReservaCampoPreferTit(timeCpu.titulares, timeCpu.reservas, rng);
+    if (j) cartoesCpu.push({ nome: j.nome, tipo: "vermelho" });
+  }
+
+  /** @type {{ id: string, nome: string, partidasFora: number }[]} */
+  const lesoesHumanoPersist = [];
+  /** @type {{ nome: string }[]} */
+  const lesoesHumanoLeve = [];
+  /** @type {{ nome: string }[]} */
+  const lesoesCpu = [];
+
+  if (proxTipo === "torneio_continental" && rng() < 0.038) {
+    const j = pickTitularOuReservaCampoPreferTit(timeJogador.titulares, timeJogador.reservas, rng);
+    if (j) {
+      lesoesHumanoPersist.push({
+        id: j.id,
+        nome: j.nome,
+        partidasFora: sortearPartidasForaLesaoCopa(rng),
+      });
+    }
+  } else if (rng() < 0.03) {
+    const j = pickTitularOuReservaCampoPreferTit(timeJogador.titulares, timeJogador.reservas, rng);
+    if (j) lesoesHumanoLeve.push({ nome: j.nome });
+  }
+  if (rng() < 0.036) {
+    const j = pickTitularOuReservaCampoPreferTit(timeCpu.titulares, timeCpu.reservas, rng);
+    if (j) lesoesCpu.push({ nome: j.nome });
+  }
+
+  return {
+    golsPorJogadorId,
+    golsCpuPorNome,
+    cartoesHumano,
+    cartoesCpu,
+    lesoesHumanoPersist,
+    lesoesHumanoLeve,
+    lesoesCpu,
+  };
+}
+
+function preencherMinutosSimulacaoCampanhaHumano(rng) {
+  minutosCampanhaPartidaPorId.clear();
+  for (const j of timeJogador.titulares) minutosCampanhaPartidaPorId.set(j.id, 90);
+  for (const j of timeJogador.reservas) {
+    if (rng() < 0.24) minutosCampanhaPartidaPorId.set(j.id, Math.floor(12 + rng() * 28));
+  }
+}
+
+/**
+ * @param {CampanhaRelatorioSimulacao} rel
+ * @param {string} idHumano
+ * @param {string} idAdv
+ * @param {number} gh gols do seu time (sempre o elenco humano na simulação)
+ * @param {number} ga gols do adversário simulado
+ * @param {import('./campaign-calendar.js').EventoCampanha | null | undefined} proxEv evento do jogo (mandante/visitante)
+ */
+function htmlRelatorioSimulacaoCampanha(rel, idHumano, idAdv, gh, ga, proxEv) {
+  const humanoCasa = humanoJogaEmCasaNoEventoCampanha(proxEv ?? {}, idHumano);
+  const idHome = humanoCasa ? idHumano : idAdv;
+  const idAway = humanoCasa ? idAdv : idHumano;
+  const gHome = humanoCasa ? gh : ga;
+  const gAway = humanoCasa ? ga : gh;
+  const colHomeEhHumano = humanoCasa;
+  const proxTipo = proxEv?.tipo;
+
+  const secGolsHum = [];
+  for (const [id, n] of [...rel.golsPorJogadorId.entries()].sort((a, b) => b[1] - a[1])) {
+    const j = [...timeJogador.titulares, ...timeJogador.reservas].find((x) => x.id === id);
+    const nm = j?.nome ?? id;
+    secGolsHum.push(`<li>${escapeHtml(nm)} — ${n} gol${n > 1 ? "s" : ""}</li>`);
+  }
+  const secGolsAdv = [];
+  for (const [nome, n] of [...rel.golsCpuPorNome.entries()].sort((a, b) => b[1] - a[1])) {
+    secGolsAdv.push(`<li>${escapeHtml(nome)} — ${n} gol${n > 1 ? "s" : ""}</li>`);
+  }
+
+  const fmtCart = (tipo) => (tipo === "vermelho" ? "cartão vermelho" : "cartão amarelo");
+
+  const htmlGolsCol = (isHuman) => {
+    const items = isHuman ? secGolsHum : secGolsAdv;
+    return items.length
+      ? `<ul class="campanha-sim-broadcast-list">${items.join("")}</ul>`
+      : `<p class="campanha-sim-broadcast-empty">Nenhum gol.</p>`;
+  };
+
+  const secCartoesCol = (isHuman) => {
+    const arr = isHuman ? rel.cartoesHumano : rel.cartoesCpu;
+    if (!arr.length) return "";
+    const linhas = arr.map(
+      (c) => `<li>${escapeHtml(c.nome)} — ${fmtCart(c.tipo)}</li>`,
+    );
+    return `<div class="campanha-sim-broadcast-sec">
+        <h4 class="campanha-sim-broadcast-sec-tit">Cartões</h4>
+        <ul class="campanha-sim-broadcast-list">${linhas.join("")}</ul>
+      </div>`;
+  };
+
+  const secLesoesCol = (isHuman) => {
+    const linLes = [];
+    if (isHuman) {
+      for (const L of rel.lesoesHumanoPersist) {
+        const det =
+          L.partidasFora <= 0
+            ? "liberado para o próximo jogo da competição"
+            : L.partidasFora === 1
+              ? "pelo menos 1 jogo de fora na competição"
+              : `pelo menos ${L.partidasFora} jogos de fora na competição`;
+        linLes.push(`<li>${escapeHtml(L.nome)} — ${det}.</li>`);
+      }
+      for (const L of rel.lesoesHumanoLeve) {
+        linLes.push(
+          `<li>${escapeHtml(L.nome)} — contusão leve (só nesta partida; sem efeito nas eliminatórias ou fora do torneio continental).</li>`,
+        );
+      }
+    } else {
+      for (const L of rel.lesoesCpu) {
+        linLes.push(`<li>${escapeHtml(L.nome)} — saída por precaução (simulação).</li>`);
+      }
+    }
+    if (!linLes.length) return "";
+    return `<div class="campanha-sim-broadcast-sec">
+        <h4 class="campanha-sim-broadcast-sec-tit">Lesões</h4>
+        <ul class="campanha-sim-broadcast-list">${linLes.join("")}</ul>
+      </div>`;
+  };
+
+  const htmlCol = (mandante) => {
+    const isHuman = mandante ? colHomeEhHumano : !colHomeEhHumano;
+    const idT = mandante ? idHome : idAway;
+    const nomeCol = selecaoPorId(idT)?.nome ?? idT;
+    return `<div class="campanha-sim-broadcast-col" role="group" aria-label="${escapeHtml(nomeCol)}">
+      <div class="campanha-sim-broadcast-col-head">
+        <div class="campanha-sim-broadcast-col-team">${htmlNomeSelecaoBandeiraCampanhaHtml(idT, false)}</div>
+      </div>
+      <div class="campanha-sim-broadcast-sec">
+        <h4 class="campanha-sim-broadcast-sec-tit">Gols</h4>
+        ${htmlGolsCol(isHuman)}
+      </div>
+      ${secCartoesCol(isHuman)}
+      ${secLesoesCol(isHuman)}
+    </div>`;
+  };
+
+  const notas = [];
+  if (proxTipo === "torneio_continental" && (rel.lesoesHumanoPersist.length || rel.cartoesHumano.length)) {
+    notas.push(
+      `<p class="campanha-sim-broadcast-nota">Cartões e lesões persistentes do seu time valem para o torneio continental na campanha.</p>`,
+    );
+  }
+  if (proxTipo === "eliminatorias_copa" && rel.cartoesHumano.length) {
+    notas.push(
+      `<p class="campanha-sim-broadcast-nota">Os cartões do seu time contam para as eliminatórias (3 amarelos = suspensão).</p>`,
+    );
+  }
+
+  return `<div class="campanha-sim-broadcast">
+    <div class="campanha-sim-broadcast-score">
+      <p class="campanha-sim-placar">
+        <span class="campanha-sim-placar-lado">${htmlNomeSelecaoBandeiraCampanhaHtml(idHome, false)}</span>
+        <span class="campanha-sim-placar-num campanha-sim-placar-num--broadcast"><strong>${gHome}</strong><span class="campanha-sim-placar-x">×</span><strong>${gAway}</strong></span>
+        <span class="campanha-sim-placar-lado">${htmlNomeSelecaoBandeiraCampanhaHtml(idAway, false)}</span>
+      </p>
+    </div>
+    <div class="campanha-sim-broadcast-grid">
+      ${htmlCol(true)}
+      ${htmlCol(false)}
+    </div>
+    ${notas.length ? `<div class="campanha-sim-broadcast-notas">${notas.join("")}</div>` : ""}
+  </div>`;
+}
+
+function mostrarOverlayResultadoSimulacaoCampanha(html) {
+  if (els.campanhaSimResultadoConteudo) els.campanhaSimResultadoConteudo.innerHTML = html;
+  if (els.campanhaSimOverlay) {
+    els.campanhaSimOverlay.removeAttribute("hidden");
+    els.campanhaSimOverlay.style.removeProperty("display");
+  }
+}
+
+function esconderOverlayResultadoSimulacaoCampanha() {
+  if (els.campanhaSimOverlay) {
+    els.campanhaSimOverlay.setAttribute("hidden", "");
+    els.campanhaSimOverlay.style.removeProperty("display");
+  }
+}
+
+function confirmarSimulacaoCampanhaHubAplicarEFinalizar() {
+  const p = campanhaSimulacaoPendenteFinalizar;
+  if (!p || !campanhaEstadoMemoria) {
+    esconderOverlayResultadoSimulacaoCampanha();
+    return;
+  }
+  try {
+    campanhaEventoAtualId = p.prox.id;
+    const { titulares, reservas } = montarTimeJogadorCampanhaParaPartida(campanhaEstadoMemoria);
+    timeJogador = { titulares, reservas };
+    timeCpu = elencoSelecaoCom12Reservas(p.prox.adversarioId);
+    tipoModoJogo = "campanha";
+    metaSelecaoJogador = selecaoPorId(campanhaEstadoMemoria.selecaoId);
+    metaSelecaoCpu = selecaoPorId(p.prox.adversarioId);
+    golsJogador = p.gh;
+    golsCpu = p.ga;
+    golsPorJogadorNaPartida.clear();
+    for (const [id, n] of p.relatorio.golsPorJogadorId) {
+      golsPorJogadorNaPartida.set(id, n);
+    }
+    const findH = (id) => [...timeJogador.titulares, ...timeJogador.reservas].find((x) => x.id === id);
+    for (const c of p.relatorio.cartoesHumano) {
+      const j = findH(c.id);
+      if (j) registrarDisciplinaCopaHumanoAposCartao(j, c.tipo);
+    }
+    for (const L of p.relatorio.lesoesHumanoPersist) {
+      const j = findH(L.id);
+      if (j) {
+        j.lesionado = true;
+        j.copaLesaoPartidasFora = L.partidasFora;
+      }
+    }
+    const rngM = criarRng(
+      (campanhaEstadoMemoria.seedCampanha ^ String(p.prox.id).length * 131) >>> 0,
+    );
+    resetMinutosCampanhaPartida();
+    preencherMinutosSimulacaoCampanhaHumano(rngM);
+    snapshotElencoLimpo();
+    gravarSnapshotDisciplinaCampanhaCompSeAtiva();
+    finalizarCampanhaAposPartida();
+    campanhaSimulacaoPendenteFinalizar = null;
+    esconderOverlayResultadoSimulacaoCampanha();
+    pintarCampanhaHub();
+  } catch (e) {
+    console.error(e);
+    campanhaSimulacaoPendenteFinalizar = null;
+    campanhaEventoAtualId = null;
+    esconderOverlayResultadoSimulacaoCampanha();
+    alert(String(e?.message ?? e));
+  }
+}
+
 function simularProximoJogoCampanhaHub() {
+  if (campanhaSimulacaoPendenteFinalizar) {
+    alert("Confirme ou conclua o resultado da simulação em curso antes de simular outro jogo.");
+    return;
+  }
   if (!campanhaEstadoMemoria) campanhaEstadoMemoria = carregarCampanhaAtiva();
   if (!campanhaEstadoMemoria || campanhaEstadoMemoria.convocadosIds.length !== 23) {
     alert("Defina a convocação de 23 jogadores no hub da campanha.");
@@ -5481,27 +6173,32 @@ function simularProximoJogoCampanhaHub() {
     alert("Não há próximo jogo simulável no calendário.");
     return;
   }
-  campanhaEventoAtualId = prox.id;
   try {
     const { titulares, reservas } = montarTimeJogadorCampanhaParaPartida(campanhaEstadoMemoria);
     timeJogador = { titulares, reservas };
+    timeCpu = elencoSelecaoCom12Reservas(prox.adversarioId);
     const rng = criarRng((campanhaEstadoMemoria.seedCampanha ^ Date.now() ^ 0x51937131) >>> 0);
     const fHum = forcaMediaTitularesCampanha();
     const fAdv = forcaSelecaoId(prox.adversarioId);
     const { gh, ga } = simularPlacarSemEmpate(fHum, fAdv, rng);
-    golsJogador = gh;
-    golsCpu = ga;
-    tipoModoJogo = "campanha";
-    metaSelecaoJogador = selecaoPorId(campanhaEstadoMemoria.selecaoId);
-    metaSelecaoCpu = selecaoPorId(prox.adversarioId);
-    resetMinutosCampanhaPartida();
-    snapshotElencoLimpo();
-    gravarSnapshotDisciplinaCampanhaCompSeAtiva();
-    finalizarCampanhaAposPartida();
+    const relatorio = gerarRelatorioSimulacaoCampanhaHub(rng, prox.tipo, gh, ga);
+    campanhaSimulacaoPendenteFinalizar = { prox, gh, ga, relatorio };
+    mostrarOverlayResultadoSimulacaoCampanha(
+      htmlRelatorioSimulacaoCampanha(
+        relatorio,
+        campanhaEstadoMemoria.selecaoId,
+        prox.adversarioId,
+        gh,
+        ga,
+        prox,
+      ),
+    );
     pintarCampanhaHub();
   } catch (e) {
     console.error(e);
+    campanhaSimulacaoPendenteFinalizar = null;
     campanhaEventoAtualId = null;
+    esconderOverlayResultadoSimulacaoCampanha();
     alert(String(e?.message ?? e));
   }
 }
@@ -5690,7 +6387,31 @@ els.btnCampanhaRefazerConvocacao?.addEventListener("click", () => {
   pintarCampanhaConvocacaoLista();
 });
 
+const vistasHubCampanha = /** @type {const} */ ([
+  ["inicio", els.btnCampanhaVistaInicio],
+  ["competicoes", els.btnCampanhaVistaCompeticoes],
+  ["calendario", els.btnCampanhaVistaCalendario],
+  ["campeoes", els.btnCampanhaVistaCampeoes],
+]);
+for (const [vista, btn] of vistasHubCampanha) {
+  btn?.addEventListener("click", () => {
+    definirVistaHubCampanha(/** @type {"inicio"|"competicoes"|"calendario"|"campeoes"} */ (vista));
+  });
+}
+els.campanhaHubCalAnoSelect?.addEventListener("change", () => pintarCampanhaHubCalendarioPane());
+els.campanhaHubCampeoesAnoSelect?.addEventListener("change", () => pintarCampanhaHubCampeoesPane());
+els.campanhaHubCampeoesCompSelect?.addEventListener("change", () => pintarCampanhaHubCampeoesPane());
+
+els.btnCampanhaSimResultadoOk?.addEventListener("click", () => {
+  confirmarSimulacaoCampanhaHubAplicarEFinalizar();
+});
+
 els.btnCampanhaHubVoltarMenu?.addEventListener("click", () => {
+  if (campanhaSimulacaoPendenteFinalizar) {
+    campanhaSimulacaoPendenteFinalizar = null;
+    campanhaEventoAtualId = null;
+    esconderOverlayResultadoSimulacaoCampanha();
+  }
   tipoModoJogo = "amistoso";
   campanhaEventoAtualId = null;
   if (els.telaCampanha) {
@@ -6711,7 +7432,7 @@ function copaHubBotoesJogoOcultar() {
 
 /**
  * @param {string | undefined} textoProximo texto do botão “Próximo jogo” / “Entrar em campo” / etc.
- * @param {{ mostrarSimular?: boolean }} [opts] após a 3.ª rodada de grupos, “Simular próximo jogo” fica oculto (só “Ir ao mata-mata” avança a classificação).
+ * @param {{ mostrarSimular?: boolean }} [opts] após a 3.ª rodada de grupos, "Simular próximo jogo" fica oculto (só "Ir ao mata-mata" avança a classificação).
  */
 function copaHubBotoesJogoMostrar(textoProximo, opts) {
   opts = opts ?? {};

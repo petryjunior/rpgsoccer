@@ -1,5 +1,5 @@
 /**
- * Histórico persistido de campeões: Copa do Mundo + todos os torneios continentais por ano civil.
+ * Histórico persistido de campeões: Copa do Mundo + todos os torneios continentais por ano.
  */
 
 import {
@@ -42,7 +42,7 @@ export function registrarCampeaoCampanha(estado, r) {
 
 /**
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
- * @param {number} anoMundial ano civil do Mundial (ex.: 2030)
+ * @param {number} anoMundial ano do Mundial (ex.: 2030)
  * @param {string} vencedorSelecaoId
  */
 export function registrarCampeaoCopaMundialCampanha(estado, anoMundial, vencedorSelecaoId) {
@@ -89,7 +89,7 @@ function simularCampeaoMiniTorneio(pool, rng) {
 }
 
 /**
- * Ao encerrar o ano civil: um campeão por confederação que teve edição do torneio continental.
+ * Ao encerrar o ano: um campeão por confederação que teve edição do torneio continental.
  * A confederação do jogador usa `torneioContinental.campeaoContinentalId` quando a fase terminou;
  * as demais são simuladas (CPU).
  *

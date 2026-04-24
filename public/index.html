@@ -30,7 +30,7 @@
           <button
             type="button"
             id="btn-menu-carregar-copa"
-            class="btn sec menu-mod-btn"
+            class="btn pri menu-mod-btn"
             onclick="(function(){var cfg=document.getElementById('tela-configuracoes');if(cfg){cfg.style.display='none';cfg.setAttribute('hidden','');}var fn=window.__qwertyFootballAbrirTelaCarregarCopa;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
           >
             Carregar Copa
@@ -46,7 +46,7 @@
           <button
             type="button"
             id="btn-menu-configuracoes"
-            class="btn sec menu-mod-btn"
+            class="btn pri menu-mod-btn"
             onclick="(function(){var i=document.getElementById('tela-inicio');var cfg=document.getElementById('tela-configuracoes');if(i){i.style.display='none';i.setAttribute('hidden','');}if(cfg){cfg.style.removeProperty('display');cfg.removeAttribute('hidden');}var fn=window.__qwertyFootballAoAbrirConfiguracoes;if(typeof fn==='function'){try{fn();}catch(e){console.error(e);}}})()"
           >
             Configurações
@@ -66,15 +66,15 @@
           <div class="config-radio-linhas">
             <label class="config-radio-linha">
               <input type="radio" name="qwerty-dificuldade" value="facil" />
-              Fácil — desafios de letra ~25% mais lentos que na média
+              Fácil
             </label>
             <label class="config-radio-linha">
               <input type="radio" name="qwerty-dificuldade" value="media" checked />
-              Média — equilíbrio atual do jogo
+              Média
             </label>
             <label class="config-radio-linha">
               <input type="radio" name="qwerty-dificuldade" value="dificil" />
-              Difícil — desafios de letra ~25% mais rápidos que na média
+              Difícil
             </label>
           </div>
         </fieldset>
@@ -93,7 +93,7 @@
 
     <div id="tela-campanha" class="tela-menu tela-campanha" hidden>
       <div class="tela-menu-inner tela-campanha-inner">
-        <h2 class="tela-menu-titulo">Modo Campanha</h2>
+        <h2 class="tela-menu-titulo">Campanha</h2>
 
         <div id="campanha-passo-inicio" class="campanha-passo">
           <p class="tela-menu-sub">
@@ -131,17 +131,98 @@
         </div>
 
         <div id="campanha-passo-hub" class="campanha-passo" hidden>
-          <p id="campanha-hub-resumo" class="tela-menu-sub"></p>
-          <div id="campanha-hub-torneio" class="campanha-hub-torneio" hidden aria-label="Tabelas do torneio continental"></div>
-          <div id="campanha-hub-elims" class="campanha-hub-torneio campanha-hub-elims" hidden aria-label="Tabelas das eliminatórias da Copa"></div>
-          <p id="campanha-hub-eventos-titulo-ano" class="campanha-hub-calendario-titulo tela-menu-sub"></p>
-          <ul id="campanha-hub-eventos" class="campanha-hub-eventos" aria-label="Calendário da temporada em andamento"></ul>
-          <div id="campanha-hub-eventos-historico" class="campanha-hub-eventos-historico" hidden aria-label="Calendários de anos anteriores"></div>
-          <div
-            id="campanha-hub-campeoes-historico"
-            class="campanha-hub-campeoes-historico"
-            aria-label="Histórico de campeões"
-          ></div>
+          <div id="campanha-hub-cabecalho-jogador" class="campanha-hub-cabecalho-jogador"></div>
+          <nav class="campanha-hub-tabs" role="tablist" aria-label="Secções do hub da campanha">
+            <button
+              type="button"
+              id="btn-campanha-vista-inicio"
+              class="campanha-hub-tab campanha-hub-tab--ativo"
+              role="tab"
+              aria-selected="true"
+              data-campanha-hub-vista="inicio"
+            >
+              Início
+            </button>
+            <button
+              type="button"
+              id="btn-campanha-vista-competicoes"
+              class="campanha-hub-tab"
+              role="tab"
+              aria-selected="false"
+              data-campanha-hub-vista="competicoes"
+            >
+              Competições
+            </button>
+            <button
+              type="button"
+              id="btn-campanha-vista-calendario"
+              class="campanha-hub-tab"
+              role="tab"
+              aria-selected="false"
+              data-campanha-hub-vista="calendario"
+            >
+              Calendário
+            </button>
+            <button
+              type="button"
+              id="btn-campanha-vista-campeoes"
+              class="campanha-hub-tab"
+              role="tab"
+              aria-selected="false"
+              data-campanha-hub-vista="campeoes"
+            >
+              Campeões
+            </button>
+          </nav>
+
+          <div id="campanha-hub-pane-inicio" class="campanha-hub-pane" role="tabpanel">
+            <section class="campanha-hub-secao" aria-labelledby="campanha-hub-tit-proximo">
+              <h3 id="campanha-hub-tit-proximo" class="campanha-hub-secao-titulo">Próximo jogo</h3>
+              <div id="campanha-hub-proximo-jogo-conteudo" class="campanha-hub-proximo-conteudo tela-menu-sub"></div>
+            </section>
+            <div
+              id="campanha-hub-tabelas-proximo"
+              class="campanha-hub-tabelas-proximo campanha-hub-torneio"
+              hidden
+              aria-live="polite"
+            ></div>
+          </div>
+
+          <div id="campanha-hub-pane-competicoes" class="campanha-hub-pane" role="tabpanel" hidden>
+            <div id="campanha-hub-torneio" class="campanha-hub-torneio" hidden aria-label="Tabelas do torneio continental"></div>
+            <div id="campanha-hub-elims" class="campanha-hub-torneio campanha-hub-elims" hidden aria-label="Tabelas das eliminatórias da Copa"></div>
+          </div>
+
+          <div id="campanha-hub-pane-calendario" class="campanha-hub-pane" role="tabpanel" hidden>
+            <p class="tela-menu-sub campanha-hub-cal-toolbar">
+              <label for="campanha-hub-cal-ano-select">Ano</label>
+              <select id="campanha-hub-cal-ano-select" class="campanha-hub-select-ano"></select>
+            </p>
+            <p id="campanha-hub-eventos-titulo-ano" class="campanha-hub-calendario-titulo tela-menu-sub"></p>
+            <ul id="campanha-hub-eventos" class="campanha-hub-eventos" aria-label="Calendário do ano selecionado"></ul>
+          </div>
+
+          <div id="campanha-hub-pane-campeoes" class="campanha-hub-pane" role="tabpanel" hidden>
+            <div class="tela-menu-sub campanha-hub-campeoes-toolbar">
+              <span class="campanha-hub-campeoes-filtro">
+                <label for="campanha-hub-campeoes-ano-select">Ano</label>
+                <select id="campanha-hub-campeoes-ano-select" class="campanha-hub-select-ano">
+                  <option value="">Todos os anos</option>
+                </select>
+              </span>
+              <span class="campanha-hub-campeoes-filtro">
+                <label for="campanha-hub-campeoes-comp-select">Competição</label>
+                <select
+                  id="campanha-hub-campeoes-comp-select"
+                  class="campanha-hub-select-ano campanha-hub-campeoes-comp-select"
+                >
+                  <option value="">Todas as competições</option>
+                </select>
+              </span>
+            </div>
+            <div id="campanha-hub-campeoes-conteudo" class="campanha-hub-campeoes-conteudo" aria-live="polite"></div>
+          </div>
+
           <div class="tela-menu-acoes">
             <button type="button" id="btn-campanha-copa-2030" class="btn pri" hidden>
               Copa do Mundo (campanha)
@@ -152,6 +233,21 @@
             <button type="button" id="btn-campanha-jogar-proximo" class="btn pri" disabled>Jogar próximo evento</button>
             <button type="button" id="btn-campanha-refazer-convocacao" class="btn sec">Refazer convocação</button>
             <button type="button" id="btn-campanha-hub-voltar-menu" class="btn sec">Voltar ao menu principal</button>
+          </div>
+        </div>
+      </div>
+      <div
+        id="campanha-sim-resultado-overlay"
+        class="campanha-sim-overlay"
+        hidden
+        aria-modal="true"
+        role="dialog"
+        aria-label="Resultado da partida simulada"
+      >
+        <div class="campanha-sim-panel">
+          <div id="campanha-sim-resultado-conteudo" class="campanha-sim-conteudo tela-menu-sub"></div>
+          <div class="tela-menu-acoes campanha-sim-acoes">
+            <button type="button" id="btn-campanha-sim-resultado-ok" class="btn pri">Continuar</button>
           </div>
         </div>
       </div>
@@ -331,7 +427,7 @@
           <div id="copa-chave-wrap" class="copa-chave-wrap" hidden>
             <h3 class="copa-subtitulo">Chave do mata-mata (FIFA)</h3>
             <p class="copa-chave-hint tela-menu-sub">
-              Formato 48 equipas: 12 grupos; após a fase de grupos entram 32 no mata-mata (rodada de 32 com cruzamentos definidos, depois oitavas em pares de vencedores). Nas quartas, cruzamento 1×3, 2×4, 5×7 e 6×8. Os jogos sem a sua seleção são simulados ao abrir a fase; o destaque de vencedor só aparece depois que você joga o seu jogo desta fase.
+              Formato com 48 seleções: 12 grupos; após a fase de grupos entram 32 no mata-mata (rodada de 32 com cruzamentos definidos, depois oitavas em pares de vencedores). Nas quartas, cruzamento 1×3, 2×4, 5×7 e 6×8. Os jogos sem a sua seleção são simulados ao abrir a fase; o destaque de vencedor só aparece depois que você joga o seu jogo desta fase.
             </p>
             <div id="copa-chave" class="copa-chave" aria-label="Chaveamento completo"></div>
           </div>

@@ -204,7 +204,7 @@ export function dadosTorneioContinental(selecaoId) {
 }
 
 /**
- * Há fase final da competição continental da confederação nesse ano civil,
+ * Há fase final da competição continental da confederação nesse ano,
  * em linha com o calendário real (aproximação; atualize listas/regras quando a FIFA/CONMEBOL/etc. mudarem).
  * @param {ConfedKey} confKey
  * @param {number} ano

@@ -1,5 +1,5 @@
 /**
- * 1.ª temporada da campanha começa neste ano civil.
+ * 1.ª temporada da campanha começa neste ano.
  * 2026 fica de fora (Copa do Mundo / sem eliminatórias no jogo).
  */
 export const ANO_BASE_CAMPANHA = 2027;
@@ -32,6 +32,19 @@ const MESES_PT = [
 export function textoMesAno(mes, ano) {
   const m = Math.max(1, Math.min(12, mes | 0));
   return `${MESES_PT[m - 1]} de ${ano}`;
+}
+
+/**
+ * Formato curto para o hub (ex.: 03/27): mês com dois dígitos e ano com dois dígitos.
+ * @param {number} mes 1–12
+ * @param {number} ano ano completo (ex.: 2027)
+ */
+export function textoMesAnoCurto(mes, ano) {
+  const m = Math.max(1, Math.min(12, mes | 0));
+  const a = Number(ano);
+  const yy = Number.isFinite(a) ? (((Math.trunc(a) % 100) + 100) % 100) : NaN;
+  const yyStr = Number.isFinite(yy) ? String(yy).padStart(2, "0") : "??";
+  return `${String(m).padStart(2, "0")}/${yyStr}`;
 }
 
 /**

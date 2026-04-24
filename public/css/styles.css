@@ -2504,6 +2504,371 @@ body {
   color: var(--muted);
 }
 
+.campanha-hub-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+}
+
+.campanha-hub-tab {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--borda);
+  background: var(--painel);
+  color: var(--texto);
+  cursor: pointer;
+}
+
+.campanha-hub-tab:hover {
+  border-color: var(--verde-claro, #5cb85c);
+}
+
+.campanha-hub-tab--ativo {
+  background: var(--verde-escuro, #2d7a52);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 650;
+}
+
+/* Ações do hub: mesma escala tipográfica das abas (Início, Competições, …) */
+#campanha-passo-hub > .tela-menu-acoes .btn {
+  font-size: 0.9rem;
+  padding: 0.4rem 0.85rem;
+}
+
+.campanha-hub-pane {
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.campanha-hub-cabecalho-jogador {
+  margin: 0 0 0.75rem;
+}
+
+.campanha-hub-cabecalho-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+}
+
+.campanha-hub-cabecalho-texto {
+  text-align: center;
+}
+
+.campanha-hub-cab-flag {
+  flex-shrink: 0;
+  border-radius: 6px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+}
+
+.campanha-hub-cabecalho-nome {
+  margin: 0 0 0.2rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.campanha-hub-cabecalho-data {
+  margin: 0;
+}
+
+.campanha-hub-secao-titulo {
+  margin: 0.85rem 0 0.45rem;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.campanha-hub-tabelas-proximo {
+  margin-top: 0.75rem;
+}
+
+.campanha-hub-proximo-par {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.35rem;
+  line-height: 1.45;
+}
+
+.campanha-hub-proximo-confronto {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  vertical-align: middle;
+}
+
+.campanha-hub-cal-toolbar {
+  margin: 0 0 0.65rem;
+}
+
+.campanha-hub-select-ano {
+  margin-left: 0.5rem;
+  font: inherit;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--borda);
+  background: var(--painel);
+  color: var(--texto);
+}
+
+.campanha-hub-campeoes-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.65rem 1.35rem;
+  margin: 0 0 0.45rem;
+}
+
+.campanha-hub-campeoes-filtro {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.campanha-hub-campeoes-comp-select {
+  min-width: 10rem;
+  max-width: min(100%, 24rem);
+}
+
+.campanha-hub-campeoes-conteudo {
+  margin-top: 0.35rem;
+}
+
+/* Não usar só `display: flex` aqui: sobrescreve `[hidden]` e o modal fica sempre visível na tela Campanha. */
+.campanha-sim-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.campanha-sim-overlay[hidden] {
+  display: none !important;
+}
+
+.campanha-sim-overlay:not([hidden]) {
+  display: flex;
+}
+
+.campanha-sim-panel {
+  max-width: min(52rem, 96vw);
+  width: 100%;
+  max-height: min(90vh, 38rem);
+  overflow: auto;
+  padding: 0;
+  border-radius: 14px;
+  border: 1px solid rgba(201, 162, 39, 0.35);
+  background: linear-gradient(165deg, #1a2430 0%, #121a22 48%, #0f1419 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 20px 50px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  text-align: left;
+}
+
+.campanha-sim-conteudo {
+  margin: 0;
+  padding: 0.55rem 0 0.85rem;
+  line-height: 1.45;
+}
+
+/* Card estilo transmissão: placar + duas colunas (mandante | visitante) */
+.campanha-sim-broadcast {
+  --campanha-sim-broadcast-accent: #e8c547;
+}
+
+.campanha-sim-broadcast-score {
+  padding: 0.65rem 1rem 0.75rem;
+  border-bottom: 2px solid rgba(201, 162, 39, 0.45);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, transparent 100%);
+}
+
+.campanha-sim-conteudo .campanha-sim-placar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem 1rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  text-align: center;
+}
+
+.campanha-sim-placar-num {
+  white-space: nowrap;
+}
+
+.campanha-sim-placar-num--broadcast {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--texto);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+}
+
+.campanha-sim-placar-num--broadcast strong {
+  min-width: 1.35ch;
+  text-align: center;
+  color: var(--campanha-sim-broadcast-accent);
+}
+
+.campanha-sim-placar-x {
+  font-size: 1.1rem;
+  font-weight: 600;
+  opacity: 0.55;
+  padding: 0 0.1rem;
+}
+
+.campanha-sim-placar .nome-com-bandeira {
+  font-weight: 650;
+}
+
+.campanha-sim-placar-lado {
+  max-width: min(42vw, 11rem);
+}
+
+.campanha-sim-placar-lado .nome-com-bandeira {
+  justify-content: center;
+  text-align: left;
+}
+
+.campanha-sim-broadcast-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  min-height: 0;
+}
+
+@media (max-width: 520px) {
+  .campanha-sim-broadcast-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .campanha-sim-broadcast-col:first-child {
+    border-right: none;
+    border-bottom: 1px solid rgba(42, 53, 68, 0.9);
+  }
+}
+
+.campanha-sim-broadcast-col {
+  padding: 0.75rem 0.85rem 0.9rem;
+  border-right: 1px solid rgba(42, 53, 68, 0.75);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 42%);
+}
+
+.campanha-sim-broadcast-col:last-child {
+  border-right: none;
+}
+
+.campanha-sim-broadcast-col-head {
+  margin-bottom: 0.55rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.2);
+}
+
+.campanha-sim-broadcast-col-team .nome-com-bandeira {
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.campanha-sim-broadcast-sec {
+  margin-top: 0.55rem;
+}
+
+.campanha-sim-broadcast-sec:first-of-type {
+  margin-top: 0.35rem;
+}
+
+.campanha-sim-broadcast-sec-tit {
+  margin: 0 0 0.28rem;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.campanha-sim-broadcast-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+}
+
+.campanha-sim-broadcast-list li {
+  position: relative;
+  margin: 0;
+  padding: 0.22rem 0 0.22rem 0.65rem;
+  border-left: 2px solid rgba(201, 162, 39, 0.35);
+  color: var(--texto);
+}
+
+.campanha-sim-broadcast-list li + li {
+  margin-top: 0.08rem;
+}
+
+.campanha-sim-broadcast-empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.campanha-sim-broadcast-notas {
+  padding: 0.55rem 1rem 0.15rem;
+  border-top: 1px solid rgba(42, 53, 68, 0.85);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.campanha-sim-broadcast-nota {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.campanha-sim-broadcast-nota:first-child {
+  margin-top: 0;
+}
+
+.campanha-sim-acoes {
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid rgba(42, 53, 68, 0.75);
+  background: rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+
+.nome-com-bandeira {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.campanha-inline-flag {
+  flex-shrink: 0;
+  border-radius: 2px;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.35);
+  vertical-align: middle;
+}
+
 .campanha-hub-torneio {
   margin: 0.65rem 0 0.85rem;
   padding: 0.55rem 0.65rem 0.65rem;
@@ -2595,6 +2960,10 @@ body {
   padding: 0.45rem 0.5rem;
   border-bottom: 1px solid var(--borda);
   color: var(--muted);
+}
+
+.campanha-hub-eventos li > .campanha-hub-proximo-par {
+  margin: 0;
 }
 
 .campanha-hub-eventos li.campanha-ev-feito {
@@ -2691,6 +3060,10 @@ body {
   padding: 0.2rem 0;
 }
 
+.campanha-hub-campeoes-linha-pre {
+  color: var(--muted);
+}
+
 .campanha-hub-campeoes-lista {
   list-style: none;
   margin: 0.45rem 0 0;
@@ -2698,9 +3071,18 @@ body {
 }
 
 .campanha-hub-campeoes-lista li {
-  padding: 0.35rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.35rem;
+  padding: 0.4rem 0;
   border-bottom: 1px solid var(--borda);
   font-size: 0.95rem;
+}
+
+.campanha-hub-campeoes-lista li .nome-com-bandeira {
+  color: var(--texto);
+  font-weight: 600;
 }
 
 .campanha-hub-campeoes-lista li:last-child {

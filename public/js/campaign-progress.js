@@ -7,7 +7,7 @@ import { hashStringToSeed, statsPorPosicaoCampanha, forcaMediaTitularesSelecao }
 import { criarRng } from "./world-cup.js";
 
 /**
- * Probabilidade de aposentadoria + regeneração (filho) ao fim do ano civil, após +1 idade.
+ * Probabilidade de aposentadoria + regeneração (filho) ao fim do ano, após +1 idade.
  * @param {number} idade idade atual do jogador (já incrementada para o novo ano).
  */
 export function chanceAposentadoriaRegenPorIdade(idade) {
@@ -169,7 +169,7 @@ export function snapshotReferenciasTemporadaCampanha(jogadores) {
 }
 
 /**
- * +1 ano civil por temporada concluída no calendário da campanha.
+ * +1 ano por temporada concluída no calendário da campanha.
  * @param {import('./campaign-pool.js').JogadorCampanha[]} jogadores
  */
 export function incrementarIdadeElencoCampanha(jogadores) {
@@ -181,7 +181,7 @@ export function incrementarIdadeElencoCampanha(jogadores) {
 /**
  * Após uma partida: oscilações maiores no mesmo ano (forma + ruído; viés por idade).
  * Opcional: `minutosPorJogadorId` — só quem jogou >0 min recebe intensidade extra (jovem sobe mais, veterano desce mais).
- * Opcional: `idsBonusAttrMaiorInicio` — bónus raro (ex.: atributo acima do snapshot do após duelos fortes).
+ * Opcional: `idsBonusAttrMaiorInicio` — bônus raro (ex.: atributo acima do snapshot do após duelos fortes).
  * @param {import('./campaign-pool.js').JogadorCampanha[]} todosJogadores
  * @param {Set<string>} idsConvocados
  * @param {number} seed

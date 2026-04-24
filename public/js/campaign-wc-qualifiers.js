@@ -43,7 +43,7 @@ export function anosTresEliminatoriasAntesDaCopa(anoCopa) {
 }
 
 /**
- * @param {number} ano civil (calendário da campanha)
+ * @param {number} ano Ano do calendário da campanha
  * @returns {boolean}
  */
 export function anoComEliminatoriasCopa(ano) {
@@ -70,7 +70,7 @@ export function copaAlvoEliminatoriasDoAno(anoCivil) {
 }
 
 /**
- * Ano civil em que se disputa a Copa (jun/jul no jogo).
+ * Ano em que se disputa a Copa (jun/jul no jogo).
  * @param {number} ano
  */
 export function anoEhCopaMundialCampanha(ano) {
@@ -115,7 +115,7 @@ function janelasFifaWcqParaCopa(anoCopa) {
 }
 
 /**
- * Vagas por confederação no formato de 48 equipas (próximo do alvo FIFA 2026; total 48).
+ * Vagas por confederação no formato de 48 seleções (próximo do alvo FIFA 2026; total 48).
  * @type {Record<import('./campaign-confederation.js').ConfedKey, number>}
  */
 export const VAGAS_COPA_POR_CONFEDERACAO = {
@@ -380,7 +380,7 @@ const TEXTO_VAGAS_POR_CONFEDERACAO =
   "UEFA 16, CONMEBOL 7, CAF 9, CONCACAF 7, AFC 8, OFC 1";
 
 /**
- * Regras e quotas das eliminatórias no hub.
+ * Regras e cotas das eliminatórias no hub.
  * @param {import('./campaign-tournament.js').TorneioContinentalEstado | null | undefined} T
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido | null | undefined} [estado] para o ano-alvo da Copa no ciclo
  */
@@ -473,7 +473,7 @@ export function agregarPontosEliminatoriasDoAno(estado, rng) {
     return;
   }
   // Não simular aqui todas as partidas de grupo: isso preenchia o motor antes do calendário
-  // (jogos de anos futuros apareciam com placar e a tabela com 6 jogos por equipa).
+  // (jogos de anos futuros apareciam com placar e a tabela com 6 jogos por seleção).
   // Partidas CPU×CPU fora da rodada do humano são resolvidas em `simularRodadaGruposExcetoPar`;
   // pontos anuais usam só jogos já decididos (`gh >= 0`).
   if (!estado.wcqPontosAcumulados) estado.wcqPontosAcumulados = {};
@@ -660,7 +660,7 @@ export function classificadosUefaCopaPorTabelaFinalGrupos(estado, idsTodos, rng)
 }
 
 /**
- * Define os 48 classificados (quotas por confederação + ranking dentro de cada pool).
+ * Define os 48 classificados (cotas por confederação + ranking dentro de cada pool).
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
  * @param {string[]} idsTodos
  * @param {() => number} rng

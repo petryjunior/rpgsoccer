@@ -203,7 +203,7 @@ export {
   confederacaoId,
   dadosTorneioContinental,
 } from "./campaign-confederation.js";
-export { ANO_BASE_CAMPANHA, textoMesAno } from "./campaign-dates.js";
+export { ANO_BASE_CAMPANHA, textoMesAno, textoMesAnoCurto } from "./campaign-dates.js";
 export {
   proximoEventoPendente,
   criarCalendarioTemporada,

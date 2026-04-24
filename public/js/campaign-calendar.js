@@ -264,7 +264,7 @@ export function garantirEventoCopaMundialNoCalendarioAtual(estado) {
 /**
  * @param {string} selecaoPlayerId
  * @param {string[]} idsSelecoes todas as seleções (inclui jogador)
- * @param {number} anoCalendario ano civil da janela (ex.: 2027)
+ * @param {number} anoCalendario ano da janela (ex.: 2027)
  * @param {() => number} rng
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido | null | undefined} [estadoCampanha] quando definido, preserva eliminatórias (ciclo 2027–29) e injeta só jogos WCQ daquele ano
  * @returns {{ eventos: EventoCampanha[], torneioContinental: object | null, eliminatoriasCopa: object | null }}
@@ -393,7 +393,7 @@ export function proximoEventoPendente(eventos) {
 
 /**
  * True se todos os eventos que precedem o slot da Copa na ordem do calendário já estão concluídos.
- * Sem evento `copa_mundial` nesse ano civil, devolve true (não bloqueia o botão do hub).
+ * Sem evento `copa_mundial` nesse ano, devolve true (não bloqueia o botão do hub).
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
  * @param {number} anoCivil
  */
@@ -417,7 +417,7 @@ export function jogouTudoAntesDoSlotCopaMundialNoCalendario(estado, anoCivil) {
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
  */
 /**
- * Guarda uma cópia do calendário do ano civil antes de substituir por `criarCalendarioTemporada`.
+ * Guarda uma cópia do calendário do ano antes de substituir por `criarCalendarioTemporada`.
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado
  * @param {number} anoCivilQueTermina
  */

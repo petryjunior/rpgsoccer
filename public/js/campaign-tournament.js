@@ -607,7 +607,7 @@ function todasPartidasHumanoNoGrupoDecididas(T) {
 }
 
 /**
- * Há no calendário civil um jogo de grupos desta competição ainda por disputar (próximo passo do jogador).
+ * Há no calendário um jogo de grupos desta competição ainda por disputar (próximo passo do jogador).
  * Evita que `repararFaseGruposTorneioCampanha` chame `simularPartidasPendentesTodosGrupos` após um amistoso
  * e resolva em massa o resto dos grupos — incluindo o próximo WCQ — só porque o reparo abriu o hub.
  * @param {import('./campaign-storage.js').CampanhaEstadoPersistido} estado

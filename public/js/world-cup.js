@@ -1,8 +1,8 @@
 /**
- * Modo Copa do Mundo — formato FIFA 2026 (48 equipas):
+ * Modo Copa do Mundo — formato FIFA 2026 (48 seleções):
  * 12 grupos de 4; classificam os 2 primeiros + os 8 melhores terceiros (32 no mata-mata);
  * dezesseis-avos (16 jogos) → oitavas (8) → quartas → semifinais → final.
- * Critérios dos terceiros entre grupos: pontos, saldo, golos marcados, golos sofridos, “ranking” (força média).
+ * Critérios dos terceiros entre grupos: pontos, saldo, gols marcados, gols sofridos, “ranking” (força média).
  */
 
 /**
@@ -121,7 +121,7 @@ function sortear48IdsCopaComQuotasInterno(todasSelecoes, playerTeamId, rng, vaga
   }
   if (somaVagas !== COPA_TOTAL_EQUIPES) {
     throw new Error(
-      `Copa: quotas por confederação devem somar ${COPA_TOTAL_EQUIPES} (soma atual: ${somaVagas}).`,
+      `Copa: as cotas por confederação devem somar ${COPA_TOTAL_EQUIPES} (soma atual: ${somaVagas}).`,
     );
   }
   /** @type {Record<string, { id: string, titulares: { ataque: number, defesa: number }[] }[]>} */
@@ -139,7 +139,7 @@ function sortear48IdsCopaComQuotasInterno(todasSelecoes, playerTeamId, rng, vaga
   }
   const pConf = confederacaoDeId(playerTeamId);
   if (restante[pConf] == null || restante[pConf] < 1) {
-    throw new Error(`Copa: quota inválida para a confederação da sua seleção (${pConf}).`);
+    throw new Error(`Copa: cota inválida para a confederação da sua seleção (${pConf}).`);
   }
   /** @type {Set<string>} */
   const ids = new Set([playerTeamId]);
@@ -151,7 +151,7 @@ function sortear48IdsCopaComQuotasInterno(todasSelecoes, playerTeamId, rng, vaga
       const pool = (porConf[k] ?? []).filter((s) => !ids.has(s.id));
       if (!pool.length) {
         throw new Error(
-          `Copa: não há seleções suficientes na confederação ${k} para preencher a quota (${need - n} vaga(s) em falta).`,
+          `Copa: não há seleções suficientes na confederação ${k} para preencher a cota (${need - n} vaga(s) em falta).`,
         );
       }
       const esc = escolherUmaSelecaoPesoInscricao(pool, rng);
@@ -162,14 +162,14 @@ function sortear48IdsCopaComQuotasInterno(todasSelecoes, playerTeamId, rng, vaga
 }
 
 /**
- * Opções do sorteio das 48 vagas (modo Copa avulsa com quotas por confederação).
+ * Opções do sorteio das 48 vagas (modo Copa avulsa com cotas por confederação).
  * @typedef {{ vagasPorConfederacao: Record<string, number>, confederacaoDeId: (id: string) => string }} Sorteio48QuotasOpts
  */
 
 /**
  * Escolhe 48 seleções: a do jogador entra sempre; as outras obedecem ao critério indicado em `opts`.
  *
- * - **Com `opts`**: quotas por confederação (ex.: mesmas da campanha); dentro de cada confederação,
+ * - **Com `opts`**: cotas por confederação (ex.: mesmas da campanha); dentro de cada confederação,
  *   sorteio sem reposição com probabilidade proporcional a `pesoInscricaoCopa` (força dos titulares).
  * - **Sem `opts`**: legado — 47 vagas globais só por peso (não garante distribuição por confederação).
  *
@@ -282,7 +282,7 @@ export function montarEstadoCopaCom48Ids(ids48, playerTeamId, seed, opts) {
       effectivePlayerId = ids48[0];
     }
   } else if (!ids48.includes(playerTeamId)) {
-    throw new Error(`Copa: a sua seleção tem de estar entre as ${COPA_TOTAL_EQUIPES}.`);
+    throw new Error(`Copa: sua seleção precisa estar entre as ${COPA_TOTAL_EQUIPES}.`);
   }
   const rng = opts.rng ?? criarRng(seed >>> 0);
   const grupos = sortearGrupos(ids48, rng);
@@ -841,7 +841,7 @@ export function jogadorQualificaParaMataMata48(
 }
 
 /**
- * Oitavas de final (16 equipas): vencedores da R32 em ordem dos jogos → 8 partidas.
+ * Oitavas de final (16 seleções): vencedores da R32 em ordem dos jogos → 8 partidas.
  * @param {string[]} vencedoresR32 16 ids
  */
 export function montarOitavasDezesseisAvos(vencedoresR32) {
